@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ueransim.name" . }}-gnb
+  labels:
+    app.kubernetes.io/component: gnb
+    {{- include "ueransim.selectorLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/component: gnb
+    {{- include "ueransim.selectorLabels" . | nindent 4 }}
+  ports:
+  - name: rls
+    port: 4997
+    protocol: UDP
+  - name: health
+    port: 9999
+    protocol: TCP

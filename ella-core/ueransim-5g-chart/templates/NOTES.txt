@@ -1,0 +1,17 @@
+UERANSIM 5G Simulator Deployed
+
+  gNB: {{ include "ueransim.name" . }}-gnb
+  UE:  {{ include "ueransim.name" . }}-ue
+  UE supi: {{ .Values.subscriber.supi }}
+  AMF target: auto-detected from Ella Core leader (sidecar polling every 10s)
+
+Leader failover is automatic — the sidecar detects leader changes and the
+gNB restarts with the new AMF address without pod restarts.
+
+To check logs:
+  kubectl logs -n {{ .Release.Namespace }} deployment/{{ include "ueransim.name" . }}-gnb -c gnb
+  kubectl logs -n {{ .Release.Namespace }} deployment/{{ include "ueransim.name" . }}-gnb -c leader-watch
+  kubectl logs -n {{ .Release.Namespace }} deployment/{{ include "ueransim.name" . }}-ue -c ue
+
+To verify UE registration:
+  kubectl exec -n {{ .Release.Namespace }} deployment/{{ include "ueransim.name" . }}-ue -c ue -- ip addr show uesimtun0

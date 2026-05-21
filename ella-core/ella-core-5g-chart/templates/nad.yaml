@@ -1,0 +1,24 @@
+{{- range $name, $config := .Values.multus }}
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: core-{{ $name }}
+  labels:
+    {{- include "ella-core.selectorLabels" $ | nindent 4 }}
+spec:
+  config: |
+    {
+      "cniVersion": "0.3.1",
+      "type": "macvlan",
+      "master": "{{ $config.master }}",
+      "mode": "bridge",
+      "ipam": {
+        "type": "whereabouts",
+        "range": "{{ $config.subnet }}",
+        "range_start": "{{ $config.rangeStart }}",
+        "range_end": "{{ $config.rangeEnd }}"
+      },
+      "capabilities": {"mac": true}
+    }
+{{- end }}

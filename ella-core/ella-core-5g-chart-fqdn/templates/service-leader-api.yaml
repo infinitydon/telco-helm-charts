@@ -1,0 +1,25 @@
+{{- /*
+  Leader-aware NodePort service.
+  Initially matches all pods; the leader-watcher Deployment patches the selector
+  to point directly at the current Raft leader pod using its
+  statefulset.kubernetes.io/pod-name label.
+*/ -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ella-core.serviceName" . }}-leader-api
+  labels:
+    {{- include "ella-core.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: leader-api
+spec:
+  type: {{ .Values.leaderService.type }}
+  selector:
+    {{- include "ella-core.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: api
+      port: {{ .Values.api.port }}
+      targetPort: api
+      protocol: TCP
+      {{- if eq .Values.leaderService.type "NodePort" }}
+      nodePort: {{ .Values.leaderService.nodePort }}
+      {{- end }}

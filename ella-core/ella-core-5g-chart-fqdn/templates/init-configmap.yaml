@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ella-core.name" . }}-init-script
+  labels:
+    {{- include "ella-core.selectorLabels" . | nindent 4 }}
+data:
+  init.sh: |
+    #!/bin/sh
+    set -e
+
+    SVC="{{ include "ella-core.name" . }}"
+    NS="{{ include "ella-core.namespace" . }}"
+    REPLICAS="{{ .Values.statefulset.replicas }}"
+    RAFT_PORT="{{ .Values.raft.port }}"
+    API_PORT="{{ .Values.api.port }}"
+    N2_PORT="{{ .Values.n2.port }}"
+    XDP_MODE="{{ .Values.xdp.attachMode }}"
+    LOG_LEVEL="{{ .Values.logging.level }}"
+
+    NODE_ID=$(( ${HOSTNAME##*-} + 1 ))
+    OFFSET=${HOSTNAME##*-}
+
+    # Discover N2 IP from Multus interface for radio plane (gNB attachment)
+    N2_IP=$(ip -4 addr show n2 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | head -1)
+    if [ -z "${N2_IP}" ]; then
+      echo "ERROR: Could not determine N2 IP from interface n2"
+      exit 1
+    fi
+
+    echo "Node ID: ${NODE_ID}, N2: ${N2_IP}, Pod IP: ${POD_IP}, Host: ${HOSTNAME}"
+
+    # Write core.yaml
+    cat > /config/core.yaml << CORE_EOF
+    logging:
+      system:
+        level: "${LOG_LEVEL}"
+        output: "stdout"
+      audit:
+        output: "stdout"
+    db:
+      path: "/core/data/ella.db"
+    interfaces:
+      n2:
+        address: "${N2_IP}"
+        port: ${N2_PORT}
+      n3:
+        name: "n3"
+      n6:
+        name: "n6"
+      api:
+        address: "${POD_IP}"
+        port: ${API_PORT}
+    xdp:
+      attach-mode: "${XDP_MODE}"
+    cluster:
+      enabled: true
+      node-id: ${NODE_ID}
+      bind-address: "${POD_IP}:${RAFT_PORT}"
+      advertise-address: "${HOSTNAME}.${SVC}.${NS}.svc.cluster.local:${RAFT_PORT}"
+      peers:
+    CORE_EOF
+
+    # Write peer list. For follower nodes, existing nodes come first (join flow
+    # contacts them before self, avoiding self-contact race when Raft listener
+    # isn't ready yet).
+    if [ "${NODE_ID}" = "1" ]; then
+      {{- range $i := until (.Values.statefulset.replicas | int) }}
+      echo "    - {{ include "ella-core.peer" (dict "root" $ "idx" $i) }}" >> /config/core.yaml
+      {{- end }}
+    else
+      # Other peers first
+      i=0
+      while [ ${i} -lt ${OFFSET} ]; do
+        echo "    - ${SVC}-${i}.${SVC}.${NS}.svc.cluster.local:${RAFT_PORT}" >> /config/core.yaml
+        i=$((i + 1))
+      done
+      # Self last
+      echo "    - ${HOSTNAME}.${SVC}.${NS}.svc.cluster.local:${RAFT_PORT}" >> /config/core.yaml
+    fi
+
+    # For follower nodes: attach join token and wait for existing peers
+    if [ "${NODE_ID}" != "1" ]; then
+      echo "Waiting for join token..."
+      for i in $(seq 1 30); do
+        if [ -s "/tmp/join-tokens/node-${NODE_ID}" ]; then
+          TOKEN=$(cat "/tmp/join-tokens/node-${NODE_ID}")
+          echo "  join-token: \"${TOKEN}\"" >> /config/core.yaml
+          echo "Join token loaded for node ${NODE_ID}"
+          break
+        fi
+        sleep 2
+      done
+      if ! grep -q "join-token" /config/core.yaml; then
+        echo "ERROR: Join token for node ${NODE_ID} not found after 60s"
+        exit 1
+      fi
+
+      echo "Waiting for existing peers to be ready..."
+      j=0
+      while [ ${j} -lt ${OFFSET} ]; do
+        PEER="${SVC}-${j}.${SVC}.${NS}.svc.cluster.local"
+        echo "  Checking ${PEER}:${RAFT_PORT}..."
+        for attempt in $(seq 1 30); do
+          if nc -z -w 2 "${PEER}" ${RAFT_PORT} 2>/dev/null; then
+            echo "    ${PEER} ready"
+            break
+          fi
+          sleep 2
+        done
+        j=$((j + 1))
+      done
+    fi
+
+    echo "Generated config:"
+    cat /config/core.yaml

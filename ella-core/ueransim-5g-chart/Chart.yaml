@@ -1,0 +1,12 @@
+apiVersion: v2
+name: ueransim
+version: 1.0.0
+description: Helm chart for UERANSIM 5G UE/gNB simulator
+keywords:
+  - 5g
+  - ueransim
+  - gnb
+  - ue
+  - simulator
+maintainers:
+  - name: ueransim-helm

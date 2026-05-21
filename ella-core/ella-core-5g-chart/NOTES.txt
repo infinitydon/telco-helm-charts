@@ -1,0 +1,50 @@
+Ella Core 5G — HA Cluster Deployed
+
+{{- if eq (int .Values.statefulset.replicas) 3 }}
+  Cluster: {{ .Values.statefulset.replicas }} nodes (1 leader + 2 followers)
+{{- else }}
+  Cluster: {{ .Values.statefulset.replicas }} nodes
+{{- end }}
+  Raft port: {{ .Values.raft.port }}
+  XDP mode:  {{ .Values.xdp.attachMode }}
+
+Static IP range (Whereabouts CNI — deterministic per pod):
+  N2 (radio control): {{ .Values.multus.n2.rangeStart }}-{{ .Values.multus.n2.rangeEnd }}
+  N3 (user plane):    {{ .Values.multus.n3.rangeStart }}-{{ .Values.multus.n3.rangeEnd }}
+  N6 (data network):  {{ .Values.multus.n6.rangeStart }}-{{ .Values.multus.n6.rangeEnd }}
+
+  Pod 0 (node-1, leader) gets the FIRST IP in each range.
+  Pod 1 (node-2) gets the SECOND, Pod 2 (node-3) gets the THIRD.
+  IPs survive pod rescheduling.
+
+RAN Configuration:
+  Point gNBs to ALL 3 N2 IPs as an AMF Set:
+{{- if contains "10.10.0.10" .Values.multus.n2.rangeStart }}
+    AMF 1: 10.10.0.10  AMF 2: 10.10.0.11  AMF 3: 10.10.0.12
+{{- else }}
+    (calculated from .Values.multus.n2.rangeStart — first 3 addresses)
+{{- end }}
+
+Admin user:  {{ .Values.admin.email }}
+{{- if eq .Values.service.type "NodePort" }}
+API access (any pod):        http://<node-ip>:{{ .Values.service.nodePort }}
+{{- end }}
+{{- if eq .Values.leaderService.type "NodePort" }}
+Leader API (always leader):  http://<node-ip>:{{ .Values.leaderService.nodePort }}
+{{- end }}
+{{- if not (or (eq .Values.service.type "NodePort") (eq .Values.leaderService.type "NodePort")) }}
+API access:  via service {{ include "ella-core.serviceName" . }}-api:{{ .Values.api.port }}
+  Leader API: via service {{ include "ella-core.serviceName" . }}-leader-api:{{ .Values.api.port }}
+{{- end }}
+
+BGP: {{ if .Values.perNodeConfig.n6.bgp.enabled }}enabled (ASN {{ .Values.perNodeConfig.n6.bgp.asn }}){{ else }}disabled{{ end }}
+NAT: {{ if .Values.perNodeConfig.n6.natEnabled }}enabled{{ else }}disabled{{ end }}
+
+To check cluster health:
+  kubectl exec -n {{ .Release.Namespace }} statefulset/{{ include "ella-core.serviceName" . }} -c core -- \
+    curl -s http://localhost:{{ .Values.api.port }}/api/v1/cluster/autopilot
+
+Rolling upgrade:
+  kubectl exec -n {{ .Release.Namespace }} ella-core-2 -c core -- curl -s -X POST http://localhost:{{ .Values.api.port }}/api/v1/cluster/members/3/drain
+  kubectl set image -n {{ .Release.Namespace }} statefulset/{{ include "ella-core.serviceName" . }} core=<new-image>
+  kubectl exec -n {{ .Release.Namespace }} ella-core-2 -c core -- curl -s -X POST http://localhost:{{ .Values.api.port }}/api/v1/cluster/members/3/resume

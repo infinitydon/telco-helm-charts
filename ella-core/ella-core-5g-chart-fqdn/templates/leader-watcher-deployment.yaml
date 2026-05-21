@@ -1,0 +1,118 @@
+{{- /*
+  Leader Watcher Deployment: polls the Ella Core API every 10s to detect the
+  current Raft leader, then patches the ella-core-leader-api Service selector
+  to point directly at that pod via statefulset.kubernetes.io/pod-name.
+  This ensures the NodePort service always routes to the leader for UI access.
+*/ -}}
+{{- $svc := include "ella-core.name" . }}
+{{- $ns := include "ella-core.namespace" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $svc }}-leader-watcher
+  labels:
+    {{- include "ella-core.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: leader-watcher
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "ella-core.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: leader-watcher
+  template:
+    metadata:
+      labels:
+        {{- include "ella-core.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: leader-watcher
+    spec:
+      serviceAccountName: {{ $svc }}-leader-watcher
+      containers:
+      - name: watcher
+        image: {{ .Values.leaderWatcher.image.repository }}:{{ .Values.leaderWatcher.image.tag }}
+        imagePullPolicy: {{ .Values.leaderWatcher.image.pullPolicy }}
+        env:
+        - name: CORE_SVC
+          value: {{ $svc }}
+        - name: CORE_NS
+          value: {{ $ns }}
+        - name: CORE_API_PORT
+          value: {{ .Values.api.port | quote }}
+        - name: LEADER_SVC_NAME
+          value: {{ $svc }}-leader-api
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Leader watcher starting"
+          echo "  Core API: http://${CORE_SVC}-api.${CORE_NS}.svc.cluster.local:${CORE_API_PORT}"
+          echo "  Leader service: ${LEADER_SVC_NAME}"
+
+          PREVIOUS_LEADER=""
+          K8S_API="https://kubernetes.default.svc"
+
+          while true; do
+            API_TOKEN=$(cat /tmp/api-token/token 2>/dev/null || true)
+            K8S_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token 2>/dev/null || true)
+
+            if [ -z "${API_TOKEN}" ] || [ -z "${K8S_TOKEN}" ]; then
+              echo "$(date -Iseconds) Waiting for tokens..."
+              sleep 5
+              continue
+            fi
+
+            # Query Ella Core for the current leader
+            RESP=$(curl -s --connect-timeout 3 \
+              -H "Authorization: Bearer ${API_TOKEN}" \
+              "http://${CORE_SVC}-api.${CORE_NS}.svc.cluster.local:${CORE_API_PORT}/api/v1/cluster/members" 2>/dev/null || true)
+
+            # Extract leader nodeId: first grep isolates the leader JSON object,
+            # second extracts its nodeId, cut strips the label.
+            LEADER_NODE_ID=$(echo "${RESP}" | \
+              grep -o '{[^}]*"isLeader":true[^}]*}' | \
+              grep -o '"nodeId":[0-9]*' | cut -d: -f2 || true)
+
+            if [ -z "${LEADER_NODE_ID}" ]; then
+              echo "$(date -Iseconds) Could not determine leader (API unavailable or no leader elected)"
+              sleep 5
+              continue
+            fi
+
+            if [ "${LEADER_NODE_ID}" != "${PREVIOUS_LEADER}" ]; then
+              POD_INDEX=$((LEADER_NODE_ID - 1))
+              POD_NAME="${CORE_SVC}-${POD_INDEX}"
+              echo "$(date -Iseconds) Leader changed: nodeId=${PREVIOUS_LEADER:-<none>} -> nodeId=${LEADER_NODE_ID} (pod: ${POD_NAME})"
+
+              # Patch the leader service selector via Kubernetes API
+              PATCH_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k \
+                -H "Authorization: Bearer ${K8S_TOKEN}" \
+                -H "Content-Type: application/strategic-merge-patch+json" \
+                -X PATCH \
+                "${K8S_API}/api/v1/namespaces/${CORE_NS}/services/${LEADER_SVC_NAME}" \
+                -d "{\"spec\":{\"selector\":{\"statefulset.kubernetes.io/pod-name\":\"${POD_NAME}\"}}}" 2>/dev/null || echo "000")
+
+              if [ "${PATCH_CODE}" = "200" ]; then
+                echo "  Service selector patched -> ${POD_NAME}"
+                PREVIOUS_LEADER="${LEADER_NODE_ID}"
+              else
+                echo "  ERROR: Failed to patch service (HTTP ${PATCH_CODE})"
+              fi
+            fi
+
+            sleep 10
+          done
+        volumeMounts:
+        - name: api-token
+          mountPath: /tmp/api-token
+          readOnly: true
+        resources:
+          requests:
+            cpu: "10m"
+            memory: "32Mi"
+          limits:
+            cpu: "50m"
+            memory: "64Mi"
+      volumes:
+      - name: api-token
+        secret:
+          secretName: {{ $svc }}-ueransim-api-token
+          optional: true

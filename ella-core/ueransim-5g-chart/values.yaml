@@ -1,0 +1,63 @@
+image:
+  repository: free5gc/ueransim
+  tag: "v4.2.2"
+  pullPolicy: IfNotPresent
+
+initImage:
+  repository: alpine
+  tag: "3.21.7"
+  pullPolicy: IfNotPresent
+
+sidecarImage:
+  repository: alpine
+  tag: "3.21.7"
+  pullPolicy: IfNotPresent
+
+gnb:
+  name: ueransim-gnb
+  nci: "0x000000010"
+  idLength: 32
+  tac: "000001"
+  linkIp: "127.0.0.1"
+  slices:
+    sst: 0x01
+    sd: "1"
+
+subscriber:
+  supi: "imsi-001010000000001"
+  mcc: "001"
+  mnc: "01"
+  key: "465B5CE8B199B49FAA5F0A2EE238A6BC"
+  opc: "E8ED289DEBA952E4283B54E88E6183CA"
+  amf: "8000"
+  sqn: "000000000000"
+
+ellaCore:
+  namespace: ella-core
+  serviceName: ella-core
+  apiPort: 5002
+  apiTokenSecret: ella-core-ueransim-api-token
+
+interfaces:
+  n2:
+    master: "ens19"
+    subnet: "10.10.0.0/24"
+    rangeStart: "10.10.0.20"
+    rangeEnd: "10.10.0.20"
+  n3:
+    master: "ens20"
+    subnet: "10.10.1.0/24"
+    rangeStart: "10.10.1.20"
+    rangeEnd: "10.10.1.20"
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ella-core.name" . }}-init-script
+  labels:
+    {{- include "ella-core.selectorLabels" . | nindent 4 }}
+data:
+  init.sh: |
+    #!/bin/sh
+    set -e
+
+    SVC="{{ include "ella-core.name" . }}"
+    NS="{{ include "ella-core.namespace" . }}"
+    REPLICAS="{{ .Values.statefulset.replicas }}"
+    RAFT_PORT="{{ .Values.raft.port }}"
+    API_PORT="{{ .Values.api.port }}"
+    N2_PORT="{{ .Values.n2.port }}"
+    XDP_MODE="{{ .Values.xdp.attachMode }}"
+    LOG_LEVEL="{{ .Values.logging.level }}"
+
+    NODE_ID=$(( ${HOSTNAME##*-} + 1 ))
+    OFFSET=${HOSTNAME##*-}
+
+    # Discover N2 IP from Multus interface (stable via Whereabouts)
+    N2_IP=$(ip -4 addr show n2 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | head -1)
+    if [ -z "${N2_IP}" ]; then
+      echo "ERROR: Could not determine N2 IP from interface n2"
+      exit 1
+    fi
+
+    echo "Node ID: ${NODE_ID}, N2: ${N2_IP}, Pod IP: ${POD_IP}"
+
+    # Write core.yaml
+    cat > /config/core.yaml << CORE_EOF
+    logging:
+      system:
+        level: "${LOG_LEVEL}"
+        output: "stdout"
+      audit:
+        output: "stdout"
+    db:
+      path: "/core/data/ella.db"
+    interfaces:
+      n2:
+        address: "${N2_IP}"
+        port: ${N2_PORT}
+      n3:
+        name: "n3"
+      n6:
+        name: "n6"
+      api:
+        address: "${POD_IP}"
+        port: ${API_PORT}
+    xdp:
+      attach-mode: "${XDP_MODE}"
+    cluster:
+      enabled: true
+      node-id: ${NODE_ID}
+      bind-address: "${N2_IP}:${RAFT_PORT}"
+      advertise-address: "${N2_IP}:${RAFT_PORT}"
+      peers:
+        {{- range $i := until (.Values.statefulset.replicas | int) }}
+        - {{ include "ella-core.n2ip" (dict "root" $ "idx" $i) }}:{{ $.Values.raft.port }}
+        {{- end }}
+    CORE_EOF
+
+    # For follower nodes: attach join token
+    if [ "${NODE_ID}" != "1" ]; then
+      echo "Waiting for join token..."
+      for i in $(seq 1 30); do
+        if [ -s "/tmp/join-tokens/node-${NODE_ID}" ]; then
+          TOKEN=$(cat "/tmp/join-tokens/node-${NODE_ID}")
+          echo "  join-token: \"${TOKEN}\"" >> /config/core.yaml
+          echo "Join token loaded for node ${NODE_ID}"
+          break
+        fi
+        sleep 2
+      done
+      if ! grep -q "join-token" /config/core.yaml; then
+        echo "ERROR: Join token for node ${NODE_ID} not found after 60s"
+        exit 1
+      fi
+    fi
+
+    echo "Generated config:"
+    cat /config/core.yaml

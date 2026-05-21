@@ -1,0 +1,25 @@
+{{- /*
+  Headless service for pod DNS: ella-core-{0..N}.ella-core.<ns>.svc.cluster.local
+  publishNotReadyAddresses ensures DNS is available even before pods are ready,
+  which is required for OrderedReady StatefulSet startup.
+*/ -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ella-core.serviceName" . }}
+  labels:
+    {{- include "ella-core.selectorLabels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "ella-core.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: raft
+      port: {{ .Values.raft.port }}
+      targetPort: raft
+      protocol: TCP
+    - name: api
+      port: {{ .Values.api.port }}
+      targetPort: api
+      protocol: TCP

@@ -1,0 +1,110 @@
+# Ella Core image
+image:
+  repository: ghcr.io/ellanetworks/ella-core #ghcr.io/infinitydon/ellacore
+  tag: v1.11.0 #"892e13e"
+  pullPolicy: Always
+
+# StatefulSet configuration
+statefulset:
+  replicas: 3
+  podManagementPolicy: OrderedReady
+
+# Admin credentials for API access
+admin:
+  email: "admin@ellanetworks.com"
+  password: "changeme"
+
+# API interface
+api:
+  port: 5002
+
+# N2 interface (SCTP control plane)
+n2:
+  port: 38412
+
+# Raft clustering
+raft:
+  port: 7000
+
+# XDP attach mode
+xdp:
+  attachMode: generic
+
+# Multus interfaces with Whereabouts IPAM
+# Each interface gets a stable IP allocated by Whereabouts based on pod name
+multus:
+  n2:
+    master: "ens19"
+    subnet: "10.10.0.0/24"
+    rangeStart: "10.10.0.10"
+    rangeEnd: "10.10.0.15"
+  n3:
+    master: "ens20"
+    subnet: "10.10.1.0/24"
+    rangeStart: "10.10.1.10"
+    rangeEnd: "10.10.1.15"
+  n6:
+    master: "ens21"
+    subnet: "10.10.2.0/24"
+    rangeStart: "10.10.2.10"
+    rangeEnd: "10.10.2.15"
+
+# Per-node N6 networking configuration
+perNodeConfig:
+  n6:
+    natEnabled: false
+    bgp:
+      enabled: false
+      asn: 65001
+      routerId: ""
+      peers: []
+
+# Kubernetes Service for API
+service:
+  type: NodePort
+  nodePort: 30502
+
+# Resource limits
+resources:
+  requests:
+    cpu: "1"
+    memory: "2Gi"
+  limits:
+    cpu: "4"
+    memory: "8Gi"
+
+# Persistent storage for Raft DB
+persistence:
+  size: 10Gi
+  storageClass: ""
+
+# Leader-aware NodePort service — always routes to the current Raft leader
+leaderService:
+  type: NodePort
+  nodePort: 30503
+
+# Leader watcher — patches the leader service selector on leader change
+leaderWatcher:
+  image:
+    repository: curlimages/curl
+    tag: "8.20.0"
+    pullPolicy: IfNotPresent
+
+# Pod placement
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Logging
+logging:
+  level: "info"
+
+# UERANSIM subscriber provisioning
+# Bootstrap job will provision this subscriber idempotently
+ueransim:
+  subscriber:
+    imsi: "001010000000001"
+    key: "465B5CE8B199B49FAA5F0A2EE238A6BC"
+    opc: "E8ED289DEBA952E4283B54E88E6183CA"
+    sequenceNumber: "000000000000"
+    profileName: "default"

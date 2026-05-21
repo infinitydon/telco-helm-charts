@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ueransim.name" . }}-ue
+  labels:
+    app.kubernetes.io/component: ue
+    {{- include "ueransim.selectorLabels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: ue
+      {{- include "ueransim.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: ue
+        {{- include "ueransim.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.affinity }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: leader-watch
+        image: {{ .Values.sidecarImage.repository }}:{{ .Values.sidecarImage.tag }}
+        imagePullPolicy: {{ .Values.sidecarImage.pullPolicy }}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            apk add --no-cache curl jq
+
+            CORE_NS="${CORE_NS}"
+            CORE_SVC="${CORE_SVC}"
+            CORE_API_PORT="${CORE_API_PORT}"
+            API="http://${CORE_SVC}-api.${CORE_NS}.svc.cluster.local:${CORE_API_PORT}"
+
+            echo "UE leader-watch sidecar starting, API: ${API}"
+            PREVIOUS_NODE_ID=""
+            GENERATION=1
+
+            while true; do
+              TOKEN=$(cat /tmp/api-token/token 2>/dev/null)
+              if [ -n "${TOKEN}" ]; then
+                LEADER_NODE_ID=$(curl -s --connect-timeout 3 -H "Authorization: Bearer ${TOKEN}" "${API}/api/v1/cluster/members" 2>/dev/null | jq -r '.result[] | select(.isLeader == true) | .nodeId' 2>/dev/null)
+                if [ -n "${LEADER_NODE_ID}" ] && [ "${LEADER_NODE_ID}" != "null" ]; then
+                  if [ "${LEADER_NODE_ID}" != "${PREVIOUS_NODE_ID}" ]; then
+                    if [ -n "${PREVIOUS_NODE_ID}" ]; then
+                      GENERATION=$((GENERATION + 1))
+                    fi
+                    echo "${GENERATION}" > /shared/leader-gen
+                    echo "$(date -Iseconds) Leader: nodeId=${PREVIOUS_NODE_ID:-<none>} -> nodeId=${LEADER_NODE_ID} (gen ${GENERATION})"
+                    PREVIOUS_NODE_ID="${LEADER_NODE_ID}"
+                  fi
+                fi
+              fi
+              sleep 10
+            done
+        env:
+        - name: CORE_NS
+          value: {{ .Values.ellaCore.namespace | quote }}
+        - name: CORE_SVC
+          value: {{ .Values.ellaCore.serviceName | quote }}
+        - name: CORE_API_PORT
+          value: {{ .Values.ellaCore.apiPort | quote }}
+        volumeMounts:
+        - name: shared
+          mountPath: /shared
+        - name: api-token
+          mountPath: /tmp/api-token
+          readOnly: true
+        resources:
+          requests:
+            cpu: "10m"
+            memory: "64Mi"
+          limits:
+            cpu: "50m"
+            memory: "128Mi"
+      - name: ue
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["/bin/bash", "/scripts/wrapper.sh"]
+        securityContext:
+          privileged: true
+          capabilities:
+            add:
+              - NET_ADMIN
+        volumeMounts:
+        - name: config
+          mountPath: /config
+        - name: shared
+          mountPath: /shared
+        - name: ue-wrapper
+          mountPath: /scripts
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+      volumes:
+      - name: ue-wrapper
+        configMap:
+          name: {{ include "ueransim.name" . }}-ue-wrapper
+          defaultMode: 0755
+      - name: config
+        configMap:
+          name: {{ include "ueransim.name" . }}-ue-config
+      - name: shared
+        emptyDir: {}
+      - name: api-token
+        secret:
+          secretName: {{ .Values.ellaCore.apiTokenSecret }}
+          optional: false

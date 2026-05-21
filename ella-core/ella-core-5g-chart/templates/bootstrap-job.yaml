@@ -1,0 +1,193 @@
+{{- /*
+  Bootstrap Job: post-install/post-upgrade Helm hook.
+  Runs after ella-core-0 is ready, then:
+    1. Admin user creation (idempotent)
+    2. API tokens (helm-automation + ueransim)
+    3. Join tokens for follower nodes → Secrets
+    4. Subscriber provisioning (idempotent)
+    5. Per-node N6 config push
+*/ -}}
+{{- $replicas := .Values.statefulset.replicas | int }}
+{{- $svc := include "ella-core.name" . }}
+{{- $ns := include "ella-core.namespace" . }}
+{{- $apiPort := .Values.api.port | toString }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $svc }}-bootstrap
+  labels:
+    {{- include "ella-core.selectorLabels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation, hook-succeeded
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "ella-core.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ $svc }}-bootstrap
+      initContainers:
+      - name: wait-for-leader
+        image: curlimages/curl:8.20.0
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for ella-core-0 to become ready..."
+          for i in $(seq 1 60); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              "http://{{ $svc }}-0.{{ $svc }}.{{ $ns }}.svc.cluster.local:{{ $apiPort }}/api/v1/status" 2>/dev/null || echo "000")
+            if [ "${STATUS}" = "200" ]; then
+              echo "ella-core-0 is ready"
+              exit 0
+            fi
+            echo "  attempt ${i}/60: got HTTP ${STATUS}"
+            sleep 3
+          done
+          echo "ERROR: Timed out waiting for ella-core-0"
+          exit 1
+      containers:
+      - name: bootstrap
+        image: alpine/k8s:1.32.3
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          API="http://{{ $svc }}-0.{{ $svc }}.{{ $ns }}.svc.cluster.local:{{ $apiPort }}"
+
+          # --- Step 1: Admin user ---
+          echo "=== Step 1: Admin user ==="
+          INIT_RESP=$(curl -s -X POST "${API}/api/v1/init" \
+            -H "Content-Type: application/json" \
+            -d '{"email":"{{ .Values.admin.email }}","password":"{{ .Values.admin.password }}" }')
+
+          if echo "${INIT_RESP}" | grep -q '"token"'; then
+            ADMIN_TOKEN=$(echo "${INIT_RESP}" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+            echo "  Admin user created"
+          else
+            echo "  System already initialized, logging in..."
+            ADMIN_TOKEN=$(curl -s -X POST "${API}/api/v1/auth/login" \
+              -H "Content-Type: application/json" \
+              -d '{"email":"{{ .Values.admin.email }}","password":"{{ .Values.admin.password }}"}' | \
+              grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+            echo "  Authenticated"
+          fi
+
+          if [ -z "${ADMIN_TOKEN}" ]; then
+            echo "ERROR: Could not obtain admin token"
+            exit 1
+          fi
+
+          # --- Step 2: API tokens ---
+          echo "=== Step 2: API tokens ==="
+
+          echo "  Creating helm-automation token..."
+          curl -s -X POST "${API}/api/v1/users/me/api-tokens" \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"helm-automation"}' > /dev/null || true
+          echo "  Done"
+
+          echo "  Creating ueransim token..."
+          UERANSIM_RESP=$(curl -s -X POST "${API}/api/v1/users/me/api-tokens" \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"ueransim"}')
+          UERANSIM_TOKEN=$(echo "${UERANSIM_RESP}" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+
+          if [ -z "${UERANSIM_TOKEN}" ]; then
+            echo "  Token may already exist, fetching..."
+            UERANSIM_TOKEN=$(curl -s -H "Authorization: Bearer ${ADMIN_TOKEN}" "${API}/api/v1/users/me/api-tokens" | \
+              grep -o '"name":"ueransim"[^}]*"token":"[^"]*"' | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+          fi
+
+          if [ -n "${UERANSIM_TOKEN}" ]; then
+            kubectl create secret generic {{ $svc }}-ueransim-api-token \
+              -n {{ $ns }} \
+              --from-literal=token="${UERANSIM_TOKEN}" \
+              --dry-run=client -o yaml | kubectl apply -f -
+            echo "  UERANSIM token stored in Secret"
+          else
+            echo "  WARNING: Could not create UERANSIM token"
+          fi
+
+          # --- Step 3: Join tokens ---
+          echo "=== Step 3: Join tokens ==="
+          {{- range $podIdx := until $replicas }}
+          {{- if ne $podIdx 0 }}
+          {{- $nodeID := add1 $podIdx }}
+          echo "  Minting join token for node {{ $nodeID }}..."
+          RESP=$(curl -s -X POST "${API}/api/v1/cluster/pki/join-tokens" \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"nodeID": {{ $nodeID }}, "ttlSeconds": 3600}')
+          TOKEN=$(echo "${RESP}" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+
+          if [ -z "${TOKEN}" ]; then
+            echo "  Join token for node {{ $nodeID }} unavailable (may already be a member)"
+          else
+            kubectl create secret generic {{ $svc }}-join-token-{{ $nodeID }} \
+              -n {{ $ns }} \
+              --from-literal=token="${TOKEN}" \
+              --dry-run=client -o yaml | kubectl apply -f -
+            echo "  Token stored in Secret {{ $svc }}-join-token-{{ $nodeID }}"
+          fi
+          {{- end }}
+          {{- end }}
+
+          # --- Step 4: Subscriber provisioning ---
+          echo "=== Step 4: Subscriber provisioning ==="
+          IMSI="{{ .Values.ueransim.subscriber.imsi }}"
+
+          echo "  Checking subscriber ${IMSI}..."
+          CHECK_HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            "${API}/api/v1/subscribers/${IMSI}")
+
+          if [ "${CHECK_HTTP}" = "200" ]; then
+            echo "  Subscriber ${IMSI} already exists, skipping"
+          else
+            echo "  Creating subscriber ${IMSI}..."
+            CREATE_HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${API}/api/v1/subscribers" \
+              -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "imsi":"{{ .Values.ueransim.subscriber.imsi }}",
+                "key":"{{ .Values.ueransim.subscriber.key }}",
+                "opc":"{{ .Values.ueransim.subscriber.opc }}",
+                "profile_name":"{{ .Values.ueransim.subscriber.profileName }}",
+                "sequenceNumber":"{{ .Values.ueransim.subscriber.sequenceNumber }}"
+              }')
+            if [ "${CREATE_HTTP}" = "201" ] || [ "${CREATE_HTTP}" = "200" ]; then
+              echo "  Subscriber ${IMSI} created"
+            else
+              echo "  WARNING: Subscriber creation returned HTTP ${CREATE_HTTP}"
+            fi
+          fi
+
+          # --- Step 5: Per-node N6 config ---
+          echo "=== Step 5: Per-node N6 config ==="
+          PAYLOAD='{{ toJson .Values.perNodeConfig.n6 }}'
+
+          for i in $(seq 0 $(({{ $replicas }} - 1))); do
+            NODE_ID=$((i + 1))
+            NODE_URL="http://{{ $svc }}-${i}.{{ $svc }}.{{ $ns }}.svc.cluster.local:{{ $apiPort }}"
+
+            echo "  Pushing N6 config to node ${NODE_ID}..."
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "${NODE_URL}/api/v1/networking/n6" \
+              -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "${PAYLOAD}")
+
+            if [ "${HTTP_CODE}" = "200" ] || [ "${HTTP_CODE}" = "201" ]; then
+              echo "  Node ${NODE_ID}: OK"
+            else
+              echo "  Node ${NODE_ID}: HTTP ${HTTP_CODE} (may not be ready yet)"
+            fi
+          done
+
+          echo "=== Bootstrap complete ==="

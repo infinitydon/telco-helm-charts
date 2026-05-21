@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ueransim.name" . }}-gnb-wrapper
+  labels:
+    {{- include "ueransim.selectorLabels" . | nindent 4 }}
+data:
+  wrapper.sh: |
+    #!/bin/bash
+    set -e
+
+    CONFIG="/config/gnb.yaml"
+    LEADER_FILE="/shared/leader-ip"
+    HEALTH_PID=""
+
+    start_health() {
+      # Kill any previous health listener
+      [ -n "${HEALTH_PID}" ] && kill "${HEALTH_PID}" 2>/dev/null || true
+      # Start a TCP readiness listener on port 9999
+      perl -MIO::Socket::INET -e '$s=new IO::Socket::INET(Listen=>1,LocalPort=>9999,Proto=>"tcp",ReuseAddr=>1); while($c=$s->accept()){print $c "OK\n"; close $c}' &
+      HEALTH_PID=$!
+    }
+
+    # Wait for init container to write the initial leader IP
+    echo "Waiting for leader IP from init container..."
+    while [ ! -s "${LEADER_FILE}" ]; do
+      sleep 1
+    done
+    CURRENT_LEADER=$(cat "${LEADER_FILE}")
+    echo "Initial leader: ${CURRENT_LEADER}"
+
+    # Ensure config has the correct initial AMF address
+    sed -i "s/address: '[^']*'/address: '${CURRENT_LEADER}'/" "${CONFIG}"
+    echo "Starting nr-gnb with AMF: ${CURRENT_LEADER}"
+
+    # Start gNB in background
+    /ueransim/nr-gnb -c "${CONFIG}" &
+    GNB_PID=$!
+    start_health
+
+    cleanup() {
+      echo "Received shutdown signal, stopping..."
+      [ -n "${HEALTH_PID}" ] && kill "${HEALTH_PID}" 2>/dev/null || true
+      kill "${GNB_PID}" 2>/dev/null || true
+      wait "${GNB_PID}" 2>/dev/null || true
+      echo "gNB stopped."
+      exit 0
+    }
+    trap cleanup SIGTERM SIGINT
+
+    # Watch for leader changes
+    while true; do
+      sleep 5
+      if [ -s "${LEADER_FILE}" ]; then
+        NEW_LEADER=$(cat "${LEADER_FILE}")
+        if [ "${NEW_LEADER}" != "${CURRENT_LEADER}" ]; then
+          echo "$(date -Iseconds) Leader changed: ${CURRENT_LEADER} -> ${NEW_LEADER}"
+          sed -i "s/address: '[^']*'/address: '${NEW_LEADER}'/" "${CONFIG}"
+          CURRENT_LEADER="${NEW_LEADER}"
+
+          # Restart gNB with new AMF address
+          kill "${GNB_PID}" 2>/dev/null || true
+          wait "${GNB_PID}" 2>/dev/null || true
+          /ueransim/nr-gnb -c "${CONFIG}" &
+          GNB_PID=$!
+          start_health
+          echo "gNB restarted with new leader: ${NEW_LEADER}"
+        fi
+      fi
+    done

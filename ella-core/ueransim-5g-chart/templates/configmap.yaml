@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ueransim.name" . }}-init-script
+  labels:
+    {{- include "ueransim.selectorLabels" . | nindent 4 }}
+data:
+  init.sh: |
+    #!/bin/sh
+    set -e
+
+    CORE_NS="{{ .Values.ellaCore.namespace }}"
+    CORE_SVC="{{ .Values.ellaCore.serviceName }}"
+    CORE_API_PORT="{{ .Values.ellaCore.apiPort }}"
+
+    echo "Reading API token from mounted secret..."
+    API_TOKEN=$(cat /tmp/api-token/token)
+    if [ -z "${API_TOKEN}" ]; then
+      echo "ERROR: Could not read API token"
+      exit 1
+    fi
+    echo "  Token loaded"
+
+    API="http://${CORE_SVC}-api.${CORE_NS}.svc.cluster.local:${CORE_API_PORT}"
+
+    echo "Finding cluster leader..."
+    K8S_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+    K8S_API="https://kubernetes.default.svc"
+    for i in $(seq 1 30); do
+      LEADER_NODE_ID=$(curl -s --connect-timeout 3 -H "Authorization: Bearer ${API_TOKEN}" "${API}/api/v1/cluster/members" | jq -r '.result[] | select(.isLeader == true) | .nodeId')
+      if [ -n "${LEADER_NODE_ID}" ] && [ "${LEADER_NODE_ID}" != "null" ]; then
+        LEADER_POD="${CORE_SVC}-$((LEADER_NODE_ID - 1))"
+        echo "  Leader nodeId: ${LEADER_NODE_ID} -> pod: ${LEADER_POD}"
+        LEADER_N2_IP=$(curl -s -k -H "Authorization: Bearer ${K8S_TOKEN}" \
+          "${K8S_API}/api/v1/namespaces/${CORE_NS}/pods/${LEADER_POD}" | \
+          jq -r '.metadata.annotations."k8s.v1.cni.cncf.io/network-status"' | \
+          jq -r '.[] | select(.interface=="n2") | .ips[0]')
+        if [ -n "${LEADER_N2_IP}" ] && [ "${LEADER_N2_IP}" != "null" ]; then
+          echo "  Leader N2 IP: ${LEADER_N2_IP}"
+          break
+        fi
+      fi
+      echo "  Waiting for leader... (attempt ${i}/30)"
+      sleep 2
+    done
+    if [ -z "${LEADER_N2_IP}" ]; then
+      echo "ERROR: Could not determine leader after 60s"
+      exit 1
+    fi
+
+    echo "Determining local interface IPs..."
+    LOCAL_N2_IP=$(ip -4 addr show n2 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | head -1)
+    LOCAL_N3_IP=$(ip -4 addr show n3 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | head -1)
+    if [ -z "${LOCAL_N2_IP}" ] || [ -z "${LOCAL_N3_IP}" ]; then
+      echo "ERROR: Could not determine local N2/N3 IPs"
+      exit 1
+    fi
+    echo "  Local N2: ${LOCAL_N2_IP}, N3: ${LOCAL_N3_IP}"
+
+    echo "Generating gNB config..."
+    cat > /config/gnb.yaml << GNBCFG
+    mcc: '{{ .Values.subscriber.mcc }}'
+    mnc: '{{ .Values.subscriber.mnc }}'
+    nci: '{{ .Values.gnb.nci }}'
+    idLength: {{ .Values.gnb.idLength }}
+    tac: {{ .Values.gnb.tac }}
+    linkIp: '0.0.0.0'
+    ngapIp: '${LOCAL_N2_IP}'
+    gtpIp: '${LOCAL_N3_IP}'
+    amfConfigs:
+      - address: '${LEADER_N2_IP}'
+        port: 38412
+    slices:
+      - sst: {{ .Values.gnb.slices.sst }}
+    ignoreStreamIds: true
+    GNBCFG
+
+    echo "${LEADER_N2_IP}" > /shared/leader-ip
+    echo "gNB config generation complete"

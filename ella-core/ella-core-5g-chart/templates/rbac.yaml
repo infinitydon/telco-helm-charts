@@ -1,0 +1,84 @@
+{{- /*
+  ServiceAccount and RBAC for the bootstrap job.
+  Needs permission to create/update Secrets for join tokens and API tokens.
+*/ -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "ella-core.name" . }}-bootstrap
+  labels:
+    {{- include "ella-core.selectorLabels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "ella-core.name" . }}-bootstrap
+  labels:
+    {{- include "ella-core.selectorLabels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "get", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "ella-core.name" . }}-bootstrap
+  labels:
+    {{- include "ella-core.selectorLabels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "ella-core.name" . }}-bootstrap
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "ella-core.name" . }}-bootstrap
+---
+{{/*
+  ServiceAccount and RBAC for the leader-watcher Deployment.
+  Needs permission to patch the leader-api Service.
+*/}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "ella-core.name" . }}-leader-watcher
+  labels:
+    {{- include "ella-core.selectorLabels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "ella-core.name" . }}-leader-watcher
+  labels:
+    {{- include "ella-core.selectorLabels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    resourceNames: ["{{ include "ella-core.name" . }}-leader-api"]
+    verbs: ["get", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "ella-core.name" . }}-leader-watcher
+  labels:
+    {{- include "ella-core.selectorLabels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "ella-core.name" . }}-leader-watcher
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "ella-core.name" . }}-leader-watcher

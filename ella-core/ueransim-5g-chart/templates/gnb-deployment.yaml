@@ -1,0 +1,160 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ueransim.name" . }}-gnb
+  labels:
+    app.kubernetes.io/component: gnb
+    {{- include "ueransim.selectorLabels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: gnb
+      {{- include "ueransim.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: gnb
+        {{- include "ueransim.selectorLabels" . | nindent 8 }}
+      annotations:
+        k8s.v1.cni.cncf.io/networks: |
+          [
+            {"name": "ueransim-n2", "namespace": "{{ include "ueransim.namespace" . }}", "interface": "n2"},
+            {"name": "ueransim-n3", "namespace": "{{ include "ueransim.namespace" . }}", "interface": "n3"}
+          ]
+    spec:
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.affinity }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "ueransim.name" . }}-gnb
+      initContainers:
+      - name: config-gen
+        image: {{ .Values.initImage.repository }}:{{ .Values.initImage.tag }}
+        imagePullPolicy: {{ .Values.initImage.pullPolicy }}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            apk add --no-cache curl jq iproute2
+            /scripts/init.sh
+        env:
+        - name: CORE_NS
+          value: {{ .Values.ellaCore.namespace | quote }}
+        - name: CORE_SVC
+          value: {{ .Values.ellaCore.serviceName | quote }}
+        - name: CORE_API_PORT
+          value: {{ .Values.ellaCore.apiPort | quote }}
+        volumeMounts:
+        - name: init-script
+          mountPath: /scripts
+        - name: config
+          mountPath: /config
+        - name: shared
+          mountPath: /shared
+        - name: api-token
+          mountPath: /tmp/api-token
+          readOnly: true
+      containers:
+      - name: leader-watch
+        image: {{ .Values.sidecarImage.repository }}:{{ .Values.sidecarImage.tag }}
+        imagePullPolicy: {{ .Values.sidecarImage.pullPolicy }}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            apk add --no-cache curl jq
+
+            CORE_NS="${CORE_NS}"
+            CORE_SVC="${CORE_SVC}"
+            CORE_API_PORT="${CORE_API_PORT}"
+            API="http://${CORE_SVC}-api.${CORE_NS}.svc.cluster.local:${CORE_API_PORT}"
+
+            echo "Leader watch sidecar starting, API: ${API}"
+            K8S_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+            K8S_API="https://kubernetes.default.svc"
+            PREVIOUS_NODE_ID=""
+            while true; do
+              TOKEN=$(cat /tmp/api-token/token 2>/dev/null)
+              if [ -n "${TOKEN}" ]; then
+                LEADER_NODE_ID=$(curl -s --connect-timeout 3 -H "Authorization: Bearer ${TOKEN}" "${API}/api/v1/cluster/members" 2>/dev/null | jq -r '.result[] | select(.isLeader == true) | .nodeId' 2>/dev/null)
+                if [ -n "${LEADER_NODE_ID}" ] && [ "${LEADER_NODE_ID}" != "null" ]; then
+                  if [ "${LEADER_NODE_ID}" != "${PREVIOUS_NODE_ID}" ]; then
+                    LEADER_POD="${CORE_SVC}-$((LEADER_NODE_ID - 1))"
+                    N2_IP=$(curl -s -k -H "Authorization: Bearer ${K8S_TOKEN}" \
+                      "${K8S_API}/api/v1/namespaces/${CORE_NS}/pods/${LEADER_POD}" 2>/dev/null | \
+                      jq -r '.metadata.annotations."k8s.v1.cni.cncf.io/network-status"' 2>/dev/null | \
+                      jq -r '.[] | select(.interface=="n2") | .ips[0]' 2>/dev/null)
+                    if [ -n "${N2_IP}" ] && [ "${N2_IP}" != "null" ]; then
+                      echo "${N2_IP}" > /shared/leader-ip
+                      echo "$(date -Iseconds) Leader: nodeId=${PREVIOUS_NODE_ID:-<none>} -> nodeId=${LEADER_NODE_ID} (N2: ${N2_IP})"
+                      PREVIOUS_NODE_ID="${LEADER_NODE_ID}"
+                    fi
+                  fi
+                fi
+              fi
+              sleep 10
+            done
+        env:
+        - name: CORE_NS
+          value: {{ .Values.ellaCore.namespace | quote }}
+        - name: CORE_SVC
+          value: {{ .Values.ellaCore.serviceName | quote }}
+        - name: CORE_API_PORT
+          value: {{ .Values.ellaCore.apiPort | quote }}
+        volumeMounts:
+        - name: shared
+          mountPath: /shared
+        - name: api-token
+          mountPath: /tmp/api-token
+          readOnly: true
+        resources:
+          requests:
+            cpu: "10m"
+            memory: "64Mi"
+          limits:
+            cpu: "50m"
+            memory: "128Mi"
+      - name: gnb
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["/bin/bash", "/scripts/wrapper.sh"]
+        securityContext:
+          privileged: true
+          capabilities:
+            add:
+              - NET_ADMIN
+        volumeMounts:
+        - name: config
+          mountPath: /config
+        - name: shared
+          mountPath: /shared
+        - name: gnb-wrapper
+          mountPath: /scripts
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+      volumes:
+      - name: init-script
+        configMap:
+          name: {{ include "ueransim.name" . }}-init-script
+          defaultMode: 0755
+      - name: gnb-wrapper
+        configMap:
+          name: {{ include "ueransim.name" . }}-gnb-wrapper
+          defaultMode: 0755
+      - name: config
+        emptyDir: {}
+      - name: shared
+        emptyDir: {}
+      - name: api-token
+        secret:
+          secretName: {{ .Values.ellaCore.apiTokenSecret }}
+          optional: false

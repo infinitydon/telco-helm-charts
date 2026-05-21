@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ueransim.name" . }}-ue-config
+  labels:
+    {{- include "ueransim.selectorLabels" . | nindent 4 }}
+data:
+  ue.yaml: |
+    supi: '{{ .Values.subscriber.supi }}'
+    mcc: '{{ .Values.subscriber.mcc }}'
+    mnc: '{{ .Values.subscriber.mnc }}'
+    key: '{{ .Values.subscriber.key }}'
+    op: '{{ .Values.subscriber.opc }}'
+    opType: 'OPC'
+    amf: '{{ .Values.subscriber.amf }}'
+    imei: '356938035643803'
+    imeiSv: '4370816125816151'
+    gnbSearchList:
+      - {{ include "ueransim.name" . }}-gnb
+    uacAic:
+      mps: false
+      mcs: false
+    uacAcc:
+      normalClass: 0
+      class11: false
+      class12: false
+      class13: false
+      class14: false
+      class15: false
+    sessions:
+      - type: 'IPv4'
+        apn: 'internet'
+        slice:
+          sst: 1
+    configured-nssai:
+      - sst: 1
+    default-nssai:
+      - sst: 1
+        sd: 1
+    integrity:
+      IA1: true
+      IA2: true
+      IA3: true
+    ciphering:
+      EA1: true
+      EA2: true
+      EA3: true
+    integrityMaxRate:
+      uplink: 'full'
+      downlink: 'full'
