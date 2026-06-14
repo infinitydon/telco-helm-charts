@@ -2,8 +2,13 @@ Open5GS 4G EPC lab installed with ten Multus networks.
 
 {{- if .Values.webui.enabled }}
 Open the WebUI:
+{{- if eq .Values.webui.service.type "NodePort" }}
+  NodePort: {{ .Values.webui.service.nodePort }}
+  Browse to http://<worker-node-ip>:{{ .Values.webui.service.nodePort }} and log in with admin / 1423.
+{{- else }}
   kubectl port-forward service/{{ include "open5gs-4g.fullname" . }}-webui 9999:{{ .Values.webui.service.port }}
   Browse to http://localhost:9999 and log in with admin / 1423.
+{{- end }}
 {{- end }}
 
 Check LTE attach:

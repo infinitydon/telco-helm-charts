@@ -88,6 +88,6 @@ resources: {}
 webui:
   enabled: true
   service:
-    type: ClusterIP
+    type: NodePort
     port: 9999
-    nodePort: ""
+    nodePort: 30080

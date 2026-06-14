@@ -45,19 +45,15 @@ The WebUI uses the default Kubernetes pod network, like the 5G SBI, and does
 not require a Multus interface. The existing automatic subscriber
 provisioning remains enabled.
 
-```powershell
-kubectl port-forward -n open5gs-5g `
-  service/open5gs-5g-open5gs-5g-webui 9999:9999
-```
-
-Open `http://localhost:9999` and sign in with username `admin` and password
+The service defaults to NodePort `30081`. Open
+`http://<worker-node-ip>:30081` and sign in with username `admin` and password
 `1423`. Change the default password after signing in. Subscribers created in
 the WebUI are stored in the same MongoDB database as the automatically
 provisioned lab subscriber.
 
-Set `webui.enabled=false` to disable the WebUI. The service defaults to
-`ClusterIP`; `webui.service.type` and `webui.service.nodePort` can expose it
-as a NodePort when required.
+Set `webui.enabled=false` to disable the WebUI. Override
+`webui.service.type` or `webui.service.nodePort` when NodePort is unsuitable
+or port `30081` is already allocated.
 
 ## Verify
 
