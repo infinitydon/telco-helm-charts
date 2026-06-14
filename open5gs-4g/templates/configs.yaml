@@ -1,0 +1,128 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "open5gs-4g.fullname" . }}-configs
+data:
+  hss.yaml: |
+    db_uri: mongodb://{{ include "open5gs-4g.fullname" . }}-mongodb/open5gs
+    logger: { level: info }
+    hss:
+      freeDiameter: /opt/open5gs/etc/freeDiameter/hss.conf
+  mme.yaml: |
+    logger: { level: info }
+    mme:
+      freeDiameter: /opt/open5gs/etc/freeDiameter/mme.conf
+      s1ap:
+        server:
+          - address: {{ .Values.addresses.mmeS1 }}
+      gtpc:
+        server:
+          - address: {{ .Values.addresses.mmeS11 }}
+        client:
+          sgwc:
+            - address: {{ .Values.addresses.sgwcS11 }}
+          smf:
+            - address: {{ .Values.addresses.smfS5c }}
+      gummei:
+        - plmn_id: { mcc: {{ .Values.plmn.mcc | quote }}, mnc: {{ .Values.plmn.mnc | quote }} }
+          mme_gid: 2
+          mme_code: 1
+      tai:
+        - plmn_id: { mcc: {{ .Values.plmn.mcc | quote }}, mnc: {{ .Values.plmn.mnc | quote }} }
+          tac: {{ .Values.plmn.tac }}
+      security:
+        integrity_order: [ EIA2, EIA1, EIA0 ]
+        ciphering_order: [ EEA0, EEA1, EEA2 ]
+      network_name: { full: Open5GS }
+      mme_name: open5gs-mme0
+      time:
+        t3412: { value: 540 }
+  sgwc.yaml: |
+    logger: { level: info }
+    sgwc:
+      gtpc:
+        server:
+          - address: {{ .Values.addresses.sgwcS5c }}
+          - address: {{ .Values.addresses.sgwcS11 }}
+      pfcp:
+        server:
+          - address: {{ .Values.addresses.sgwcSxa }}
+        client:
+          sgwu:
+            - address: {{ .Values.addresses.sgwuSxa }}
+              apn: {{ .Values.subscriber.apn }}
+  sgwu.yaml: |
+    logger: { level: info }
+    sgwu:
+      pfcp:
+        server:
+          - address: {{ .Values.addresses.sgwuSxa }}
+        client:
+          sgwc:
+            - address: {{ .Values.addresses.sgwcSxa }}
+      gtpu:
+        server:
+          - address: {{ .Values.addresses.sgwuS1u }}
+            advertise: {{ .Values.addresses.sgwuS1u }}
+          - address: {{ .Values.addresses.sgwuS5u }}
+  smf.yaml: |
+    logger: { level: info }
+    smf:
+      freeDiameter: /opt/open5gs/etc/freeDiameter/smf.conf
+      ctf:
+        enabled: no
+      gtpc:
+        server:
+          - address: {{ .Values.addresses.smfS5c }}
+      gtpu:
+        server:
+          - address: {{ .Values.addresses.smfS5c }}
+      pfcp:
+        server:
+          - address: {{ .Values.addresses.smfSxb }}
+        client:
+          upf:
+            - address: {{ .Values.addresses.upfSxb }}
+      session:
+        - subnet: {{ .Values.ueSubnet }}
+          gateway: {{ .Values.ueGateway }}
+          dnn: {{ .Values.subscriber.apn }}
+      dns: [ 8.8.8.8, 8.8.4.4 ]
+      mtu: 1400
+  upf.yaml: |
+    logger: { level: info }
+    upf:
+      pfcp:
+        server:
+          - address: {{ .Values.addresses.upfSxb }}
+        client:
+          smf:
+            - address: {{ .Values.addresses.smfSxb }}
+      gtpu:
+        server:
+          - address: {{ .Values.addresses.upfS5u }}
+            advertise: {{ .Values.addresses.upfS5u }}
+      session:
+        - subnet: {{ .Values.ueSubnet }}
+          gateway: {{ .Values.ueGateway }}
+          dnn: {{ .Values.subscriber.apn }}
+          dev: ogstun
+  pcrf.yaml: |
+    db_uri: mongodb://{{ include "open5gs-4g.fullname" . }}-mongodb/open5gs
+    logger: { level: info }
+    pcrf:
+      freeDiameter: /opt/open5gs/etc/freeDiameter/pcrf.conf
+  hss.conf: |
+{{ tpl (.Files.Get "files/diameter-hss.conf") . | indent 4 }}
+  mme.conf: |
+{{ tpl (.Files.Get "files/diameter-mme.conf") . | indent 4 }}
+  smf.conf: |
+{{ tpl (.Files.Get "files/diameter-smf.conf") . | indent 4 }}
+  pcrf.conf: |
+{{ tpl (.Files.Get "files/diameter-pcrf.conf") . | indent 4 }}
+  enb.conf: |
+{{ tpl (.Files.Get "files/enb.conf") . | indent 4 }}
+  ue.conf: |
+{{ tpl (.Files.Get "files/ue.conf") . | indent 4 }}
+  rr.conf: |
+{{ tpl (.Files.Get "files/rr.conf") . | indent 4 }}

@@ -1,0 +1,147 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-gnb
+  labels:
+    {{- include "open5gs-5g.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: gnb
+  ports:
+    - name: radio
+      port: 4997
+      targetPort: 4997
+      protocol: UDP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-gnb
+  labels:
+    {{- include "open5gs-5g.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: gnb
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: gnb
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-5g.fullname" . }}-n2","interface":"n2","ips":["{{ .Values.addresses.gnbN2 }}/24"]},{"name":"{{ include "open5gs-5g.fullname" . }}-n3","interface":"n3","ips":["{{ .Values.addresses.gnbN3 }}/24"]}]
+    spec:
+      terminationGracePeriodSeconds: 5
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      containers:
+        - name: gnb
+          image: {{ .Values.image.ueransim }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["gnb"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/ueransim/gnb.yaml
+              subPath: gnb.yaml
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "open5gs-5g.fullname" . }}-configs
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-ue
+  labels:
+    {{- include "open5gs-5g.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: ue
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: ue
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
+    spec:
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      initContainers:
+        - name: provision-subscriber
+          image: {{ .Values.image.dbctl }}
+          env:
+            - name: DB_URI
+              value: mongodb://{{ include "open5gs-5g.fullname" . }}-mongodb/open5gs
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until open5gs-dbctl showall >/dev/null 2>&1; do sleep 2; done;
+              open5gs-dbctl remove {{ .Values.subscriber.imsi }} || true;
+              open5gs-dbctl add_ue_with_slice
+              {{ .Values.subscriber.imsi }}
+              {{ .Values.subscriber.key }}
+              {{ .Values.subscriber.opc }}
+              {{ .Values.subscriber.dnn }}
+              {{ .Values.subscriber.sst }}
+              {{ trimPrefix "0x" .Values.subscriber.sd }}
+      containers:
+        - name: ue
+          image: {{ .Values.image.ueransim }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["ue"]
+          securityContext:
+            privileged: true
+            capabilities: { add: [NET_ADMIN] }
+          volumeMounts:
+            - name: config
+              mountPath: /etc/ueransim/ue.yaml
+              subPath: ue.yaml
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "open5gs-5g.fullname" . }}-configs
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-data
+  labels:
+    {{- include "open5gs-5g.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: data
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: data
+      annotations:
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-5g.fullname" . }}-n6","interface":"n6","ips":["{{ .Values.addresses.dataN6 }}/24"]}]
+    spec:
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      containers:
+        - name: data
+          image: {{ .Values.image.toolbox }}
+          securityContext:
+            capabilities: { add: [NET_ADMIN] }
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              ip route add {{ .Values.ueSubnet }} via {{ .Values.addresses.upfN6 }} dev n6;
+              sleep infinity
