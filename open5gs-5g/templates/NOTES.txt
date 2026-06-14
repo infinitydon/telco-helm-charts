@@ -1,5 +1,11 @@
 Open5GS 5G SA lab installed.
 
+{{- if .Values.webui.enabled }}
+Open the WebUI:
+  kubectl port-forward service/{{ include "open5gs-5g.fullname" . }}-webui 9999:{{ .Values.webui.service.port }}
+  Browse to http://localhost:9999 and log in with admin / 1423.
+{{- end }}
+
 Multus networks:
   N2: {{ include "open5gs-5g.fullname" . }}-n2
   N3: {{ include "open5gs-5g.fullname" . }}-n3

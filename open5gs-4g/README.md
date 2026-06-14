@@ -6,8 +6,9 @@ Open5GS, an srsRAN eNB and UE, and an SGi test endpoint.
 ## Components
 
 - HSS, MME, SGW-C, SGW-U, SMF/PGW-C, UPF/PGW-U, and PCRF
+- Open5GS WebUI for viewing and managing subscribers
 - srsRAN 4G eNB and UE using ZeroMQ as the virtual radio
-- A subscriber created before the simulator starts
+- A subscriber created before the simulator starts; WebUI does not replace it
 - A data pod at `10.55.0.100` for the end-to-end ping
 
 ## Multus interfaces
@@ -47,6 +48,26 @@ helm upgrade --install open5gs-4g .\open5gs-4g `
 
 Change `nodeSelector` or subscriber values with a values file when needed.
 The included subscriber credentials are lab-only defaults.
+
+## WebUI
+
+The WebUI uses the default Kubernetes pod network and does not require a
+Multus interface. The existing automatic subscriber provisioning remains
+enabled.
+
+```powershell
+kubectl port-forward -n open5gs-4g `
+  service/open5gs-4g-open5gs-4g-webui 9999:9999
+```
+
+Open `http://localhost:9999` and sign in with username `admin` and password
+`1423`. Change the default password after signing in. Subscribers created in
+the WebUI are stored in the same MongoDB database as the automatically
+provisioned lab subscriber.
+
+Set `webui.enabled=false` to disable the WebUI. The service defaults to
+`ClusterIP`; `webui.service.type` and `webui.service.nodePort` can expose it
+as a NodePort when required.
 
 ## Verify
 

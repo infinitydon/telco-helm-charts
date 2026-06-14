@@ -1,5 +1,6 @@
 image:
   open5gs: gradiant/open5gs:2.7.5
+  webui: gradiant/open5gs-webui:2.7.5
   mongodb: mongo:6.0
   dbctl: gradiant/open5gs-dbctl:0.10.3
   ueransim: gradiant/ueransim:3.2.6
@@ -49,3 +50,10 @@ addresses:
   dataN6: 10.54.0.100
 
 resources: {}
+
+webui:
+  enabled: true
+  service:
+    type: ClusterIP
+    port: 9999
+    nodePort: ""

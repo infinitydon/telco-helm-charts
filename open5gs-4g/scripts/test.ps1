@@ -1,18 +1,34 @@
 param(
     [string]$Namespace = "open5gs-4g",
     [string]$Release = "open5gs-4g",
+    [string]$Kubeconfig = "",
     [int]$TimeoutSeconds = 180
 )
 
 $ErrorActionPreference = "Stop"
+$kubectlArgs = @()
+if ($Kubeconfig) {
+    $kubectlArgs += @("--kubeconfig", $Kubeconfig)
+}
 $deployment = "$Release-open5gs-4g-simulator"
+$dataDeployment = "$Release-open5gs-4g-data"
+$webuiService = "$Release-open5gs-4g-webui"
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 
-kubectl wait --namespace $Namespace --for=condition=Available `
+kubectl @kubectlArgs wait --namespace $Namespace --for=condition=Available `
+    "deployment/$webuiService" --timeout="${TimeoutSeconds}s"
+kubectl @kubectlArgs exec --namespace $Namespace "deployment/$dataDeployment" -- `
+    wget -q --spider "http://${webuiService}:9999/"
+if ($LASTEXITCODE -ne 0) {
+    throw "Open5GS WebUI is not reachable."
+}
+Write-Host "Open5GS WebUI is reachable."
+
+kubectl @kubectlArgs wait --namespace $Namespace --for=condition=Available `
     "deployment/$deployment" --timeout="${TimeoutSeconds}s"
 
 do {
-    $logs = (kubectl logs --namespace $Namespace "deployment/$deployment" `
+    $logs = (kubectl @kubectlArgs logs --namespace $Namespace "deployment/$deployment" `
         --container ue --tail=150) -join "`n"
     if ($logs.Contains("Network attach successful")) {
         Write-Host "LTE attach succeeded."
@@ -25,7 +41,7 @@ if (-not $logs.Contains("Network attach successful")) {
     throw "LTE UE did not attach within $TimeoutSeconds seconds."
 }
 
-kubectl exec --namespace $Namespace "deployment/$deployment" --container ue `
+kubectl @kubectlArgs exec --namespace $Namespace "deployment/$deployment" --container ue `
     -- ping -I tun_srsue -c 5 -W 2 10.55.0.100
 if ($LASTEXITCODE -ne 0) {
     throw "LTE UE could not reach the SGi test endpoint."

@@ -6,8 +6,9 @@ MongoDB, the Open5GS 5G core, UERANSIM, and an N6 test endpoint.
 ## Components
 
 - NRF, AUSF, UDM, UDR, PCF, NSSF, AMF, SMF, and UPF
+- Open5GS WebUI for viewing and managing subscribers
 - UERANSIM gNB and UE
-- A subscriber created before the UE starts
+- A subscriber created before the UE starts; WebUI does not replace it
 - A data pod at `10.54.0.100` for the end-to-end ping
 
 ## Multus interfaces
@@ -37,6 +38,26 @@ $env:KUBECONFIG = "C:\path\to\kubeconfig"
 helm upgrade --install open5gs-5g .\open5gs-5g `
   --namespace open5gs-5g --create-namespace --wait --timeout 5m
 ```
+
+## WebUI
+
+The WebUI uses the default Kubernetes pod network, like the 5G SBI, and does
+not require a Multus interface. The existing automatic subscriber
+provisioning remains enabled.
+
+```powershell
+kubectl port-forward -n open5gs-5g `
+  service/open5gs-5g-open5gs-5g-webui 9999:9999
+```
+
+Open `http://localhost:9999` and sign in with username `admin` and password
+`1423`. Change the default password after signing in. Subscribers created in
+the WebUI are stored in the same MongoDB database as the automatically
+provisioned lab subscriber.
+
+Set `webui.enabled=false` to disable the WebUI. The service defaults to
+`ClusterIP`; `webui.service.type` and `webui.service.nodePort` can expose it
+as a NodePort when required.
 
 ## Verify
 

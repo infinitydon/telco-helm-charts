@@ -74,7 +74,9 @@ data:
             - uri: http://{{ include "open5gs-5g.fullname" . }}-nrf:7777
           nsi:
             - uri: http://{{ include "open5gs-5g.fullname" . }}-nrf:7777
-              s_nssai: { sst: {{ .Values.subscriber.sst }} }
+              s_nssai:
+                sst: {{ .Values.subscriber.sst }}
+                sd: {{ .Values.subscriber.sd }}
   amf.yaml: |
     logger: { level: info }
     amf:
