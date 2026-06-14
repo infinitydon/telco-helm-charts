@@ -2,5 +2,5 @@ apiVersion: v2
 name: open5gs-4g
 description: Beginner-friendly Open5GS EPC lab with Multus and srsRAN 4G
 type: application
-version: 0.1.0
+version: 0.1.1
 appVersion: "2.7.5"

@@ -76,9 +76,11 @@ spec:
           image: {{ $root.Values.image.open5gs }}
           imagePullPolicy: {{ $root.Values.image.pullPolicy }}
           command: ["open5gs-{{ $name }}d"]
+          {{- if or (eq $name "udr") (eq $name "pcf") }}
           env:
             - name: DB_URI
               value: mongodb://{{ include "open5gs-5g.fullname" $root }}-mongodb/open5gs
+          {{- end }}
           {{- if eq $name "upf" }}
           securityContext:
             privileged: true
