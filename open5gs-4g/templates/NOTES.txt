@@ -1,0 +1,7 @@
+Open5GS 4G EPC lab installed with ten Multus networks.
+
+Check LTE attach:
+  kubectl logs deploy/{{ include "open5gs-4g.fullname" . }}-simulator -c ue
+
+Ping the SGi endpoint through the LTE UE:
+  kubectl exec deploy/{{ include "open5gs-4g.fullname" . }}-simulator -c ue -- ping -I tun_srsue {{ .Values.addresses.dataSgi }}

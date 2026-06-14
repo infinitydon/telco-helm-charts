@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open5gs-4g.fullname" . }}-simulator
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: simulator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: simulator
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-4g.fullname" . }}-s1-mme","interface":"s1mme","ips":["{{ .Values.addresses.enbS1 }}/24"]},{"name":"{{ include "open5gs-4g.fullname" . }}-s1-u","interface":"s1u","ips":["{{ .Values.addresses.enbS1u }}/24"]}]
+    spec:
+      terminationGracePeriodSeconds: 5
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      initContainers:
+        - name: provision-subscriber
+          image: {{ .Values.image.dbctl }}
+          env:
+            - name: DB_URI
+              value: mongodb://{{ include "open5gs-4g.fullname" . }}-mongodb/open5gs
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until open5gs-dbctl showall >/dev/null 2>&1; do sleep 2; done;
+              open5gs-dbctl remove {{ .Values.subscriber.imsi }} || true;
+              open5gs-dbctl add_ue_with_apn
+              {{ .Values.subscriber.imsi }}
+              {{ .Values.subscriber.key }}
+              {{ .Values.subscriber.opc }}
+              {{ .Values.subscriber.apn }}
+      containers:
+        - name: enb
+          image: {{ .Values.image.srsran }}
+          args: ["enb"]
+          env:
+            - { name: GTP_BIND_INTERFACE, value: s1u }
+            - { name: S1C_BIND_INTERFACE, value: s1mme }
+            - { name: MME_ADDR, value: {{ .Values.addresses.mmeS1 | quote }} }
+            - { name: TAC, value: {{ .Values.enb.tac | quote }} }
+          volumeMounts:
+            - { name: config, mountPath: /etc/srsran/enb.conf, subPath: enb.conf }
+            - { name: config, mountPath: /etc/srsran/rr.conf, subPath: rr.conf }
+        - name: ue
+          image: {{ .Values.image.srsran }}
+          args: ["ue"]
+          securityContext:
+            privileged: true
+            capabilities: { add: [NET_ADMIN] }
+          volumeMounts:
+            - { name: config, mountPath: /etc/srsran/ue.conf, subPath: ue.conf }
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "open5gs-4g.fullname" . }}-configs
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open5gs-4g.fullname" . }}-data
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: data
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: data
+      annotations:
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-4g.fullname" . }}-sgi","interface":"sgi","ips":["{{ .Values.addresses.dataSgi }}/24"]}]
+    spec:
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      containers:
+        - name: data
+          image: {{ .Values.image.toolbox }}
+          securityContext:
+            capabilities: { add: [NET_ADMIN] }
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              ip route add {{ .Values.ueSubnet }} via {{ .Values.addresses.upfSgi }} dev sgi;
+              sleep infinity

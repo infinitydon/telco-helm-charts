@@ -1,0 +1,13 @@
+Open5GS 5G SA lab installed.
+
+Multus networks:
+  N2: {{ include "open5gs-5g.fullname" . }}-n2
+  N3: {{ include "open5gs-5g.fullname" . }}-n3
+  N4: {{ include "open5gs-5g.fullname" . }}-n4
+  N6: {{ include "open5gs-5g.fullname" . }}-n6
+
+Check registration and the PDU session:
+  kubectl logs deploy/{{ include "open5gs-5g.fullname" . }}-ue
+
+Ping the N6 test endpoint through the UE tunnel:
+  kubectl exec deploy/{{ include "open5gs-5g.fullname" . }}-ue -- ping -I uesimtun0 {{ .Values.addresses.dataN6 }}

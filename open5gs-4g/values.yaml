@@ -1,0 +1,85 @@
+image:
+  open5gs: gradiant/open5gs:2.7.5
+  mongodb: mongo:6.0
+  dbctl: gradiant/open5gs-dbctl:0.10.3
+  srsran: gradiant/srsran-4g:23_11
+  toolbox: alpine:3.21
+  pullPolicy: IfNotPresent
+
+nodeSelector:
+  kubernetes.io/hostname: ebpf-bng-node-01
+
+plmn:
+  mcc: "001"
+  mnc: "01"
+  tac: 1
+
+subscriber:
+  imsi: "001010000000001"
+  key: "465B5CE8B199B49FAA5F0A2EE238A6BC"
+  opc: "E8ED289DEBA952E4283B54E88E6183CA"
+  apn: internet
+
+ueSubnet: 10.46.0.0/16
+ueGateway: 10.46.0.1
+
+multus:
+  s1-mme: { subnet: 10.41.0.0/24 }
+  s11: { subnet: 10.42.0.0/24 }
+  s5-c: { subnet: 10.43.0.0/24 }
+  s6a: { subnet: 10.44.0.0/24 }
+  gx: { subnet: 10.45.0.0/24 }
+  sxa: { subnet: 10.47.0.0/24 }
+  sxb: { subnet: 10.48.0.0/24 }
+  s1-u: { subnet: 10.49.0.0/24 }
+  s5-u: { subnet: 10.50.0.0/24 }
+  sgi: { subnet: 10.55.0.0/24 }
+
+addresses:
+  mmeS1: 10.41.0.2
+  enbS1: 10.41.0.10
+  mmeS11: 10.42.0.2
+  sgwcS11: 10.42.0.3
+  sgwcS5c: 10.43.0.2
+  smfS5c: 10.43.0.3
+  mmeS6a: 10.44.0.2
+  hssS6a: 10.44.0.3
+  smfGx: 10.45.0.2
+  pcrfGx: 10.45.0.3
+  sgwcSxa: 10.47.0.2
+  sgwuSxa: 10.47.0.3
+  smfSxb: 10.48.0.2
+  upfSxb: 10.48.0.3
+  sgwuS1u: 10.49.0.2
+  enbS1u: 10.49.0.10
+  sgwuS5u: 10.50.0.2
+  upfS5u: 10.50.0.3
+  upfSgi: 10.55.0.2
+  dataSgi: 10.55.0.100
+
+containerPorts:
+  frdi: 3868
+
+config:
+  mme:
+    frdi: { hostname: "10.44.0.2", port: 3868 }
+  hss:
+    frdi: { hostname: "10.44.0.3", port: 3868 }
+  smf:
+    frdi: { hostname: "10.45.0.2", port: 3868 }
+  pcrf:
+    frdi: { hostname: "10.45.0.3", port: 3868 }
+
+enb:
+  enb_id: "0x19B"
+  mcc: "001"
+  mnc: "01"
+  tac: "0001"
+
+ue:
+  imsi: "001010000000001"
+  k: "465B5CE8B199B49FAA5F0A2EE238A6BC"
+  opc: "E8ED289DEBA952E4283B54E88E6183CA"
+  imei: "353490069873319"
+
+resources: {}

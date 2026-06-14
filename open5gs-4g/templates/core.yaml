@@ -1,0 +1,97 @@
+{{- $root := . -}}
+{{- $functions := list "hss" "mme" "sgwc" "sgwu" "smf" "upf" "pcrf" -}}
+{{- range $name := $functions }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open5gs-4g.fullname" $root }}-{{ $name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $root.Release.Name }}
+      app.kubernetes.io/component: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ $root.Release.Name }}
+        app.kubernetes.io/component: {{ $name }}
+      annotations:
+        checksum/config: {{ include (print $root.Template.BasePath "/configs.yaml") $root | sha256sum }}
+        {{- if eq $name "hss" }}
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-4g.fullname" $root }}-s6a","interface":"s6a","ips":["{{ $root.Values.addresses.hssS6a }}/24"]}]
+        {{- else if eq $name "mme" }}
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-4g.fullname" $root }}-s1-mme","interface":"s1mme","ips":["{{ $root.Values.addresses.mmeS1 }}/24"]},{"name":"{{ include "open5gs-4g.fullname" $root }}-s11","interface":"s11","ips":["{{ $root.Values.addresses.mmeS11 }}/24"]},{"name":"{{ include "open5gs-4g.fullname" $root }}-s6a","interface":"s6a","ips":["{{ $root.Values.addresses.mmeS6a }}/24"]}]
+        {{- else if eq $name "sgwc" }}
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-4g.fullname" $root }}-s11","interface":"s11","ips":["{{ $root.Values.addresses.sgwcS11 }}/24"]},{"name":"{{ include "open5gs-4g.fullname" $root }}-s5-c","interface":"s5c","ips":["{{ $root.Values.addresses.sgwcS5c }}/24"]},{"name":"{{ include "open5gs-4g.fullname" $root }}-sxa","interface":"sxa","ips":["{{ $root.Values.addresses.sgwcSxa }}/24"]}]
+        {{- else if eq $name "sgwu" }}
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-4g.fullname" $root }}-sxa","interface":"sxa","ips":["{{ $root.Values.addresses.sgwuSxa }}/24"]},{"name":"{{ include "open5gs-4g.fullname" $root }}-s1-u","interface":"s1u","ips":["{{ $root.Values.addresses.sgwuS1u }}/24"]},{"name":"{{ include "open5gs-4g.fullname" $root }}-s5-u","interface":"s5u","ips":["{{ $root.Values.addresses.sgwuS5u }}/24"]}]
+        {{- else if eq $name "smf" }}
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-4g.fullname" $root }}-s5-c","interface":"s5c","ips":["{{ $root.Values.addresses.smfS5c }}/24"]},{"name":"{{ include "open5gs-4g.fullname" $root }}-gx","interface":"gx","ips":["{{ $root.Values.addresses.smfGx }}/24"]},{"name":"{{ include "open5gs-4g.fullname" $root }}-sxb","interface":"sxb","ips":["{{ $root.Values.addresses.smfSxb }}/24"]}]
+        {{- else if eq $name "upf" }}
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-4g.fullname" $root }}-sxb","interface":"sxb","ips":["{{ $root.Values.addresses.upfSxb }}/24"]},{"name":"{{ include "open5gs-4g.fullname" $root }}-s5-u","interface":"s5u","ips":["{{ $root.Values.addresses.upfS5u }}/24"]},{"name":"{{ include "open5gs-4g.fullname" $root }}-sgi","interface":"sgi","ips":["{{ $root.Values.addresses.upfSgi }}/24"]}]
+        {{- else if eq $name "pcrf" }}
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-4g.fullname" $root }}-gx","interface":"gx","ips":["{{ $root.Values.addresses.pcrfGx }}/24"]}]
+        {{- end }}
+    spec:
+      nodeSelector:
+        {{- toYaml $root.Values.nodeSelector | nindent 8 }}
+      {{- if eq $name "upf" }}
+      initContainers:
+        - name: create-tun
+          image: {{ $root.Values.image.open5gs }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              ip tuntap add name ogstun mode tun;
+              ip addr add {{ $root.Values.ueGateway }}/16 dev ogstun;
+              ip link set ogstun up;
+              ip route add {{ $root.Values.addresses.sgwuS1u }}/32
+              via {{ $root.Values.addresses.sgwuS5u }} dev s5u;
+              sysctl -w net.ipv4.ip_forward=1;
+              sysctl -w net.ipv4.conf.all.rp_filter=0;
+              sysctl -w net.ipv4.conf.s5u.rp_filter=0;
+              sysctl -w net.ipv4.conf.sgi.rp_filter=0;
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            runAsGroup: 0
+            capabilities: { add: [NET_ADMIN] }
+      {{- end }}
+      containers:
+        - name: {{ $name }}
+          image: {{ $root.Values.image.open5gs }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          command: ["open5gs-{{ $name }}d"]
+          env:
+            - name: DB_URI
+              value: mongodb://{{ include "open5gs-4g.fullname" $root }}-mongodb/open5gs
+          {{- if eq $name "upf" }}
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            runAsGroup: 0
+            capabilities: { add: [NET_ADMIN] }
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /opt/open5gs/etc/open5gs/{{ $name }}.yaml
+              subPath: {{ $name }}.yaml
+            {{- if or (eq $name "hss") (eq $name "mme") (eq $name "smf") (eq $name "pcrf") }}
+            - name: config
+              mountPath: /opt/open5gs/etc/freeDiameter/{{ $name }}.conf
+              subPath: {{ $name }}.conf
+            {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "open5gs-4g.fullname" $root }}-configs
+{{- end }}
