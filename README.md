@@ -1,12 +1,37 @@
 # Telco Helm Charts
 
-This repository contains small, teaching-oriented telecom labs.
+This repository contains Helm charts for beginner-friendly Open5GS labs and
+high-availability Ella Core private 5G deployments.
 
-| Chart | Core | RAN simulator | End-to-end check |
+## Chart Catalog
+
+| Chart | Purpose | Multus interfaces | Validation or companion |
 | --- | --- | --- | --- |
-| `open5gs-4g` | Open5GS EPC | srsRAN 4G eNB and UE | UE attach and ping over SGi |
-| `open5gs-5g` | Open5GS 5G SA | UERANSIM gNB and UE | UE registration, PDU session, and ping over N6 |
+| [`open5gs-4g`](open5gs-4g/) | Open5GS EPC learning lab | LTE signaling and user-plane interfaces | Included srsRAN eNB/UE attach and SGi ping |
+| [`open5gs-5g`](open5gs-5g/) | Open5GS standalone 5G learning lab | N2, N3, N4, and N6 | Included UERANSIM registration, PDU session, and N6 ping |
+| [`ella-core-5g-chart`](ella-core/ella-core-5g-chart/) | HA Ella Core cluster using stable N2 addresses for Raft | N2, N3, and N6 | Bootstrap provisioning and HA failover workflow |
+| [`ella-core-5g-chart-fqdn`](ella-core/ella-core-5g-chart-fqdn/) | HA Ella Core cluster using Kubernetes pod FQDNs for Raft | N2, N3, and N6 | Bootstrap provisioning and HA failover workflow |
+| [`ueransim-5g-chart`](ella-core/ueransim-5g-chart/) | UERANSIM gNB and UE for Ella Core | gNB N2 and N3 | Dynamic Ella Core leader discovery and UE registration |
 
-Both charts create their own Multus `NetworkAttachmentDefinition` resources.
-See each chart's README for the interface list, addressing, installation, and
-verification commands.
+## Open5GS Labs
+
+The Open5GS charts are compact, self-contained labs intended for learning.
+Each chart includes its RAN simulator, subscriber provisioning, WebUI, Multus
+networks, and an automated end-to-end test. The 5G SBI and both WebUIs use the
+default Kubernetes pod network rather than Multus.
+
+## Ella Core
+
+The Ella Core charts deploy an HA Raft cluster and include automatic admin,
+API-token, join-token, subscriber, and N6 configuration. Choose one core
+variant:
+
+- `ella-core-5g-chart` advertises stable Multus N2 addresses as Raft peers.
+- `ella-core-5g-chart-fqdn` advertises Kubernetes pod FQDNs as Raft peers.
+
+Deploy `ueransim-5g-chart` alongside the selected Ella Core chart for
+end-to-end gNB and UE testing. It discovers the active Ella Core leader and
+updates the gNB after failover.
+
+See each chart's README for prerequisites, address planning, installation,
+and verification commands.
