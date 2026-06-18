@@ -25,16 +25,26 @@ ueSubnet: 10.46.0.0/16
 ueGateway: 10.46.0.1
 
 multus:
-  s1-mme: { subnet: 10.41.0.0/24 }
-  s11: { subnet: 10.42.0.0/24 }
-  s5-c: { subnet: 10.43.0.0/24 }
-  s6a: { subnet: 10.44.0.0/24 }
-  gx: { subnet: 10.45.0.0/24 }
-  sxa: { subnet: 10.47.0.0/24 }
-  sxb: { subnet: 10.48.0.0/24 }
-  s1-u: { subnet: 10.49.0.0/24 }
-  s5-u: { subnet: 10.50.0.0/24 }
-  sgi: { subnet: 10.55.0.0/24 }
+  s1-mme:
+    subnet: 10.41.0.0/24
+  s11:
+    subnet: 10.42.0.0/24
+  s5-c:
+    subnet: 10.43.0.0/24
+  s6a:
+    subnet: 10.44.0.0/24
+  gx:
+    subnet: 10.45.0.0/24
+  sxa:
+    subnet: 10.47.0.0/24
+  sxb:
+    subnet: 10.48.0.0/24
+  s1-u:
+    subnet: 10.49.0.0/24
+  s5-u:
+    subnet: 10.50.0.0/24
+  sgi:
+    subnet: 10.55.0.0/24
 
 addresses:
   mmeS1: 10.41.0.2
