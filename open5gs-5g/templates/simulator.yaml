@@ -41,6 +41,15 @@ spec:
       terminationGracePeriodSeconds: 5
       nodeSelector:
         {{- toYaml .Values.nodeSelector | nindent 8 }}
+      initContainers:
+        - name: wait-for-amf
+          image: {{ .Values.image.toolbox }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until ping -c 1 -W 1 {{ .Values.addresses.amfN2 }} >/dev/null 2>&1;
+              do sleep 2; done
       containers:
         - name: gnb
           image: {{ .Values.image.ueransim }}
@@ -97,6 +106,14 @@ spec:
               {{ .Values.subscriber.dnn }}
               {{ .Values.subscriber.sst }}
               {{ trimPrefix "0x" .Values.subscriber.sd }}
+        - name: wait-for-gnb
+          image: {{ .Values.image.toolbox }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until nc -zu -w 1 {{ include "open5gs-5g.fullname" . }}-gnb 4997
+              >/dev/null 2>&1; do sleep 2; done
       containers:
         - name: ue
           image: {{ .Values.image.ueransim }}

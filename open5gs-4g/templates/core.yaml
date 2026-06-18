@@ -44,8 +44,22 @@ spec:
     spec:
       nodeSelector:
         {{- toYaml $root.Values.nodeSelector | nindent 8 }}
-      {{- if eq $name "upf" }}
+      {{- if or (eq $name "upf") (eq $name "hss") (eq $name "pcrf") }}
       initContainers:
+        {{- if or (eq $name "hss") (eq $name "pcrf") }}
+        - name: wait-for-mongodb
+          image: {{ $root.Values.image.mongodb }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          env:
+            - name: DB_URI
+              value: mongodb://{{ include "open5gs-4g.fullname" $root }}-mongodb/open5gs
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until mongosh "$DB_URI" --quiet --eval "db.runCommand({ ping: 1 })"
+              >/dev/null 2>&1; do sleep 2; done
+        {{- end }}
+        {{- if eq $name "upf" }}
         - name: create-tun
           image: {{ $root.Values.image.open5gs }}
           command: ["/bin/sh", "-ec"]
@@ -65,6 +79,7 @@ spec:
             runAsUser: 0
             runAsGroup: 0
             capabilities: { add: [NET_ADMIN] }
+        {{- end }}
       {{- end }}
       containers:
         - name: {{ $name }}

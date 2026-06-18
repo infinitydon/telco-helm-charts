@@ -39,6 +39,14 @@ spec:
               {{ .Values.subscriber.key }}
               {{ .Values.subscriber.opc }}
               {{ .Values.subscriber.apn }}
+        - name: wait-for-mme
+          image: {{ .Values.image.toolbox }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until ping -c 1 -W 1 {{ .Values.addresses.mmeS1 }} >/dev/null 2>&1;
+              do sleep 2; done
       containers:
         - name: enb
           image: {{ .Values.image.srsran }}

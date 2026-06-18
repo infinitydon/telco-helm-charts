@@ -40,19 +40,31 @@ spec:
         k8s.v1.cni.cncf.io/networks: >-
           [{"name":"{{ include "open5gs-5g.fullname" $root }}-n2","interface":"n2","ips":["{{ $root.Values.addresses.amfN2 }}/24"]}]
       {{- else if eq $name "smf" }}
-      annotations:
         k8s.v1.cni.cncf.io/networks: >-
           [{"name":"{{ include "open5gs-5g.fullname" $root }}-n4","interface":"n4","ips":["{{ $root.Values.addresses.smfN4 }}/24"]}]
       {{- else if eq $name "upf" }}
-      annotations:
         k8s.v1.cni.cncf.io/networks: >-
           [{"name":"{{ include "open5gs-5g.fullname" $root }}-n3","interface":"n3","ips":["{{ $root.Values.addresses.upfN3 }}/24"]},{"name":"{{ include "open5gs-5g.fullname" $root }}-n4","interface":"n4","ips":["{{ $root.Values.addresses.upfN4 }}/24"]},{"name":"{{ include "open5gs-5g.fullname" $root }}-n6","interface":"n6","ips":["{{ $root.Values.addresses.upfN6 }}/24"]}]
       {{- end }}
     spec:
       nodeSelector:
         {{- toYaml $root.Values.nodeSelector | nindent 8 }}
-      {{- if eq $name "upf" }}
+      {{- if or (eq $name "upf") (eq $name "udr") (eq $name "pcf") }}
       initContainers:
+        {{- if or (eq $name "udr") (eq $name "pcf") }}
+        - name: wait-for-mongodb
+          image: {{ $root.Values.image.mongodb }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          env:
+            - name: DB_URI
+              value: mongodb://{{ include "open5gs-5g.fullname" $root }}-mongodb/open5gs
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until mongosh "$DB_URI" --quiet --eval "db.runCommand({ ping: 1 })"
+              >/dev/null 2>&1; do sleep 2; done
+        {{- end }}
+        {{- if eq $name "upf" }}
         - name: create-tun
           image: {{ $root.Values.image.open5gs }}
           securityContext:
@@ -70,6 +82,7 @@ spec:
               sysctl -w net.ipv4.conf.all.rp_filter=0;
               sysctl -w net.ipv4.conf.n3.rp_filter=0;
               sysctl -w net.ipv4.conf.n6.rp_filter=0;
+        {{- end }}
       {{- end }}
       containers:
         - name: {{ $name }}
