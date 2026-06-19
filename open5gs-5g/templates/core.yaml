@@ -25,6 +25,8 @@ metadata:
     {{- include "open5gs-5g.labels" $root | nindent 4 }}
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/instance: {{ $root.Release.Name }}
@@ -36,6 +38,7 @@ spec:
         app.kubernetes.io/component: {{ $name }}
       annotations:
         checksum/config: {{ include (print $root.Template.BasePath "/configs.yaml") $root | sha256sum }}
+        checksum/nads: {{ include (print $root.Template.BasePath "/nads.yaml") $root | sha256sum }}
       {{- if eq $name "amf" }}
         k8s.v1.cni.cncf.io/networks: >-
           [{"name":"{{ include "open5gs-5g.fullname" $root }}-n2","interface":"n2","ips":["{{ $root.Values.addresses.amfN2 }}/24"]}]

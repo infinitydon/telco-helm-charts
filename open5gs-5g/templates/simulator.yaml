@@ -35,6 +35,7 @@ spec:
         app.kubernetes.io/component: gnb
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
+        checksum/nads: {{ include (print $.Template.BasePath "/nads.yaml") . | sha256sum }}
         k8s.v1.cni.cncf.io/networks: >-
           [{"name":"{{ include "open5gs-5g.fullname" . }}-n2","interface":"n2","ips":["{{ .Values.addresses.gnbN2 }}/24"]},{"name":"{{ include "open5gs-5g.fullname" . }}-n3","interface":"n3","ips":["{{ .Values.addresses.gnbN3 }}/24"]}]
     spec:
@@ -139,6 +140,8 @@ metadata:
     {{- include "open5gs-5g.labels" . | nindent 4 }}
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/instance: {{ .Release.Name }}
@@ -149,6 +152,7 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: data
       annotations:
+        checksum/nads: {{ include (print $.Template.BasePath "/nads.yaml") . | sha256sum }}
         k8s.v1.cni.cncf.io/networks: >-
           [{"name":"{{ include "open5gs-5g.fullname" . }}-n6","interface":"n6","ips":["{{ .Values.addresses.dataN6 }}/24"]}]
     spec:

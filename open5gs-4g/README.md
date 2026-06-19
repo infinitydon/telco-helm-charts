@@ -13,6 +13,11 @@ Open5GS, an srsRAN eNB and UE, and an SGi test endpoint.
 
 ## Multus interfaces
 
+The chart defaults to `macvlan` NADs in bridge mode with `enp8s19` as the
+master interface. Override `multusDefaults` or an individual `multus` entry
+when another CNI type, master interface, or mode is required. Static workload
+addresses are assigned in pod annotations.
+
 | Interface | Protocol or purpose | Subnet | Endpoints |
 | --- | --- | --- | --- |
 | S1-MME | SCTP/S1AP | `10.41.0.0/24` | MME `.2`, eNB `.10` |
@@ -33,7 +38,8 @@ network while the eNB uses the dedicated S1-U network.
 ## Prerequisites
 
 - Kubernetes with Multus installed
-- The `bridge`, `static`, and `tuning` CNI plugins
+- The `macvlan` and `static` CNI plugins
+- Worker nodes with the `multusDefaults.master` interface, default `enp8s19`
 - SCTP support on the worker node
 - `kubectl` and Helm 3
 - One worker matching `nodeSelector` in `values.yaml`

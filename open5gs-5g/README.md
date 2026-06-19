@@ -13,6 +13,11 @@ MongoDB, the Open5GS 5G core, UERANSIM, and an N6 test endpoint.
 
 ## Multus interfaces
 
+The chart defaults to `macvlan` NADs in bridge mode with `enp8s19` as the
+master interface. Override `multusDefaults` or an individual `multus` entry
+when another CNI type, master interface, or mode is required. Static workload
+addresses are assigned in pod annotations.
+
 | Interface | Protocol or purpose | Subnet | Endpoints |
 | --- | --- | --- | --- |
 | N2 | SCTP/NGAP | `10.51.0.0/24` | AMF `.2`, gNB `.10` |
@@ -26,7 +31,8 @@ Kubernetes Services on the default pod network. SBI does not use Multus.
 ## Prerequisites
 
 - Kubernetes with Multus installed
-- The `bridge`, `static`, and `tuning` CNI plugins
+- The `macvlan` and `static` CNI plugins
+- Worker nodes with the `multusDefaults.master` interface, default `enp8s19`
 - SCTP support on the worker node
 - `kubectl` and Helm 3
 - One worker matching `nodeSelector` in `values.yaml`

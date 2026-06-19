@@ -17,6 +17,7 @@ spec:
         app.kubernetes.io/component: simulator
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
+        checksum/nads: {{ include (print $.Template.BasePath "/nads.yaml") . | sha256sum }}
         k8s.v1.cni.cncf.io/networks: >-
           [{"name":"{{ include "open5gs-4g.fullname" . }}-s1-mme","interface":"s1mme","ips":["{{ .Values.addresses.enbS1 }}/24"]},{"name":"{{ include "open5gs-4g.fullname" . }}-s1-u","interface":"s1u","ips":["{{ .Values.addresses.enbS1u }}/24"]}]
     spec:
@@ -78,6 +79,8 @@ metadata:
   name: {{ include "open5gs-4g.fullname" . }}-data
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/instance: {{ .Release.Name }}
@@ -88,6 +91,7 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: data
       annotations:
+        checksum/nads: {{ include (print $.Template.BasePath "/nads.yaml") . | sha256sum }}
         k8s.v1.cni.cncf.io/networks: >-
           [{"name":"{{ include "open5gs-4g.fullname" . }}-sgi","interface":"sgi","ips":["{{ .Values.addresses.dataSgi }}/24"]}]
     spec:

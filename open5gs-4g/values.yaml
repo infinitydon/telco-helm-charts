@@ -24,6 +24,15 @@ subscriber:
 ueSubnet: 10.46.0.0/16
 ueGateway: 10.46.0.1
 
+multusDefaults:
+  type: macvlan
+  master: enp8s19
+  mode: bridge
+  ipam:
+    type: static
+
+# Each entry creates one Multus NAD. Static workload addresses are assigned
+# in the pod annotations so the packet path is easy to follow.
 multus:
   s1-mme:
     subnet: 10.41.0.0/24

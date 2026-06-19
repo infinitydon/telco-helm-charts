@@ -1,4 +1,8 @@
 {{- range $name, $network := .Values.multus }}
+{{- $type := default $.Values.multusDefaults.type $network.type }}
+{{- $master := default $.Values.multusDefaults.master $network.master }}
+{{- $mode := default $.Values.multusDefaults.mode $network.mode }}
+{{- $ipamType := dig "ipam" "type" $.Values.multusDefaults.ipam.type $network }}
 ---
 apiVersion: k8s.cni.cncf.io/v1
 kind: NetworkAttachmentDefinition
@@ -11,10 +15,18 @@ spec:
     {
       "cniVersion": "0.3.1",
       "name": "{{ include "open5gs-5g.fullname" $ }}-{{ $name }}",
-      "type": "bridge",
+      "type": "{{ $type }}",
+      {{- if eq $type "bridge" }}
       "bridge": "{{ include "open5gs-5g.fullname" $ | trunc 8 }}-{{ $name }}",
+      {{- else if or (eq $type "macvlan") (eq $type "ipvlan") }}
+      "master": "{{ $master }}",
+      "mode": "{{ $mode }}",
+      {{- end }}
       "ipam": {
-        "type": "static"
+        "type": "{{ $ipamType }}"
+        {{- if and $network.subnet (ne $ipamType "static") }},
+        "subnet": "{{ $network.subnet }}"
+        {{- end }}
       }
     }
 {{- end }}

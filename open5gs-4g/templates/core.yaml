@@ -8,6 +8,8 @@ metadata:
   name: {{ include "open5gs-4g.fullname" $root }}-{{ $name }}
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/instance: {{ $root.Release.Name }}
@@ -19,6 +21,7 @@ spec:
         app.kubernetes.io/component: {{ $name }}
       annotations:
         checksum/config: {{ include (print $root.Template.BasePath "/configs.yaml") $root | sha256sum }}
+        checksum/nads: {{ include (print $root.Template.BasePath "/nads.yaml") $root | sha256sum }}
         {{- if eq $name "hss" }}
         k8s.v1.cni.cncf.io/networks: >-
           [{"name":"{{ include "open5gs-4g.fullname" $root }}-s6a","interface":"s6a","ips":["{{ $root.Values.addresses.hssS6a }}/24"]}]
