@@ -1,0 +1,45 @@
+{{- range $name, $network := .Values.dra.networks }}
+---
+apiVersion: linux-net.dra.infinitydon.com/v1alpha1
+kind: IPPool
+metadata:
+  name: {{ include "open5gs-5g-dra.fullname" $ }}-{{ $name }}
+  labels:
+    {{- include "open5gs-5g-dra.labels" $ | nindent 4 }}
+spec:
+  subnet: {{ $network.subnet }}
+  allocations:
+    {{- toYaml $network.allocations | nindent 4 }}
+  reservations:
+    - name: open5gs-static
+      addresses:
+        {{- toYaml $network.reservations | nindent 8 }}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: {{ include "open5gs-5g-dra.fullname" $ }}-{{ $name }}
+  labels:
+    {{- include "open5gs-5g-dra.labels" $ | nindent 4 }}
+spec:
+  spec:
+    devices:
+      requests:
+        - name: {{ $name }}
+          exactly:
+            deviceClassName: {{ $.Values.dra.deviceClassName }}
+            selectors:
+              - cel:
+                  expression: >-
+                    device.attributes['{{ $.Values.dra.driver }}'].interface == '{{ $.Values.dra.parentInterface }}'
+      config:
+        - requests: [{{ $name | quote }}]
+          opaque:
+            driver: {{ $.Values.dra.driver }}
+            parameters:
+              type: macvlan
+              mode: {{ $.Values.dra.mode }}
+              interfaceName: {{ $name }}
+              mtu: {{ $.Values.dra.mtu }}
+              ipPool: {{ include "open5gs-5g-dra.fullname" $ }}-{{ $name }}
+{{- end }}
