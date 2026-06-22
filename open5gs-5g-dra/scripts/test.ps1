@@ -46,6 +46,16 @@ if ($unexpected) {
 }
 Write-Host "DRA interfaces use protocol names only."
 
+$gnbLogs = (kubectl @kubectlArgs logs --namespace $Namespace `
+    "deployment/$gnbDeployment" --container gnb --tail=50) -join "`n"
+if (-not $gnbLogs.Contains("N2_BIND_IP: 10.60.0.10") -or
+    -not $gnbLogs.Contains("N3_BIND_IP: 10.60.0.26") -or
+    -not $gnbLogs.Contains("N3_ADVERTISE_IP: 10.60.0.26") -or
+    -not $gnbLogs.Contains("AMF_IP: 10.60.0.2")) {
+    throw "gNB entrypoint did not select the DRA N2/N3 addresses."
+}
+Write-Host "gNB binds and advertises the DRA protocol addresses."
+
 kubectl @kubectlArgs wait --namespace $Namespace --for=condition=Available `
     "deployment/$ueDeployment" --timeout="${TimeoutSeconds}s"
 
@@ -62,6 +72,11 @@ do {
 if (-not $logs.Contains("PDU Session establishment is successful")) {
     throw "5G UE did not establish a PDU session within $TimeoutSeconds seconds."
 }
+
+if ($logs -notmatch "GNB_IP:\s+\S+") {
+    throw "UE entrypoint did not resolve the gNB service address."
+}
+Write-Host "UE resolved the gNB service address."
 
 kubectl @kubectlArgs exec --namespace $Namespace "deployment/$ueDeployment" `
     --container tools -- ping -I uesimtun0 -c 5 -W 2 10.60.0.60

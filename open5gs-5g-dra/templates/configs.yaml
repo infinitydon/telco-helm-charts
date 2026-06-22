@@ -163,11 +163,11 @@ data:
     nci: "0x000000010"
     idLength: 32
     tac: {{ printf "%06d" (.Values.plmn.tac | int) | quote }}
-    linkIp: 0.0.0.0
-    ngapIp: {{ .Values.addresses.gnbN2 }}
-    gtpIp: {{ .Values.addresses.gnbN3 }}
+    linkIp: ${RADIO_BIND_IP}
+    ngapIp: ${N2_BIND_IP}
+    gtpIp: ${N3_BIND_IP}
     amfConfigs:
-      - address: {{ .Values.addresses.amfN2 }}
+      - address: ${AMF_IP}
         port: 38412
     slices:
       - sst: {{ .Values.subscriber.sst }}
@@ -183,7 +183,7 @@ data:
     amf: {{ .Values.subscriber.amf | quote }}
     imei: "356938035643803"
     gnbSearchList:
-      - {{ include "open5gs-5g-dra.fullname" . }}-gnb
+      - ${GNB_IP}
     uacAic:
       mps: false
       mcs: false

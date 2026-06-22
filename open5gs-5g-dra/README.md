@@ -73,8 +73,9 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 ```
 
 The test verifies protocol-named DRA interfaces, rejects `netN` names, checks
-UE registration and PDU-session establishment, pings `10.60.0.60` through
-`uesimtun0`, and runs iperf3 over the same path.
+the gNB entrypoint's N2/N3 bind and advertise addresses, checks UE registration
+and PDU-session establishment, pings `10.60.0.60` through `uesimtun0`, and runs
+iperf3 over the same path.
 
 Inspect allocations and persistent DRA network status with:
 
