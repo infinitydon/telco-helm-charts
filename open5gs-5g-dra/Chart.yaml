@@ -2,5 +2,5 @@ apiVersion: v2
 name: open5gs-5g-dra
 description: Open5GS 5G SA lab with DRA macvlan secondary networks and UERANSIM
 type: application
-version: 0.1.1
+version: 0.1.4
 appVersion: "2.7.5"

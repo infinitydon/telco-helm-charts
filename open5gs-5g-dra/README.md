@@ -14,17 +14,21 @@ Multus, NetworkAttachmentDefinitions, or CNI secondary attachments.
 
 ## DRA Networks
 
-The chart divides `10.60.0.0/24` into separate `/28` protocol networks:
+The chart divides `10.61.0.0/24` into separate `/28` protocol networks:
 
 | Interface | Subnet | Fixed endpoints |
 | --- | --- | --- |
-| N2 | `10.60.0.0/28` | AMF `.2`, gNB `.10` |
-| N3 | `10.60.0.16/28` | UPF `.18`, gNB `.26` |
-| N4 | `10.60.0.32/28` | SMF `.34`, UPF `.35` |
-| N6 | `10.60.0.48/28` | UPF `.50`, iperf3 server `.60` |
+| N2 | `10.61.0.0/28` | AMF `.2`, gNB `.10` |
+| N3 | `10.61.0.16/28` | UPF `.18`, gNB `.26` |
+| N4 | `10.61.0.32/28` | SMF `.34`, UPF `.35` |
+| N6 | `10.61.0.48/28` | UPF `.50`, iperf3 server `.60` |
 
 Each network has its own DRA `IPPool` and `ResourceClaimTemplate`. Claim
 requests and interfaces are explicitly named `n2`, `n3`, `n4`, or `n6`.
+
+The chart also enables a namespace-local NetworkPolicy for the NRF by default.
+This keeps stray NFs from other lab namespaces from registering into this core's
+NRF and being selected during PDU-session setup.
 Static addresses are reserved in the pools and requested through
 claim-specific Pod annotations.
 
@@ -74,7 +78,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 
 The test verifies protocol-named DRA interfaces, rejects `netN` names, checks
 the gNB entrypoint's N2/N3 bind and advertise addresses, checks UE registration
-and PDU-session establishment, pings `10.60.0.60` through `uesimtun0`, and runs
+and PDU-session establishment, pings `10.61.0.60` through `uesimtun0`, and runs
 iperf3 over the same path.
 
 Inspect allocations and persistent DRA network status with:

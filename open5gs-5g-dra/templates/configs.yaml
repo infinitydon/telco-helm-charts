@@ -137,6 +137,15 @@ data:
         - subnet: {{ .Values.ueSubnet }}
           gateway: {{ .Values.ueGateway }}
           dnn: {{ .Values.subscriber.dnn }}
+      info:
+        - s_nssai:
+            - sst: {{ .Values.subscriber.sst }}
+              sd: {{ .Values.subscriber.sd }}
+              dnn:
+                - {{ .Values.subscriber.dnn }}
+          tai:
+            - plmn_id: { mcc: {{ .Values.plmn.mcc | quote }}, mnc: {{ .Values.plmn.mnc | quote }} }
+              tac: {{ .Values.plmn.tac }}
       dns: [ 8.8.8.8, 8.8.4.4 ]
       mtu: 1400
   upf.yaml: |

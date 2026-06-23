@@ -35,54 +35,57 @@ dra:
   mtu: 1500
   networks:
     n2:
-      subnet: 10.60.0.0/28
+      subnet: 10.61.0.0/28
       allocations:
         - name: dynamic-a
-          rangeStart: 10.60.0.3
-          rangeEnd: 10.60.0.9
+          rangeStart: 10.61.0.3
+          rangeEnd: 10.61.0.9
         - name: dynamic-b
-          rangeStart: 10.60.0.11
-          rangeEnd: 10.60.0.14
-      reservations: [10.60.0.2, 10.60.0.10]
+          rangeStart: 10.61.0.11
+          rangeEnd: 10.61.0.14
+      reservations: [10.61.0.2, 10.61.0.10]
     n3:
-      subnet: 10.60.0.16/28
+      subnet: 10.61.0.16/28
       allocations:
         - name: dynamic-a
-          rangeStart: 10.60.0.19
-          rangeEnd: 10.60.0.25
+          rangeStart: 10.61.0.19
+          rangeEnd: 10.61.0.25
         - name: dynamic-b
-          rangeStart: 10.60.0.27
-          rangeEnd: 10.60.0.30
-      reservations: [10.60.0.18, 10.60.0.26]
+          rangeStart: 10.61.0.27
+          rangeEnd: 10.61.0.30
+      reservations: [10.61.0.18, 10.61.0.26]
     n4:
-      subnet: 10.60.0.32/28
+      subnet: 10.61.0.32/28
       allocations:
         - name: dynamic
-          rangeStart: 10.60.0.36
-          rangeEnd: 10.60.0.46
-      reservations: [10.60.0.34, 10.60.0.35]
+          rangeStart: 10.61.0.36
+          rangeEnd: 10.61.0.46
+      reservations: [10.61.0.34, 10.61.0.35]
     n6:
-      subnet: 10.60.0.48/28
+      subnet: 10.61.0.48/28
       allocations:
         - name: dynamic-a
-          rangeStart: 10.60.0.51
-          rangeEnd: 10.60.0.59
+          rangeStart: 10.61.0.51
+          rangeEnd: 10.61.0.59
         - name: dynamic-b
-          rangeStart: 10.60.0.61
-          rangeEnd: 10.60.0.62
-      reservations: [10.60.0.50, 10.60.0.60]
+          rangeStart: 10.61.0.61
+          rangeEnd: 10.61.0.62
+      reservations: [10.61.0.50, 10.61.0.60]
 
 addresses:
-  amfN2: 10.60.0.2
-  gnbN2: 10.60.0.10
-  upfN3: 10.60.0.18
-  gnbN3: 10.60.0.26
-  smfN4: 10.60.0.34
-  upfN4: 10.60.0.35
-  upfN6: 10.60.0.50
-  dataN6: 10.60.0.60
+  amfN2: 10.61.0.2
+  gnbN2: 10.61.0.10
+  upfN3: 10.61.0.18
+  gnbN3: 10.61.0.26
+  smfN4: 10.61.0.34
+  upfN4: 10.61.0.35
+  upfN6: 10.61.0.50
+  dataN6: 10.61.0.60
 
 resources: {}
+
+networkPolicy:
+  enabled: true
 
 webui:
   enabled: true
