@@ -1,0 +1,210 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "open5gs-5g-dra.fullname" . }}-gnb
+  labels:
+    {{- include "open5gs-5g-dra.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: gnb
+  ports:
+    - name: radio
+      port: 4997
+      targetPort: 4997
+      protocol: UDP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open5gs-5g-dra.fullname" . }}-gnb
+  labels:
+    {{- include "open5gs-5g-dra.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: gnb
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: gnb
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
+        checksum/dra-networks: {{ include (print $.Template.BasePath "/dra-networks.yaml") . | sha256sum }}
+        {{ .Values.dra.driver }}/n2.interface-name: "n2"
+        {{ .Values.dra.driver }}/n2.ip-pool: {{ printf "%s-n2" (include "open5gs-5g-dra.fullname" .) | quote }}
+        {{ .Values.dra.driver }}/n2.address: {{ printf "%s/28" .Values.addresses.gnbN2 | quote }}
+        {{ .Values.dra.driver }}/n3.interface-name: "n3"
+        {{ .Values.dra.driver }}/n3.ip-pool: {{ printf "%s-n3" (include "open5gs-5g-dra.fullname" .) | quote }}
+        {{ .Values.dra.driver }}/n3.address: {{ printf "%s/28" .Values.addresses.gnbN3 | quote }}
+    spec:
+      terminationGracePeriodSeconds: 5
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      resourceClaims:
+        - name: n2
+          resourceClaimTemplateName: {{ include "open5gs-5g-dra.fullname" . }}-n2
+        - name: n3
+          resourceClaimTemplateName: {{ include "open5gs-5g-dra.fullname" . }}-n3
+      initContainers:
+        - name: wait-for-amf
+          image: {{ .Values.image.toolbox }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until ping -c 1 -W 1 {{ .Values.addresses.amfN2 }} >/dev/null 2>&1;
+              do sleep 2; done
+      containers:
+        - name: gnb
+          image: {{ .Values.image.ueransim }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["gnb"]
+          env:
+            - name: N2_IFACE
+              value: n2
+            - name: N3_IFACE
+              value: n3
+            - name: RADIO_IFACE
+              value: eth0
+            - name: AMF_IP
+              value: {{ .Values.addresses.amfN2 | quote }}
+          resources:
+            claims:
+              - name: n2
+              - name: n3
+          volumeMounts:
+            - name: config
+              mountPath: /etc/ueransim/gnb.yaml
+              subPath: gnb.yaml
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "open5gs-5g-dra.fullname" . }}-configs
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open5gs-5g-dra.fullname" . }}-ue
+  labels:
+    {{- include "open5gs-5g-dra.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: ue
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: ue
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
+    spec:
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      initContainers:
+        - name: provision-subscriber
+          image: {{ .Values.image.dbctl }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: DB_URI
+              value: mongodb://{{ include "open5gs-5g-dra.fullname" . }}-mongodb/open5gs
+            - name: HOME
+              value: /tmp
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until open5gs-dbctl showall >/dev/null 2>&1; do sleep 2; done;
+              open5gs-dbctl remove {{ .Values.subscriber.imsi }} || true;
+              open5gs-dbctl add_ue_with_slice
+              {{ .Values.subscriber.imsi }}
+              {{ .Values.subscriber.key }}
+              {{ .Values.subscriber.opc }}
+              {{ .Values.subscriber.dnn }}
+              {{ .Values.subscriber.sst }}
+              {{ trimPrefix "0x" .Values.subscriber.sd }}
+        - name: wait-for-gnb
+          image: {{ .Values.image.toolbox }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until nc -zu -w 1 {{ include "open5gs-5g-dra.fullname" . }}-gnb 4997
+              >/dev/null 2>&1; do sleep 2; done
+      containers:
+        - name: ue
+          image: {{ .Values.image.ueransim }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["ue"]
+          env:
+            - name: GNB_HOSTNAME
+              value: {{ include "open5gs-5g-dra.fullname" . }}-gnb
+          securityContext:
+            privileged: true
+            capabilities: { add: [NET_ADMIN] }
+          volumeMounts:
+            - name: config
+              mountPath: /etc/ueransim/ue.yaml
+              subPath: ue.yaml
+        - name: tools
+          image: {{ .Values.image.toolbox }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sleep", "infinity"]
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "open5gs-5g-dra.fullname" . }}-configs
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open5gs-5g-dra.fullname" . }}-data
+  labels:
+    {{- include "open5gs-5g-dra.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: data
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: data
+      annotations:
+        checksum/dra-networks: {{ include (print $.Template.BasePath "/dra-networks.yaml") . | sha256sum }}
+        {{ .Values.dra.driver }}/n6.interface-name: "n6"
+        {{ .Values.dra.driver }}/n6.ip-pool: {{ printf "%s-n6" (include "open5gs-5g-dra.fullname" .) | quote }}
+        {{ .Values.dra.driver }}/n6.address: {{ printf "%s/28" .Values.addresses.dataN6 | quote }}
+    spec:
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      resourceClaims:
+        - name: n6
+          resourceClaimTemplateName: {{ include "open5gs-5g-dra.fullname" . }}-n6
+      containers:
+        - name: data
+          image: {{ .Values.image.toolbox }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            capabilities: { add: [NET_ADMIN] }
+          resources:
+            claims:
+              - name: n6
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              ip route add {{ .Values.ueSubnet }} via {{ .Values.addresses.upfN6 }} dev n6;
+              exec iperf3 -s -B {{ .Values.addresses.dataN6 }}

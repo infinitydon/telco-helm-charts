@@ -1,0 +1,220 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "open5gs-5g-dra.fullname" . }}-configs
+  labels:
+    {{- include "open5gs-5g-dra.labels" . | nindent 4 }}
+data:
+  nrf.yaml: |
+    logger: { level: info }
+    nrf:
+      serving:
+        - plmn_id: { mcc: {{ .Values.plmn.mcc | quote }}, mnc: {{ .Values.plmn.mnc | quote }} }
+      sbi:
+        server:
+          - dev: eth0
+            port: 7777
+            advertise: {{ include "open5gs-5g-dra.fullname" . }}-nrf
+  ausf.yaml: |
+    logger: { level: info }
+    ausf:
+      sbi:
+        server:
+          - dev: eth0
+            port: 7777
+            advertise: {{ include "open5gs-5g-dra.fullname" . }}-ausf
+        client:
+          nrf:
+            - uri: http://{{ include "open5gs-5g-dra.fullname" . }}-nrf:7777
+  udm.yaml: |
+    logger: { level: info }
+    udm:
+      sbi:
+        server:
+          - dev: eth0
+            port: 7777
+            advertise: {{ include "open5gs-5g-dra.fullname" . }}-udm
+        client:
+          nrf:
+            - uri: http://{{ include "open5gs-5g-dra.fullname" . }}-nrf:7777
+  udr.yaml: |
+    db_uri: mongodb://{{ include "open5gs-5g-dra.fullname" . }}-mongodb/open5gs
+    logger: { level: info }
+    udr:
+      sbi:
+        server:
+          - dev: eth0
+            port: 7777
+            advertise: {{ include "open5gs-5g-dra.fullname" . }}-udr
+        client:
+          nrf:
+            - uri: http://{{ include "open5gs-5g-dra.fullname" . }}-nrf:7777
+  pcf.yaml: |
+    db_uri: mongodb://{{ include "open5gs-5g-dra.fullname" . }}-mongodb/open5gs
+    logger: { level: info }
+    pcf:
+      sbi:
+        server:
+          - dev: eth0
+            port: 7777
+            advertise: {{ include "open5gs-5g-dra.fullname" . }}-pcf
+        client:
+          nrf:
+            - uri: http://{{ include "open5gs-5g-dra.fullname" . }}-nrf:7777
+  nssf.yaml: |
+    logger: { level: info }
+    nssf:
+      sbi:
+        server:
+          - dev: eth0
+            port: 7777
+            advertise: {{ include "open5gs-5g-dra.fullname" . }}-nssf
+        client:
+          nrf:
+            - uri: http://{{ include "open5gs-5g-dra.fullname" . }}-nrf:7777
+          nsi:
+            - uri: http://{{ include "open5gs-5g-dra.fullname" . }}-nrf:7777
+              s_nssai:
+                sst: {{ .Values.subscriber.sst }}
+                sd: {{ .Values.subscriber.sd }}
+  amf.yaml: |
+    logger: { level: info }
+    amf:
+      sbi:
+        server:
+          - dev: eth0
+            port: 7777
+            advertise: {{ include "open5gs-5g-dra.fullname" . }}-amf
+        client:
+          nrf:
+            - uri: http://{{ include "open5gs-5g-dra.fullname" . }}-nrf:7777
+      ngap:
+        server:
+          - address: {{ .Values.addresses.amfN2 }}
+      guami:
+        - plmn_id: { mcc: {{ .Values.plmn.mcc | quote }}, mnc: {{ .Values.plmn.mnc | quote }} }
+          amf_id: { region: 2, set: 1 }
+      tai:
+        - plmn_id: { mcc: {{ .Values.plmn.mcc | quote }}, mnc: {{ .Values.plmn.mnc | quote }} }
+          tac: {{ .Values.plmn.tac }}
+      plmn_support:
+        - plmn_id: { mcc: {{ .Values.plmn.mcc | quote }}, mnc: {{ .Values.plmn.mnc | quote }} }
+          s_nssai:
+            - sst: {{ .Values.subscriber.sst }}
+              sd: {{ .Values.subscriber.sd }}
+      security:
+        integrity_order: [ NIA2, NIA1, NIA0 ]
+        ciphering_order: [ NEA0, NEA1, NEA2 ]
+      network_name: { full: Open5GS }
+      amf_name: open5gs-amf0
+      time:
+        t3512:
+          value: 540
+  smf.yaml: |
+    logger: { level: info }
+    smf:
+      sbi:
+        server:
+          - dev: eth0
+            port: 7777
+            advertise: {{ include "open5gs-5g-dra.fullname" . }}-smf
+        client:
+          nrf:
+            - uri: http://{{ include "open5gs-5g-dra.fullname" . }}-nrf:7777
+      pfcp:
+        server:
+          - address: {{ .Values.addresses.smfN4 }}
+        client:
+          upf:
+            - address: {{ .Values.addresses.upfN4 }}
+      gtpc:
+        server:
+          - address: 0.0.0.0
+      gtpu:
+        server:
+          - address: {{ .Values.addresses.smfN4 }}
+      session:
+        - subnet: {{ .Values.ueSubnet }}
+          gateway: {{ .Values.ueGateway }}
+          dnn: {{ .Values.subscriber.dnn }}
+      info:
+        - s_nssai:
+            - sst: {{ .Values.subscriber.sst }}
+              sd: {{ .Values.subscriber.sd }}
+              dnn:
+                - {{ .Values.subscriber.dnn }}
+          tai:
+            - plmn_id: { mcc: {{ .Values.plmn.mcc | quote }}, mnc: {{ .Values.plmn.mnc | quote }} }
+              tac: {{ .Values.plmn.tac }}
+      dns: [ 8.8.8.8, 8.8.4.4 ]
+      mtu: 1400
+  upf.yaml: |
+    logger: { level: info }
+    upf:
+      pfcp:
+        server:
+          - address: {{ .Values.addresses.upfN4 }}
+        client:
+          smf:
+            - address: {{ .Values.addresses.smfN4 }}
+      gtpu:
+        server:
+          - address: {{ .Values.addresses.upfN3 }}
+            advertise: {{ .Values.addresses.upfN3 }}
+      session:
+        - subnet: {{ .Values.ueSubnet }}
+          gateway: {{ .Values.ueGateway }}
+          dnn: {{ .Values.subscriber.dnn }}
+          dev: ogstun
+  gnb.yaml: |
+    mcc: {{ .Values.plmn.mcc | quote }}
+    mnc: {{ .Values.plmn.mnc | quote }}
+    nci: "0x000000010"
+    idLength: 32
+    tac: {{ printf "%06d" (.Values.plmn.tac | int) | quote }}
+    linkIp: ${RADIO_BIND_IP}
+    ngapIp: ${N2_BIND_IP}
+    gtpIp: ${N3_BIND_IP}
+    amfConfigs:
+      - address: ${AMF_IP}
+        port: 38412
+    slices:
+      - sst: {{ .Values.subscriber.sst }}
+        sd: {{ .Values.subscriber.sd }}
+    ignoreStreamIds: true
+  ue.yaml: |
+    supi: "imsi-{{ .Values.subscriber.imsi }}"
+    mcc: {{ .Values.plmn.mcc | quote }}
+    mnc: {{ .Values.plmn.mnc | quote }}
+    key: {{ .Values.subscriber.key | quote }}
+    op: {{ .Values.subscriber.opc | quote }}
+    opType: OPC
+    amf: {{ .Values.subscriber.amf | quote }}
+    imei: "356938035643803"
+    gnbSearchList:
+      - ${GNB_IP}
+    uacAic:
+      mps: false
+      mcs: false
+    uacAcc:
+      normalClass: 0
+      class11: false
+      class12: false
+      class13: false
+      class14: false
+      class15: false
+    sessions:
+      - type: IPv4
+        apn: {{ .Values.subscriber.dnn }}
+        slice:
+          sst: {{ .Values.subscriber.sst }}
+          sd: {{ .Values.subscriber.sd }}
+    configured-nssai:
+      - sst: {{ .Values.subscriber.sst }}
+        sd: {{ .Values.subscriber.sd }}
+    default-nssai:
+      - sst: {{ .Values.subscriber.sst }}
+        sd: {{ .Values.subscriber.sd }}
+    integrity: { IA1: true, IA2: true, IA3: true }
+    ciphering: { EA1: true, EA2: true, EA3: true }
+    integrityMaxRate: { uplink: full, downlink: full }

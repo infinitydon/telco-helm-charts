@@ -1,0 +1,147 @@
+{{- $root := . -}}
+{{- $functions := list "nrf" "ausf" "udm" "udr" "pcf" "nssf" "amf" "smf" "upf" -}}
+{{- range $name := $functions }}
+{{- $component := index $root.Values.components $name | default dict -}}
+{{- if or (not (hasKey $component "enabled")) $component.enabled }}
+{{- $claims := list -}}
+{{- $claimAddresses := dict -}}
+{{- if eq $name "amf" }}
+{{- $claims = list "n2" -}}
+{{- $claimAddresses = dict "n2" $root.Values.addresses.amfN2 -}}
+{{- else if eq $name "smf" }}
+{{- $claims = list "n4" -}}
+{{- $claimAddresses = dict "n4" $root.Values.addresses.smfN4 -}}
+{{- else if eq $name "upf" }}
+{{- $claims = list "n3" "n4" "n6" -}}
+{{- $claimAddresses = dict "n3" $root.Values.addresses.upfN3 "n4" $root.Values.addresses.upfN4 "n6" $root.Values.addresses.upfN6 -}}
+{{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "open5gs-5g-dra.fullname" $root }}-{{ $name }}
+  labels:
+    {{- include "open5gs-5g-dra.labels" $root | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/instance: {{ $root.Release.Name }}
+    app.kubernetes.io/component: {{ $name }}
+  ports:
+    - name: sbi
+      port: 7777
+      targetPort: 7777
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open5gs-5g-dra.fullname" $root }}-{{ $name }}
+  labels:
+    {{- include "open5gs-5g-dra.labels" $root | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $root.Release.Name }}
+      app.kubernetes.io/component: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ $root.Release.Name }}
+        app.kubernetes.io/component: {{ $name }}
+      annotations:
+        checksum/config: {{ include (print $root.Template.BasePath "/configs.yaml") $root | sha256sum }}
+        {{- if $claims }}
+        checksum/dra-networks: {{ include (print $root.Template.BasePath "/dra-networks.yaml") $root | sha256sum }}
+        {{- range $claim := $claims }}
+        {{ $root.Values.dra.driver }}/{{ $claim }}.interface-name: {{ $claim | quote }}
+        {{ $root.Values.dra.driver }}/{{ $claim }}.ip-pool: {{ printf "%s-%s" (include "open5gs-5g-dra.fullname" $root) $claim | quote }}
+        {{ $root.Values.dra.driver }}/{{ $claim }}.address: {{ printf "%s/28" (index $claimAddresses $claim) | quote }}
+        {{- end }}
+        {{- end }}
+    spec:
+      nodeSelector:
+        {{- toYaml $root.Values.nodeSelector | nindent 8 }}
+      {{- if $claims }}
+      resourceClaims:
+        {{- range $claim := $claims }}
+        - name: {{ $claim }}
+          resourceClaimTemplateName: {{ include "open5gs-5g-dra.fullname" $root }}-{{ $claim }}
+        {{- end }}
+      {{- end }}
+      {{- if or (eq $name "upf") (eq $name "udr") (eq $name "pcf") }}
+      initContainers:
+        {{- if or (eq $name "udr") (eq $name "pcf") }}
+        - name: wait-for-mongodb
+          image: {{ $root.Values.image.mongodb }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          env:
+            - name: DB_URI
+              value: mongodb://{{ include "open5gs-5g-dra.fullname" $root }}-mongodb/open5gs
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until mongosh "$DB_URI" --quiet --eval "db.runCommand({ ping: 1 })"
+              >/dev/null 2>&1; do sleep 2; done
+        {{- end }}
+        {{- if eq $name "upf" }}
+        - name: create-tun
+          image: {{ $root.Values.image.open5gs }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            runAsGroup: 0
+            capabilities: { add: [NET_ADMIN] }
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              ip tuntap add name ogstun mode tun;
+              ip addr add {{ $root.Values.ueGateway }}/16 dev ogstun;
+              ip link set ogstun up;
+              sysctl -w net.ipv4.ip_forward=1;
+              sysctl -w net.ipv4.conf.all.rp_filter=0;
+              sysctl -w net.ipv4.conf.n3.rp_filter=0;
+              sysctl -w net.ipv4.conf.n6.rp_filter=0;
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: {{ $name }}
+          image: {{ $root.Values.image.open5gs }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          command: ["open5gs-{{ $name }}d"]
+          {{- if or (eq $name "udr") (eq $name "pcf") }}
+          env:
+            - name: DB_URI
+              value: mongodb://{{ include "open5gs-5g-dra.fullname" $root }}-mongodb/open5gs
+          {{- end }}
+          {{- if eq $name "upf" }}
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            runAsGroup: 0
+            capabilities: { add: [NET_ADMIN] }
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /opt/open5gs/etc/open5gs/{{ $name }}.yaml
+              subPath: {{ $name }}.yaml
+          {{- if or $claims $root.Values.resources }}
+          resources:
+            {{- if $claims }}
+            claims:
+              {{- range $claim := $claims }}
+              - name: {{ $claim }}
+              {{- end }}
+            {{- end }}
+            {{- with $root.Values.resources }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "open5gs-5g-dra.fullname" $root }}-configs
+{{- end }}
+{{- end }}

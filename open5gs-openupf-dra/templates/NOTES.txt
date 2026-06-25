@@ -1,0 +1,27 @@
+Open5GS 5G SA DRA lab installed.
+
+{{- if .Values.webui.enabled }}
+Open the WebUI:
+{{- if eq .Values.webui.service.type "NodePort" }}
+  NodePort: {{ .Values.webui.service.nodePort }}
+  Browse to http://<worker-node-ip>:{{ .Values.webui.service.nodePort }} and log in with admin / 1423.
+{{- else }}
+  kubectl port-forward service/{{ include "open5gs-5g-dra.fullname" . }}-webui 9999:{{ .Values.webui.service.port }}
+  Browse to http://localhost:9999 and log in with admin / 1423.
+{{- end }}
+{{- end }}
+
+DRA networks:
+  N2: {{ .Values.dra.networks.n2.subnet }}
+  N3: {{ .Values.dra.networks.n3.subnet }}
+  N4: {{ .Values.dra.networks.n4.subnet }}
+  N6: {{ .Values.dra.networks.n6.subnet }}
+
+Check registration and the PDU session:
+  kubectl logs deploy/{{ include "open5gs-5g-dra.fullname" . }}-ue
+
+Ping the N6 test endpoint through the UE tunnel:
+  kubectl exec deploy/{{ include "open5gs-5g-dra.fullname" . }}-ue -c tools -- ping -I uesimtun0 {{ .Values.addresses.dataN6 }}
+
+Run iperf3 through the UE tunnel:
+  kubectl exec deploy/{{ include "open5gs-5g-dra.fullname" . }}-ue -c tools -- iperf3 -c {{ .Values.addresses.dataN6 }} --bind-dev uesimtun0 -t 5

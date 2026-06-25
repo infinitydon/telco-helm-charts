@@ -1,0 +1,370 @@
+{{- if .Values.openupf.enabled }}
+{{- $root := . -}}
+{{- $full := include "open5gs-5g-dra.fullname" . -}}
+{{- $driver := .Values.openupf.dpdk.driver -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $full }}-openupf-smu
+  labels:
+    {{- include "open5gs-5g-dra.labels" . | nindent 4 }}
+    app.kubernetes.io/component: openupf-smu
+spec:
+  {{- with .Values.openupf.services.smu.clusterIP }}
+  clusterIP: {{ . }}
+  {{- end }}
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: openupf-smu
+  ports:
+    - name: rest
+      port: {{ .Values.openupf.services.smu.restPort }}
+      targetPort: {{ .Values.openupf.services.smu.restPort }}
+    - name: fpu-mgmt
+      port: {{ .Values.openupf.services.smu.fpuMgmtPort }}
+      targetPort: {{ .Values.openupf.services.smu.fpuMgmtPort }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $full }}-openupf-lbu
+  labels:
+    {{- include "open5gs-5g-dra.labels" . | nindent 4 }}
+    app.kubernetes.io/component: openupf-lbu
+spec:
+  {{- with .Values.openupf.services.lbu.clusterIP }}
+  clusterIP: {{ . }}
+  {{- end }}
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: openupf-lbu
+  ports:
+    - name: backend-mgmt
+      port: {{ .Values.openupf.services.lbu.backendMgmtPort }}
+      targetPort: {{ .Values.openupf.services.lbu.backendMgmtPort }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $full }}-openupf-config
+  labels:
+    {{- include "open5gs-5g-dra.labels" . | nindent 4 }}
+data:
+  smu_docker.ini: |
+    [debug]
+    debug_level={{ .Values.openupf.debug.level }}
+    debug_type = {{ .Values.openupf.debug.type }}
+    log_path = /var/log/upf_smu.log
+
+    [service]
+    node_num=32
+    session_num=1000
+    pfd_number = 10000
+    fast_number=100000
+    n3_ip_v4={{ .Values.addresses.upfN3 }}
+    n3_ip_v6=2000:2::1113:abcc
+    n6_ip_v4={{ .Values.addresses.upfN6 }}
+    n6_ip_v6=2000:3::1114:abcc
+    n9_ip_v4=10.8.127.197
+    n9_ip_v6=2000:4::1119:abcc
+    n4_ethname=n4
+    n4_ip_v4={{ .Values.addresses.upfN4 }}
+    n4_ip_v6=2000:1::1112:abcc
+    orphan_number = 10000
+    teid_number = 200000
+    dns_num=8000
+    ha_block_num = 10000
+    fast_bucket_number = 65536
+    block_number = 65536
+    block_size = 2048
+    cblock_number = 65536
+    restful_listen={{ .Values.openupf.services.smu.restPort }}
+    lb_ips = {{ required "openupf.services.lbu.clusterIP is required when openupf.enabled=true" .Values.openupf.services.lbu.clusterIP }}
+    lb_port = {{ .Values.openupf.services.lbu.backendMgmtPort }}
+    ha_ip = 192.168.199.230|192.168.204.3
+    ha_port = 34567
+    default_master = 1
+    fpu_mgmt_port = {{ .Values.openupf.services.smu.fpuMgmtPort }}
+    audit_period = 4
+    audit_switch = 1
+
+    [UP_features]
+    BUCP=1
+    DDND=1
+    DLBD=1
+    TRST=1
+    FTUP=1
+    PFDM=0
+    HEEU=1
+    TREU=1
+    EMPU=1
+    PDIU=1
+    UDBC=1
+    QUOAC=1
+    TRACE=0
+    FRRT=1
+    PFDE=0
+    EPFAR=1
+    DPDRA=1
+    ADPDP=1
+    UEIP=0
+    SSET=1
+    MNOP=0
+    MTE=1
+    BUNDL=0
+    GCOM=0
+    MPAS=0
+    RTTL=0
+    VTIME=0
+    NORP=0
+    IPTV=0
+    IP6PL=0
+    TSCU=0
+    MPTCP=0
+    ATSSS-LL=0
+    QFQM=0
+    GPQM=0
+    MT-EDT=0
+    CIOT=1
+    ETHAR=0
+
+    [ueip]
+    ueip_pool_num = 2
+    ueip_pool_1 = 192.168.77.0/24
+    ueip_pool_2 = 2001:2002:2003::0/96
+  lbu_docker.ini: |
+    [debug]
+    debug_level = {{ .Values.openupf.debug.level }}
+    debug_type = {{ .Values.openupf.debug.type }}
+    log_path = /var/log/upf_lbu.log
+
+    [service]
+    ha_ip = 0.0.0.0
+    ha_port = 23323
+    be_mgmt_port = {{ .Values.openupf.services.lbu.backendMgmtPort }}
+    default_master = 1
+    N3_IPv4 = {{ .Values.addresses.upfN3 }}/28
+    N3_IPv4_gateway = {{ .Values.addresses.upfN3Gateway }}
+    N3_IPv6 =2000:2::1113:abcc/64
+    N6_IPv4 = {{ .Values.addresses.upfN6 }}/28
+    N6_IPv4_gateway = {{ .Values.addresses.upfN6Gateway }}
+    N6_IPv6 =2001:2::2223:abcc/64
+    N9_IPv4 = 10.8.129.100/24
+    N9_IPv4_gateway = 10.8.124.200
+    N9_IPv6 =2001:9::2223:abcc/64
+    N4_IPv4 = {{ .Values.addresses.upfN4 }}/28
+    N4_IPv4_gateway = {{ .Values.addresses.upfN4Gateway }}
+    N4_IPv6 =2001:4::2223:abcc/64
+  fpu_dpdk_docker.ini: |
+    [debug]
+    debug_level = {{ .Values.openupf.debug.level }}
+    debug_type = {{ .Values.openupf.debug.type }}
+    log_path = /var/log/upf_fpu.log
+
+    [service]
+    dpdk_mtu=1500
+    mb_ips = {{ required "openupf.services.smu.clusterIP is required when openupf.enabled=true" .Values.openupf.services.smu.clusterIP }}
+    mb_port = {{ .Values.openupf.services.smu.fpuMgmtPort }}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: {{ $full }}-openupf-lbu-dpdk
+  labels:
+    {{- include "open5gs-5g-dra.labels" . | nindent 4 }}
+spec:
+  spec:
+    devices:
+      requests:
+        - name: dpdk
+          exactly:
+            deviceClassName: {{ .Values.openupf.dpdk.deviceClassName }}
+            allocationMode: ExactCount
+            count: {{ len .Values.openupf.dpdk.lbu.pciAddresses }}
+            selectors:
+              - cel:
+                  expression: >-
+                    {{- $clauses := list -}}
+                    {{- range .Values.openupf.dpdk.lbu.pciAddresses }}
+                    {{- $clauses = append $clauses (printf "device.attributes['%s'].pciAddress == '%s'" $driver .) -}}
+                    {{- end }}
+                    device.attributes['{{ $driver }}'].dpdk == true &&
+                    ({{ join " || " $clauses }})
+      config:
+        - requests: ["dpdk"]
+          opaque:
+            driver: {{ $driver }}
+            parameters:
+              type: {{ .Values.openupf.dpdk.type }}
+{{- range $index, $pci := .Values.openupf.dpdk.fpu.pciAddresses }}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: {{ $full }}-openupf-fpu-{{ add1 $index }}-dpdk
+  labels:
+    {{- include "open5gs-5g-dra.labels" $root | nindent 4 }}
+spec:
+  spec:
+    devices:
+      requests:
+        - name: dpdk
+          exactly:
+            deviceClassName: {{ $root.Values.openupf.dpdk.deviceClassName }}
+            allocationMode: ExactCount
+            count: 1
+            selectors:
+              - cel:
+                  expression: >-
+                    device.attributes['{{ $driver }}'].pciAddress == '{{ $pci }}'
+      config:
+        - requests: ["dpdk"]
+          opaque:
+            driver: {{ $driver }}
+            parameters:
+              type: {{ $root.Values.openupf.dpdk.type }}
+{{- end }}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ $full }}-openupf-smu
+  labels:
+    {{- include "open5gs-5g-dra.labels" . | nindent 4 }}
+    app.kubernetes.io/component: openupf-smu
+  annotations:
+    {{ .Values.dra.driver }}/n4.interface-name: "n4"
+    {{ .Values.dra.driver }}/n4.ip-pool: {{ printf "%s-n4" $full | quote }}
+    {{ .Values.dra.driver }}/n4.address: {{ printf "%s/28" .Values.addresses.upfN4 | quote }}
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    {{- toYaml .Values.nodeSelector | nindent 4 }}
+  {{- if .Values.openupf.imagePullSecrets }}
+  imagePullSecrets:
+    {{- range .Values.openupf.imagePullSecrets }}
+    - name: {{ . }}
+    {{- end }}
+  {{- end }}
+  resourceClaims:
+    - name: n4
+      resourceClaimTemplateName: {{ $full }}-n4
+  containers:
+    - name: smu
+      image: {{ .Values.image.openupf }}
+      imagePullPolicy: {{ .Values.image.pullPolicy }}
+      command: ["/opt/upf/script/kubernetes-entrypoint.sh", "smu"]
+      env:
+        - name: UPF_RUNCONFIG
+          value: /opt/upf/config/smu/smu_docker.ini
+      securityContext:
+        capabilities:
+          add: ["NET_ADMIN", "NET_RAW", "NET_BIND_SERVICE"]
+      resources:
+        claims:
+          - name: n4
+        {{- toYaml .Values.openupf.resources.smu | nindent 8 }}
+      volumeMounts:
+        - name: config
+          mountPath: /opt/upf/config/smu/smu_docker.ini
+          subPath: smu_docker.ini
+  volumes:
+    - name: config
+      configMap:
+        name: {{ $full }}-openupf-config
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ $full }}-openupf-lbu
+  labels:
+    {{- include "open5gs-5g-dra.labels" . | nindent 4 }}
+    app.kubernetes.io/component: openupf-lbu
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    {{- toYaml .Values.nodeSelector | nindent 4 }}
+  {{- if .Values.openupf.imagePullSecrets }}
+  imagePullSecrets:
+    {{- range .Values.openupf.imagePullSecrets }}
+    - name: {{ . }}
+    {{- end }}
+  {{- end }}
+  resourceClaims:
+    - name: dpdk
+      resourceClaimTemplateName: {{ $full }}-openupf-lbu-dpdk
+  containers:
+    - name: lbu
+      image: {{ .Values.image.openupf }}
+      imagePullPolicy: {{ .Values.image.pullPolicy }}
+      command: ["/opt/upf/script/kubernetes-entrypoint.sh", "lbu"]
+      securityContext:
+        capabilities:
+          add: ["IPC_LOCK", "SYS_ADMIN", "SYS_RAWIO"]
+      resources:
+        claims:
+          - name: dpdk
+        {{- toYaml .Values.openupf.resources.lbu | nindent 8 }}
+      volumeMounts:
+        - name: hugepages
+          mountPath: /dev/hugepages
+        - name: config
+          mountPath: /opt/upf/config/lbu/lbu_docker.ini
+          subPath: lbu_docker.ini
+  volumes:
+    - name: hugepages
+      emptyDir:
+        medium: HugePages
+    - name: config
+      configMap:
+        name: {{ $full }}-openupf-config
+{{- range $index, $pci := .Values.openupf.dpdk.fpu.pciAddresses }}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ $full }}-openupf-fpu-{{ add1 $index }}
+  labels:
+    {{- include "open5gs-5g-dra.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: openupf-fpu
+    app.kubernetes.io/part-of: openupf
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    {{- toYaml $root.Values.nodeSelector | nindent 4 }}
+  {{- if $root.Values.openupf.imagePullSecrets }}
+  imagePullSecrets:
+    {{- range $root.Values.openupf.imagePullSecrets }}
+    - name: {{ . }}
+    {{- end }}
+  {{- end }}
+  resourceClaims:
+    - name: dpdk
+      resourceClaimTemplateName: {{ $full }}-openupf-fpu-{{ add1 $index }}-dpdk
+  containers:
+    - name: fpu
+      image: {{ $root.Values.image.openupf }}
+      imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+      command: ["/opt/upf/script/kubernetes-entrypoint.sh", "fpu"]
+      securityContext:
+        capabilities:
+          add: ["IPC_LOCK", "SYS_ADMIN", "SYS_RAWIO"]
+      resources:
+        claims:
+          - name: dpdk
+        {{- toYaml $root.Values.openupf.resources.fpu | nindent 8 }}
+      volumeMounts:
+        - name: hugepages
+          mountPath: /dev/hugepages
+        - name: config
+          mountPath: /opt/upf/config/fpu/fpu_dpdk_docker.ini
+          subPath: fpu_dpdk_docker.ini
+  volumes:
+    - name: hugepages
+      emptyDir:
+        medium: HugePages
+    - name: config
+      configMap:
+        name: {{ $full }}-openupf-config
+{{- end }}
+{{- end }}

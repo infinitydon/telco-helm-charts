@@ -1,0 +1,166 @@
+image:
+  open5gs: gradiant/open5gs:2.7.5
+  webui: gradiant/open5gs-webui:2.7.5
+  mongodb: mongo:6.0@sha256:8b6d8f5bbedb25cb73517b65cf99f13aeb75ad5b157a56c479287a840bbad3ac
+  dbctl: gradiant/open5gs-dbctl:0.10.3
+  ueransim: gradiant/ueransim:3.2.6
+  toolbox: nicolaka/netshoot:v0.15@sha256:47b907d662d139d1e2f22bfe14f4efca1e3f1feed283572f47c970c780c03b61
+  openupf: ghcr.io/infinitydon/openupf:codex-openupf-cluster-bringup@sha256:8b734837e7567761282f1e7743b53b21359ff3efc04ed24f5d3943fc549ef8fd
+  pullPolicy: IfNotPresent
+
+nodeSelector:
+  linux-net.dra.infinitydon.com/enabled: "true"
+  kubernetes.io/hostname: ebpf-bng-node-01
+
+plmn:
+  mcc: "001"
+  mnc: "01"
+  tac: 1
+
+subscriber:
+  imsi: "001010000000001"
+  key: "465B5CE8B199B49FAA5F0A2EE238A6BC"
+  opc: "E8ED289DEBA952E4283B54E88E6183CA"
+  amf: "8000"
+  dnn: internet
+  sst: 1
+  sd: "0x111111"
+
+ueSubnet: 10.45.0.0/16
+ueGateway: 10.45.0.1
+
+dra:
+  driver: linux-net.dra.infinitydon.com
+  deviceClassName: linux-net-macvlan
+  parentInterface: enp8s20
+  mode: bridge
+  mtu: 1500
+  networks:
+    n2:
+      subnet: 10.60.0.0/28
+      allocations:
+        - name: dynamic-a
+          rangeStart: 10.60.0.3
+          rangeEnd: 10.60.0.9
+        - name: dynamic-b
+          rangeStart: 10.60.0.11
+          rangeEnd: 10.60.0.14
+      reservations: [10.60.0.2, 10.60.0.10]
+    n3:
+      subnet: 10.60.0.16/28
+      allocations:
+        - name: dynamic-a
+          rangeStart: 10.60.0.19
+          rangeEnd: 10.60.0.25
+        - name: dynamic-b
+          rangeStart: 10.60.0.27
+          rangeEnd: 10.60.0.30
+      reservations: [10.60.0.18, 10.60.0.26]
+    n4:
+      subnet: 10.60.0.32/28
+      allocations:
+        - name: dynamic
+          rangeStart: 10.60.0.36
+          rangeEnd: 10.60.0.46
+      reservations: [10.60.0.34, 10.60.0.35]
+    n6:
+      subnet: 10.60.0.48/28
+      allocations:
+        - name: dynamic-a
+          rangeStart: 10.60.0.51
+          rangeEnd: 10.60.0.59
+        - name: dynamic-b
+          rangeStart: 10.60.0.61
+          rangeEnd: 10.60.0.62
+      reservations: [10.60.0.50, 10.60.0.60]
+
+addresses:
+  amfN2: 10.60.0.2
+  gnbN2: 10.60.0.10
+  upfN3: 10.60.0.18
+  upfN3Gateway: 10.60.0.17
+  gnbN3: 10.60.0.26
+  smfN4: 10.60.0.34
+  upfN4: 10.60.0.35
+  upfN4Gateway: 10.60.0.33
+  upfN6: 10.60.0.50
+  upfN6Gateway: 10.60.0.49
+  dataN6: 10.60.0.60
+
+resources: {}
+
+networkPolicy:
+  enabled: true
+
+components:
+  upf:
+    enabled: false
+
+simulator:
+  gnb:
+    replicas: 0
+  ue:
+    replicas: 0
+  data:
+    replicas: 1
+
+webui:
+  enabled: true
+  service:
+    type: NodePort
+    port: 9999
+    nodePort: 30083
+
+openupf:
+  enabled: true
+  imagePullSecrets:
+    - ghcr-openupf
+  services:
+    smu:
+      clusterIP: 10.152.183.55
+      restPort: 38080
+      fpuMgmtPort: 50000
+    lbu:
+      clusterIP: 10.152.183.158
+      backendMgmtPort: 34434
+  dpdk:
+    driver: linux-net.dra.infinitydon.com
+    deviceClassName: linux-net-dpdk-intel-vf
+    type: dpdk
+    lbu:
+      pciAddresses:
+        - "0000:04:00.0"
+        - "0000:05:00.0"
+    fpu:
+      pciAddresses:
+        - "0000:03:00.0"
+        - "0000:02:00.0"
+  resources:
+    smu:
+      requests:
+        cpu: "1"
+        memory: 2Gi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+    lbu:
+      requests:
+        cpu: "3"
+        memory: 768Mi
+        hugepages-1Gi: 2Gi
+      limits:
+        cpu: "3"
+        memory: 768Mi
+        hugepages-1Gi: 2Gi
+    fpu:
+      requests:
+        cpu: "2"
+        memory: 512Mi
+        hugepages-1Gi: 1Gi
+      limits:
+        cpu: "2"
+        memory: 512Mi
+        hugepages-1Gi: 1Gi
+  debug:
+    level: MUST|ERR
+    type: ALL
