@@ -5,6 +5,11 @@ high-availability Ella Core private 5G deployments.
 
 ## Chart Catalog
 
+> OpenUPF split-UPF work is being staged on branch
+> [`codex/open5gs-openupf-core-test`](https://github.com/infinitydon/telco-helm-charts/tree/codex/open5gs-openupf-core-test).
+> That branch adds an `open5gs-5g-dra` profile for Open5GS core NFs with
+> OpenUPF SMU/LBU/FPU workers and DPDK Intel VFs.
+
 | Chart | Purpose | Secondary networking | Validation or companion |
 | --- | --- | --- | --- |
 | [`open5gs-4g`](open5gs-4g/) | Open5GS EPC learning lab | LTE signaling and user-plane interfaces | Included srsRAN eNB/UE attach and SGi ping |
