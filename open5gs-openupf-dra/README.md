@@ -24,8 +24,8 @@ The validated topology keeps kernel and DPDK paths separate:
 | Purpose | Value |
 | --- | --- |
 | Kernel DRA parent for Open5GS core, gNB, data, and SMU N4 | `enp8s20` |
-| LBU DPDK VFs | `0000:04:00.0`, `0000:05:00.0` |
-| FPU DPDK VFs | `0000:03:00.0`, `0000:02:00.0` |
+| LBU DPDK allocation | 2 VFs from `linux-net-dpdk-intel-vf` |
+| FPU DPDK allocation | 2 FPU pods, 1 VF per FPU from `linux-net-dpdk-intel-vf` |
 | SMU service ClusterIP | `10.152.183.55` |
 | LBU service ClusterIP | `10.152.183.158` |
 
@@ -60,8 +60,15 @@ Review `values.yaml` and adjust at least:
 - `dra.parentInterface`
 - `openupf.services.smu.clusterIP`
 - `openupf.services.lbu.clusterIP`
-- `openupf.dpdk.lbu.pciAddresses`
-- `openupf.dpdk.fpu.pciAddresses`
+- `openupf.dpdk.deviceClassName`
+- `openupf.dpdk.lbu.count`
+- `openupf.dpdk.fpu.count`
+
+By default the chart does not pin DPDK PCI addresses. It asks DRA for devices
+by DeviceClass and count, and the DRA plugin allocates and injects the actual
+interfaces into the OpenUPF pods. `openupf.dpdk.lbu.pciAddresses` and
+`openupf.dpdk.fpu.pciAddresses` are optional troubleshooting overrides only;
+leave them empty for normal DRA-driven allocation.
 
 Then install:
 

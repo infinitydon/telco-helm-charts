@@ -2,6 +2,9 @@
 {{- $root := . -}}
 {{- $full := include "open5gs-5g-dra.fullname" . -}}
 {{- $driver := .Values.openupf.dpdk.driver -}}
+{{- $lbuPciAddresses := default (list) .Values.openupf.dpdk.lbu.pciAddresses -}}
+{{- $fpuPciAddresses := default (list) .Values.openupf.dpdk.fpu.pciAddresses -}}
+{{- $fpuCount := int .Values.openupf.dpdk.fpu.count -}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -180,23 +183,24 @@ spec:
           exactly:
             deviceClassName: {{ .Values.openupf.dpdk.deviceClassName }}
             allocationMode: ExactCount
-            count: {{ len .Values.openupf.dpdk.lbu.pciAddresses }}
+            count: {{ .Values.openupf.dpdk.lbu.count }}
+            {{- if $lbuPciAddresses }}
             selectors:
               - cel:
                   expression: >-
                     {{- $clauses := list -}}
-                    {{- range .Values.openupf.dpdk.lbu.pciAddresses }}
+                    {{- range $lbuPciAddresses }}
                     {{- $clauses = append $clauses (printf "device.attributes['%s'].pciAddress == '%s'" $driver .) -}}
                     {{- end }}
-                    device.attributes['{{ $driver }}'].dpdk == true &&
-                    ({{ join " || " $clauses }})
+                    {{ join " || " $clauses }}
+            {{- end }}
       config:
         - requests: ["dpdk"]
           opaque:
             driver: {{ $driver }}
             parameters:
               type: {{ .Values.openupf.dpdk.type }}
-{{- range $index, $pci := .Values.openupf.dpdk.fpu.pciAddresses }}
+{{- range $index := until $fpuCount }}
 ---
 apiVersion: resource.k8s.io/v1
 kind: ResourceClaimTemplate
@@ -213,10 +217,12 @@ spec:
             deviceClassName: {{ $root.Values.openupf.dpdk.deviceClassName }}
             allocationMode: ExactCount
             count: 1
+            {{- if lt $index (len $fpuPciAddresses) }}
             selectors:
               - cel:
                   expression: >-
-                    device.attributes['{{ $driver }}'].pciAddress == '{{ $pci }}'
+                    device.attributes['{{ $driver }}'].pciAddress == '{{ index $fpuPciAddresses $index }}'
+            {{- end }}
       config:
         - requests: ["dpdk"]
           opaque:
@@ -342,7 +348,7 @@ spec:
         - name: config
           configMap:
             name: {{ $full }}-openupf-config
-{{- range $index, $pci := .Values.openupf.dpdk.fpu.pciAddresses }}
+{{- range $index := until $fpuCount }}
 ---
 apiVersion: apps/v1
 kind: Deployment
