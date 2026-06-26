@@ -21,7 +21,7 @@ metadata:
   labels:
     {{- include "open5gs-5g-dra.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.simulator.gnb.replicas }}
   strategy:
     type: Recreate
   selector:
@@ -94,7 +94,7 @@ metadata:
   labels:
     {{- include "open5gs-5g-dra.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.simulator.ue.replicas }}
   strategy:
     type: Recreate
   selector:
@@ -171,7 +171,7 @@ metadata:
   labels:
     {{- include "open5gs-5g-dra.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.simulator.data.replicas }}
   strategy:
     type: Recreate
   selector:
