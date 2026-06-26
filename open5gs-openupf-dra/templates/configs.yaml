@@ -183,14 +183,14 @@ data:
         sd: {{ .Values.subscriber.sd }}
     ignoreStreamIds: true
   ue.yaml: |
-    supi: "imsi-{{ .Values.subscriber.imsi }}"
+    supi: "imsi-__UE_IMSI__"
     mcc: {{ .Values.plmn.mcc | quote }}
     mnc: {{ .Values.plmn.mnc | quote }}
     key: {{ .Values.subscriber.key | quote }}
     op: {{ .Values.subscriber.opc | quote }}
     opType: OPC
     amf: {{ .Values.subscriber.amf | quote }}
-    imei: "356938035643803"
+    imei: "__UE_IMEI__"
     gnbSearchList:
       - ${GNB_IP}
     uacAic:

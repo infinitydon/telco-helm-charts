@@ -87,16 +87,27 @@ spec:
           configMap:
             name: {{ include "open5gs-5g-dra.fullname" . }}-configs
 ---
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Service
 metadata:
   name: {{ include "open5gs-5g-dra.fullname" . }}-ue
   labels:
     {{- include "open5gs-5g-dra.labels" . | nindent 4 }}
 spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: ue
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "open5gs-5g-dra.fullname" . }}-ue
+  labels:
+    {{- include "open5gs-5g-dra.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "open5gs-5g-dra.fullname" . }}-ue
   replicas: {{ .Values.simulator.ue.replicas }}
-  strategy:
-    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/instance: {{ .Release.Name }}
@@ -120,18 +131,48 @@ spec:
               value: mongodb://{{ include "open5gs-5g-dra.fullname" . }}-mongodb/open5gs
             - name: HOME
               value: /tmp
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: BASE_IMSI
+              value: {{ .Values.subscriber.imsi | quote }}
           command: ["/bin/sh", "-ec"]
           args:
-            - >-
+            - |
+              ordinal="${POD_NAME##*-}"
+              imsi="$(awk -v base="$BASE_IMSI" -v ord="$ordinal" 'BEGIN { printf "%015.0f", base + ord }')"
               until open5gs-dbctl showall >/dev/null 2>&1; do sleep 2; done;
-              open5gs-dbctl remove {{ .Values.subscriber.imsi }} || true;
-              open5gs-dbctl add_ue_with_slice
-              {{ .Values.subscriber.imsi }}
-              {{ .Values.subscriber.key }}
-              {{ .Values.subscriber.opc }}
-              {{ .Values.subscriber.dnn }}
-              {{ .Values.subscriber.sst }}
+              open5gs-dbctl remove "$imsi" || true;
+              open5gs-dbctl add_ue_with_slice \
+              "$imsi" \
+              {{ .Values.subscriber.key }} \
+              {{ .Values.subscriber.opc }} \
+              {{ .Values.subscriber.dnn }} \
+              {{ .Values.subscriber.sst }} \
               {{ trimPrefix "0x" .Values.subscriber.sd }}
+        - name: render-ue-config
+          image: {{ .Values.image.toolbox }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: BASE_IMSI
+              value: {{ .Values.subscriber.imsi | quote }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              ordinal="${POD_NAME##*-}"
+              imsi="$(awk -v base="$BASE_IMSI" -v ord="$ordinal" 'BEGIN { printf "%015.0f", base + ord }')"
+              imei="$(awk -v ord="$ordinal" 'BEGIN { printf "%015.0f", 356938035643803 + ord }')"
+              sed -e "s/__UE_IMSI__/${imsi}/g" -e "s/__UE_IMEI__/${imei}/g" /config-template/ue.yaml > /generated/ue.yaml
+          volumeMounts:
+            - name: config-template
+              mountPath: /config-template
+            - name: config
+              mountPath: /generated
         - name: wait-for-gnb
           image: {{ .Values.image.toolbox }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -153,16 +194,20 @@ spec:
             capabilities: { add: [NET_ADMIN] }
           volumeMounts:
             - name: config
-              mountPath: /etc/ueransim/ue.yaml
-              subPath: ue.yaml
+              mountPath: /etc/ueransim
         - name: tools
           image: {{ .Values.image.toolbox }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["sleep", "infinity"]
       volumes:
         - name: config
+          emptyDir: {}
+        - name: config-template
           configMap:
             name: {{ include "open5gs-5g-dra.fullname" . }}-configs
+            items:
+              - key: ue.yaml
+                path: ue.yaml
 ---
 apiVersion: apps/v1
 kind: Deployment

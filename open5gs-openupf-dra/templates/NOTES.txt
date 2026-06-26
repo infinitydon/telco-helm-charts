@@ -18,10 +18,10 @@ DRA networks:
   N6: {{ .Values.dra.networks.n6.subnet }}
 
 Check registration and the PDU session:
-  kubectl logs deploy/{{ include "open5gs-5g-dra.fullname" . }}-ue
+  kubectl logs statefulset/{{ include "open5gs-5g-dra.fullname" . }}-ue
 
 Ping the N6 test endpoint through the UE tunnel:
-  kubectl exec deploy/{{ include "open5gs-5g-dra.fullname" . }}-ue -c tools -- ping -I uesimtun0 {{ .Values.addresses.dataN6 }}
+  kubectl exec {{ include "open5gs-5g-dra.fullname" . }}-ue-0 -c tools -- ping -I uesimtun0 {{ .Values.addresses.dataN6 }}
 
 Run iperf3 through the UE tunnel:
-  kubectl exec deploy/{{ include "open5gs-5g-dra.fullname" . }}-ue -c tools -- iperf3 -c {{ .Values.addresses.dataN6 }} --bind-dev uesimtun0 -t 5
+  kubectl exec {{ include "open5gs-5g-dra.fullname" . }}-ue-0 -c tools -- iperf3 -c {{ .Values.addresses.dataN6 }} --bind-dev uesimtun0 -t 5

@@ -15,7 +15,7 @@ reference Open5GS-only DRA lab.
 - Open5GS NRF, AUSF, UDM, UDR, PCF, NSSF, AMF, and SMF
 - OpenUPF SMU, LBU, and configurable FPU workers as singleton Deployments
 - MongoDB and Open5GS WebUI
-- Optional UERANSIM gNB/UE and an N6 iperf3 server
+- UERANSIM gNB, 10 UE StatefulSet replicas by default, and an N6 iperf3 server
 
 ## Tested Lab Split
 
@@ -72,9 +72,9 @@ helm upgrade --install openupf-core .\open5gs-openupf-dra `
   --wait --timeout 10m
 ```
 
-The default values keep `simulator.gnb.replicas=0` and
-`simulator.ue.replicas=0` so the core and OpenUPF plane can settle first.
-Scale the gNB/UE after SMF has associated with SMU and the FPUs are active.
+The default values start `simulator.gnb.replicas=1` and
+`simulator.ue.replicas=10`. UE pods run as a StatefulSet so each pod gets a
+stable ordinal and a distinct IMSI derived from `subscriber.imsi`.
 The OpenUPF NFs run as Deployments with `Recreate` strategy, so a crashed SMU,
 LBU, or FPU is recreated by Kubernetes instead of staying down as a completed
 or failed bare Pod.

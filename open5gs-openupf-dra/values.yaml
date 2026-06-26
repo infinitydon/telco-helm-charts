@@ -98,9 +98,9 @@ components:
 
 simulator:
   gnb:
-    replicas: 0
+    replicas: 1
   ue:
-    replicas: 0
+    replicas: 10
   data:
     replicas: 1
 
