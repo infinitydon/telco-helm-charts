@@ -75,6 +75,9 @@ helm upgrade --install openupf-core .\open5gs-openupf-dra `
 The default values start `simulator.gnb.replicas=1` and
 `simulator.ue.replicas=10`. UE pods run as a StatefulSet so each pod gets a
 stable ordinal and a distinct IMSI derived from `subscriber.imsi`.
+Each UE init container deletes and recreates its derived subscriber profile on
+startup, so chart changes to subscriber key, OPC, DNN, SST, or SD are applied
+on redeploy.
 The OpenUPF NFs run as Deployments with `Recreate` strategy, so a crashed SMU,
 LBU, or FPU is recreated by Kubernetes instead of staying down as a completed
 or failed bare Pod.
@@ -101,3 +104,99 @@ kubectl -n open5gs-openupf exec deploy/openupf-core-open5gs-openupf-dra-openupf-
 The validated 10-UE run registered 10 UEs, established 10 PDU sessions,
 completed per-tunnel ping, ran 5 Mbit/s UDP iperf per tunnel with 0% loss, and
 showed both FPUs forwarding user-plane packets.
+
+## 10 UE Validation Output
+
+The following outputs were captured from the lab release with the default 10 UE
+StatefulSet running.
+
+SMU session and backend state:
+
+```powershell
+kubectl -n open5gs-openupf exec deploy/openupf-core-open5gs-openupf-dra-openupf-smu -- `
+  sh -lc "printf 'show_node\nres_stat\nquit\n' | /opt/upf/bin/cli smu 2>&1 || true"
+```
+
+```text
+smu>show_node
+-----------------------node[1]-----------------------
+Status: RUN
+SessionNum: 10
+Node ID: 10.60.0.34
+---------------------------------------
+total node:        1
+total session_nume:10
+smu>res_stat
+seid:            1000                 10
+teid:            200000               20
+session:         1000                 10
+pdr:             12000                41
+far:             12000                31
+qer:             6000                 10
+urr:             6000                 10
+bar:             1000                 10
+backend:         255                  2               Active: 2
+mb_state:        Active
+```
+
+LBU packet steering state:
+
+```powershell
+kubectl -n open5gs-openupf exec deploy/openupf-core-open5gs-openupf-dra-openupf-lbu -- `
+  sh -lc "printf 'stats\nquit\n' | /opt/upf/bin/cli lbu 2>&1 || true"
+```
+
+```text
+lbu>stats
+Total send: 4992
+Total recv: 8571
+Receive_external: 4306
+Receive_internal: 4259
+Sent_to_external: 2475
+Sent_to_FPU: 2499
+Sent_to_SMU: 18
+```
+
+FPU-1 forwarding state:
+
+```powershell
+kubectl -n open5gs-openupf exec deploy/openupf-core-open5gs-openupf-dra-openupf-fpu-1 -- `
+  sh -lc "printf 'stats\nquit\n' | /opt/upf/bin/cli fpu 2>&1 || true"
+```
+
+```text
+fpu>stats
+Total send: 41
+Total recv: 1963
+N3_MATCH: 6
+N6_MATCH: 201
+MOD_FAST: 17
+UP_RECV: 9
+UP_FWD: 9
+UP_DROP: 0
+DOWN_RECV: 214
+DOWN_FWD: 32
+ERR_PROC: 0
+```
+
+FPU-2 forwarding state:
+
+```powershell
+kubectl -n open5gs-openupf exec deploy/openupf-core-open5gs-openupf-dra-openupf-fpu-2 -- `
+  sh -lc "printf 'stats\nquit\n' | /opt/upf/bin/cli fpu 2>&1 || true"
+```
+
+```text
+fpu>stats
+Total send: 2366
+Total recv: 4208
+N3_MATCH: 2348
+N6_MATCH: 97
+MOD_FAST: 19
+UP_RECV: 2358
+UP_FWD: 2358
+UP_DROP: 0
+DOWN_RECV: 105
+DOWN_FWD: 8
+ERR_PROC: 0
+```
