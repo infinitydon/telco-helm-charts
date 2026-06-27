@@ -1,0 +1,55 @@
+image:
+  hostTools: ubuntu:24.04
+  test: alpine:3.20.3
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+rbac:
+  create: true
+serviceAccount:
+  create: true
+  name: ""
+
+orc8r:
+  domain: magma.local
+  nmsOrg: magma-test
+  nmsUrl: https://magma-test.magma.local
+  rootCA:
+    existingSecret: ""
+    secretKey: rootCA.pem
+    pem: ""
+
+agw:
+  gitUrl: https://github.com/TOSSI-Foundation/magma.git
+  magmaVersion: ebpf
+  ebpfDatapath: true
+  paths:
+    rootCA: /var/opt/magma/certs/rootCA.pem
+    dockerDir: /var/opt/magma/docker
+    repoDir: /opt/magma
+    ebpfEnv: /etc/magma/ebpf.env
+  interfaces:
+    management: eth0
+    n3: eth1
+    ovsBridge: gtp_br0
+    ovsVeth0: gtp_veth0
+    ovsVeth1: gtp_veth1
+  hostAgent:
+    enabled: false
+    nodeSelector: {}
+    tolerations: []
+    actions:
+      stageConfig: true
+      installAgw: false
+      installEbpf: false
+      startDockerCompose: false
+    resources: {}
+
+verification:
+  enabled: false
+  nodeSelector: {}
+  tolerations: []
+
+podAnnotations: {}

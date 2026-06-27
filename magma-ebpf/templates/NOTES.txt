@@ -1,0 +1,11 @@
+Magma eBPF chart installed.
+
+Rendered AGW config:
+  kubectl -n {{ .Release.Namespace }} get configmap {{ include "magma-ebpf.fullname" . }}-config -o yaml
+
+Run the safe Helm test:
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+Host mutation is disabled unless values.agw.hostAgent.enabled=true and the
+individual action flags are enabled. Keep this chart in preflight/staging mode
+until the target AGW node, root CA, and N3 interface are confirmed.

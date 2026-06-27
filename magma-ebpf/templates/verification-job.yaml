@@ -1,0 +1,40 @@
+{{- if .Values.verification.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "magma-ebpf.fullname" . }}-verify
+  labels:
+    {{- include "magma-ebpf.labels" . | nindent 4 }}
+    app.kubernetes.io/component: verifier
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        {{- include "magma-ebpf.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: verifier
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "magma-ebpf.serviceAccountName" . }}
+      {{- with .Values.verification.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.verification.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: verify
+          image: {{ .Values.image.test | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "/chart-config/verify.sh"]
+          volumeMounts:
+            - name: config
+              mountPath: /chart-config
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "magma-ebpf.fullname" . }}-config
+            defaultMode: 0755
+{{- end }}

@@ -1,0 +1,33 @@
+{{ include "magma-ebpf.assertNoLatest" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "magma-ebpf.fullname" . }}-config
+  labels:
+    {{- include "magma-ebpf.labels" . | nindent 4 }}
+data:
+  orc8r.yaml: |
+    domain: {{ .Values.orc8r.domain | quote }}
+    nmsOrg: {{ .Values.orc8r.nmsOrg | quote }}
+    nmsUrl: {{ .Values.orc8r.nmsUrl | quote }}
+    rootCAPath: {{ .Values.agw.paths.rootCA | quote }}
+  agw.env: |
+    GIT_URL={{ .Values.agw.gitUrl }}
+    MAGMA_VERSION={{ .Values.agw.magmaVersion }}
+    EBPF_DATAPATH={{ ternary "true" "false" .Values.agw.ebpfDatapath }}
+    MAGMA_ROOT={{ .Values.agw.paths.repoDir }}
+    MAGMA_DOCKER_DIR={{ .Values.agw.paths.dockerDir }}
+    EBPF_ENV={{ .Values.agw.paths.ebpfEnv }}
+    MANAGEMENT_IF={{ .Values.agw.interfaces.management }}
+    N3_IF={{ .Values.agw.interfaces.n3 }}
+    OVS_BR={{ .Values.agw.interfaces.ovsBridge }}
+    OVS_VETH0={{ .Values.agw.interfaces.ovsVeth0 }}
+    OVS_VETH1={{ .Values.agw.interfaces.ovsVeth1 }}
+  verify.sh: |
+    #!/bin/sh
+    set -eu
+    test -s /chart-config/orc8r.yaml
+    test -s /chart-config/agw.env
+    grep -q '^MAGMA_VERSION={{ .Values.agw.magmaVersion }}$' /chart-config/agw.env
+    grep -q '^N3_IF={{ .Values.agw.interfaces.n3 }}$' /chart-config/agw.env
+    echo "magma-ebpf chart config is renderable and internally consistent"

@@ -1,0 +1,16 @@
+apiVersion: v2
+name: magma-ebpf
+description: Guarded Helm workflow for Magma AGW with the TOSSI eBPF GTP-U datapath
+type: application
+version: 0.1.0
+appVersion: "ebpf"
+keywords:
+  - magma
+  - ebpf
+  - gtpu
+  - agw
+  - telco
+home: https://tossi.org/docs/core/magma-ebpf/
+sources:
+  - https://github.com/TOSSI-Foundation/magma/tree/ebpf
+  - https://github.com/TOSSI-Foundation/magma-ocr8r

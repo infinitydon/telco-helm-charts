@@ -1,0 +1,97 @@
+{{- if .Values.agw.hostAgent.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "magma-ebpf.fullname" . }}-host-agent
+  labels:
+    {{- include "magma-ebpf.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "magma-ebpf.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: host-agent
+  template:
+    metadata:
+      labels:
+        {{- include "magma-ebpf.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: host-agent
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "magma-ebpf.serviceAccountName" . }}
+      hostPID: true
+      hostNetwork: true
+      restartPolicy: Always
+      {{- with .Values.agw.hostAgent.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.agw.hostAgent.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: host-agent
+          image: {{ .Values.image.hostTools | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              set -euo pipefail
+              source /chart-config/agw.env
+              echo "magma-ebpf host agent starting on ${HOSTNAME}"
+              mkdir -p /host/var/opt/magma/certs /host/etc/magma
+              cp /chart-config/agw.env "/host${EBPF_ENV}"
+              {{- if or .Values.orc8r.rootCA.pem .Values.orc8r.rootCA.existingSecret }}
+              cp "/rootca/{{ .Values.orc8r.rootCA.secretKey }}" "/host{{ .Values.agw.paths.rootCA }}"
+              {{- else }}
+              echo "No root CA secret was provided; AGW install will fail until {{ .Values.agw.paths.rootCA }} exists on the host."
+              {{- end }}
+              {{- if .Values.agw.hostAgent.actions.installAgw }}
+              chroot /host /bin/bash -ec "GIT_URL='${GIT_URL}' MAGMA_VERSION='${MAGMA_VERSION}' EBPF_DATAPATH='${EBPF_DATAPATH}' bash -c \"\$(curl -sL https://raw.githubusercontent.com/TOSSI-Foundation/magma/refs/heads/ebpf/lte/gateway/deploy/agw_install_docker.sh)\" agw"
+              {{- else }}
+              echo "AGW installer is disabled by values.agw.hostAgent.actions.installAgw=false"
+              {{- end }}
+              {{- if .Values.agw.hostAgent.actions.installEbpf }}
+              chroot /host /bin/bash -ec "{{ .Values.agw.paths.repoDir }}/lte/gateway/ebpf/deploy/install-ebpf.sh"
+              {{- else }}
+              echo "eBPF installer is disabled by values.agw.hostAgent.actions.installEbpf=false"
+              {{- end }}
+              {{- if .Values.agw.hostAgent.actions.startDockerCompose }}
+              chroot /host /bin/bash -ec "cd {{ .Values.agw.paths.dockerDir }} && docker compose --compatibility up -d"
+              {{- else }}
+              echo "Docker compose start is disabled by values.agw.hostAgent.actions.startDockerCompose=false"
+              {{- end }}
+              sleep infinity
+          resources:
+            {{- toYaml .Values.agw.hostAgent.resources | nindent 12 }}
+          volumeMounts:
+            - name: host
+              mountPath: /host
+            - name: config
+              mountPath: /chart-config
+            {{- if or .Values.orc8r.rootCA.pem .Values.orc8r.rootCA.existingSecret }}
+            - name: rootca
+              mountPath: /rootca
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: host
+          hostPath:
+            path: /
+        - name: config
+          configMap:
+            name: {{ include "magma-ebpf.fullname" . }}-config
+        {{- if or .Values.orc8r.rootCA.pem .Values.orc8r.rootCA.existingSecret }}
+        - name: rootca
+          secret:
+            secretName: {{ include "magma-ebpf.rootCASecretName" . }}
+        {{- end }}
+{{- end }}
