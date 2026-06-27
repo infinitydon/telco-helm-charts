@@ -2,7 +2,7 @@ apiVersion: v2
 name: magma-ebpf
 description: Guarded Helm workflow for Magma AGW with the TOSSI eBPF GTP-U datapath
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "ebpf"
 keywords:
   - magma

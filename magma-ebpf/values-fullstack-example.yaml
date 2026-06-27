@@ -1,0 +1,40 @@
+# Example only. Review every target host, credential, interface, and action
+# before using this file against a real lab.
+
+rbac:
+  clusterAdmin:
+    create: true
+
+orc8r:
+  domain: magma.local
+  nmsOrg: magma-test
+  nmsUrl: https://magma-test.magma.local
+  nmsAdmin:
+    email: admin
+    password: admin
+  deployer:
+    enabled: true
+    targetHost: orc8r-host.example.local
+    ansibleUser: ubuntu
+    ssh:
+      existingSecret: orc8r-ssh
+      privateKeyKey: id_rsa
+      knownHostsKey: known_hosts
+    actions:
+      deployOrc8r: true
+      configureNms: true
+      exportRootCA: true
+
+agw:
+  interfaces:
+    management: eth0
+    n3: eth1
+  hostAgent:
+    enabled: true
+    nodeSelector:
+      kubernetes.io/hostname: agw-node-01
+    actions:
+      stageConfig: true
+      installAgw: true
+      installEbpf: true
+      startDockerCompose: true

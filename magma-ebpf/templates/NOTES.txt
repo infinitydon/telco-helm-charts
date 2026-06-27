@@ -9,3 +9,7 @@ Run the safe Helm test:
 Host mutation is disabled unless values.agw.hostAgent.enabled=true and the
 individual action flags are enabled. Keep this chart in preflight/staging mode
 until the target AGW node, root CA, and N3 interface are confirmed.
+
+orc8r deployment is disabled unless values.orc8r.deployer.enabled=true. The
+deployer can run the TOSSI magma-ocr8r Ansible workflow, configure NMS, and
+export rootCA.pem when its action flags are enabled.

@@ -46,3 +46,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-rootca" (include "magma-ebpf.fullname" .) -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "magma-ebpf.nmsSecretName" -}}
+{{- if .Values.orc8r.nmsAdmin.existingSecret -}}
+{{- .Values.orc8r.nmsAdmin.existingSecret -}}
+{{- else -}}
+{{- printf "%s-nms-admin" (include "magma-ebpf.fullname" .) -}}
+{{- end -}}
+{{- end -}}

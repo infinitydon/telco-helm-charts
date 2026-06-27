@@ -10,6 +10,10 @@ data:
     domain: {{ .Values.orc8r.domain | quote }}
     nmsOrg: {{ .Values.orc8r.nmsOrg | quote }}
     nmsUrl: {{ .Values.orc8r.nmsUrl | quote }}
+    deployerRepository: {{ .Values.orc8r.deployer.repository | quote }}
+    deployerRef: {{ .Values.orc8r.deployer.ref | quote }}
+    targetHost: {{ .Values.orc8r.deployer.targetHost | quote }}
+    ansibleUser: {{ .Values.orc8r.deployer.ansibleUser | quote }}
     rootCAPath: {{ .Values.agw.paths.rootCA | quote }}
   agw.env: |
     GIT_URL={{ .Values.agw.gitUrl }}
@@ -23,11 +27,94 @@ data:
     OVS_BR={{ .Values.agw.interfaces.ovsBridge }}
     OVS_VETH0={{ .Values.agw.interfaces.ovsVeth0 }}
     OVS_VETH1={{ .Values.agw.interfaces.ovsVeth1 }}
+  orc8r-deploy.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    export DEBIAN_FRONTEND=noninteractive
+
+    echo "Installing deployer runtime packages"
+    apt-get update -qq
+    apt-get install -y -qq ca-certificates curl git openssh-client python3 python3-pip python3-venv
+    python3 -m venv /work/venv
+    . /work/venv/bin/activate
+    pip install --no-cache-dir ansible==5.0.1 kubernetes openshift
+
+    if [ -z {{ .Values.orc8r.deployer.targetHost | quote }} ]; then
+      echo "orc8r.deployer.targetHost must be set before enabling the deployer" >&2
+      exit 1
+    fi
+
+    mkdir -p /root/.ssh
+    chmod 700 /root/.ssh
+    if [ -f /ssh/{{ .Values.orc8r.deployer.ssh.privateKeyKey }} ]; then
+      cp /ssh/{{ .Values.orc8r.deployer.ssh.privateKeyKey }} /root/.ssh/id_rsa
+      chmod 600 /root/.ssh/id_rsa
+    fi
+    if [ -f /ssh/{{ .Values.orc8r.deployer.ssh.knownHostsKey }} ]; then
+      cp /ssh/{{ .Values.orc8r.deployer.ssh.knownHostsKey }} /root/.ssh/known_hosts
+    else
+      printf "Host *\n  StrictHostKeyChecking accept-new\n" > /root/.ssh/config
+    fi
+
+    if [ -f /kubeconfig/{{ .Values.orc8r.deployer.kubeconfig.secretKey }} ]; then
+      export KUBECONFIG=/kubeconfig/{{ .Values.orc8r.deployer.kubeconfig.secretKey }}
+    fi
+
+    work=/work/magma-deployer
+    rm -rf "$work"
+    git clone --depth 1 --branch {{ .Values.orc8r.deployer.ref | quote }} {{ .Values.orc8r.deployer.repository | quote }} "$work"
+    cd "$work"
+
+    cat > hosts.yml <<EOF
+    ---
+    all:
+      hosts:
+        {{ .Values.orc8r.deployer.targetHost }}:
+      vars:
+        ansible_user: {{ .Values.orc8r.deployer.ansibleUser | quote }}
+        orc8r_domain: {{ .Values.orc8r.domain | quote }}
+        nms_org: {{ .Values.orc8r.nmsOrg | quote }}
+        nms_id: "${NMS_EMAIL}"
+        nms_pass: "${NMS_PASSWORD}"
+    EOF
+
+    echo "Prepared TOSSI magma-ocr8r deployer for {{ .Values.orc8r.domain }}"
+    if [ "${DEPLOY_ORC8R}" = "true" ]; then
+      ansible-playbook deploy-orc8r.yml
+    else
+      echo "Skipping deploy-orc8r.yml because DEPLOY_ORC8R=false"
+    fi
+
+    if [ "${CONFIGURE_NMS}" = "true" ]; then
+      ansible-playbook config-orc8r.yml
+    else
+      echo "Skipping config-orc8r.yml because CONFIGURE_NMS=false"
+    fi
+
+    if [ "${EXPORT_ROOT_CA}" = "true" ]; then
+      if [ ! -s secrets/rootCA.pem ]; then
+        echo "rootCA.pem was not found at $work/secrets/rootCA.pem" >&2
+        exit 1
+      fi
+      case "$(uname -m)" in
+        x86_64) karch=amd64 ;;
+        aarch64|arm64) karch=arm64 ;;
+        *) echo "unsupported kubectl architecture: $(uname -m)" >&2; exit 1 ;;
+      esac
+      curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/v1.36.2/bin/linux/${karch}/kubectl"
+      chmod +x /usr/local/bin/kubectl
+      kubectl -n "${POD_NAMESPACE}" create secret generic "{{ include "magma-ebpf.rootCASecretName" . }}" \
+        --from-file="{{ .Values.orc8r.rootCA.secretKey }}=secrets/rootCA.pem" \
+        --dry-run=client -o yaml | kubectl apply -f -
+    else
+      echo "Skipping rootCA export because EXPORT_ROOT_CA=false"
+    fi
   verify.sh: |
     #!/bin/sh
     set -eu
     test -s /chart-config/orc8r.yaml
     test -s /chart-config/agw.env
+    test -s /chart-config/orc8r-deploy.sh
     grep -q '^MAGMA_VERSION={{ .Values.agw.magmaVersion }}$' /chart-config/agw.env
     grep -q '^N3_IF={{ .Values.agw.interfaces.n3 }}$' /chart-config/agw.env
     echo "magma-ebpf chart config is renderable and internally consistent"

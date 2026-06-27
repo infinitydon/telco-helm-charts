@@ -6,14 +6,18 @@ This chart packages the workflow from the TOSSI Magma eBPF deployment guide:
 - the Access Gateway is an Ubuntu host running the Magma Docker AGW stack.
 - the eBPF GTP-U datapath is installed on the AGW host under `lte/gateway/ebpf`.
 
-The chart is intentionally guarded. By default it only renders Kubernetes
-configuration and a Helm test Pod. Host mutation is disabled unless you opt in
-to the privileged host-agent DaemonSet and then enable specific actions.
+The chart is intentionally guarded. By default it renders Kubernetes
+configuration, stores NMS admin credentials in a Secret, and provides a Helm
+test Pod. orc8r deployment and AGW host mutation are disabled unless you opt in
+to the deployer Job, optional cluster-admin binding, privileged host-agent
+DaemonSet, and specific action flags.
 
 ## What the chart manages
 
 - `ConfigMap` with orc8r/AGW/eBPF runtime settings.
+- `Secret` for NMS admin credentials, or reference to an existing Secret.
 - optional `Secret` for `rootCA.pem`, or reference to an existing Secret.
+- optional orc8r deployer Job that runs the TOSSI `magma-ocr8r` Ansible workflow.
 - optional privileged AGW host-agent DaemonSet for staging config and running
   the documented AGW/eBPF host installers.
 - optional verification Job.
@@ -23,7 +27,7 @@ to the privileged host-agent DaemonSet and then enable specific actions.
 
 All images are pinned to non-`latest` tags:
 
-- `ubuntu:24.04` for the disabled-by-default host agent.
+- `ubuntu:24.04` for the disabled-by-default orc8r deployer and host agent.
 - `alpine:3.20.3` for chart verification and Helm tests.
 
 The chart fails rendering if any image value uses the `latest` tag.
@@ -52,7 +56,65 @@ You can also run:
 .\magma-ebpf\scripts\test.ps1 -Kubeconfig C:\Users\Chris\.kube\ebng-cp--kubeconfig
 ```
 
-## Host install mode
+## Full stack mode
+
+The complete workflow has two sides:
+
+1. orc8r/NMS deployment through the TOSSI `magma-ocr8r` deployer.
+2. AGW Docker plus eBPF datapath deployment on the Ubuntu AGW host.
+
+The orc8r deployer performs host and cluster-wide operations through SSH and
+Ansible. Enable the cluster-admin binding only for a controlled deployer run, or
+provide an existing ServiceAccount with equivalent permissions.
+
+Create an SSH Secret for the clean Ubuntu orc8r host:
+
+```powershell
+kubectl -n magma create secret generic orc8r-ssh `
+  --from-file=id_rsa=C:\path\to\orc8r_id_rsa `
+  --from-file=known_hosts=C:\path\to\known_hosts
+```
+
+```yaml
+rbac:
+  clusterAdmin:
+    create: true
+orc8r:
+  domain: magma.local
+  nmsOrg: magma-test
+  nmsUrl: https://magma-test.magma.local
+  nmsAdmin:
+    email: admin
+    password: admin
+  deployer:
+    enabled: true
+    targetHost: orc8r-host.example.local
+    ansibleUser: ubuntu
+    ssh:
+      existingSecret: orc8r-ssh
+    actions:
+      deployOrc8r: true
+      configureNms: true
+      exportRootCA: true
+```
+
+If the deployer must use an out-of-cluster kubeconfig, create a Secret and point
+the chart at it:
+
+```powershell
+kubectl -n magma create secret generic orc8r-kubeconfig `
+  --from-file=kubeconfig=C:\Users\Chris\.kube\ebng-cp--kubeconfig
+```
+
+```yaml
+orc8r:
+  deployer:
+    kubeconfig:
+      existingSecret: orc8r-kubeconfig
+      secretKey: kubeconfig
+```
+
+## AGW host install mode
 
 Do not enable host install mode until the AGW node has the correct Ubuntu host,
 two NICs, and the orc8r root CA.
@@ -104,6 +166,23 @@ agw:
 
 The host-agent mounts `/` from the node at `/host` and runs privileged. Treat it
 as a controlled installer, not as a normal application workload.
+
+## End-to-end sequence
+
+```powershell
+helm upgrade --install magma-ebpf .\magma-ebpf `
+  -n magma --create-namespace `
+  -f .\magma-ebpf\values-fullstack-example.yaml
+```
+
+Recommended progression:
+
+1. Run the chart with all action flags false and `helm test`.
+2. Enable `orc8r.deployer.enabled=true` with only `deployOrc8r=true`.
+3. Enable `configureNms=true` once orc8r pods are Ready.
+4. Enable `exportRootCA=true` and confirm the root CA Secret exists.
+5. Enable AGW host-agent staging on one selected AGW node.
+6. Enable `installAgw`, reboot the AGW host if the installer requests it, then enable `installEbpf`.
 
 ## Reference
 

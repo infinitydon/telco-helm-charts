@@ -1,4 +1,5 @@
 image:
+  deployer: ubuntu:24.04
   hostTools: ubuntu:24.04
   test: alpine:3.20.3
   pullPolicy: IfNotPresent
@@ -8,6 +9,8 @@ fullnameOverride: ""
 
 rbac:
   create: true
+  clusterAdmin:
+    create: false
 serviceAccount:
   create: true
   name: ""
@@ -16,6 +19,32 @@ orc8r:
   domain: magma.local
   nmsOrg: magma-test
   nmsUrl: https://magma-test.magma.local
+  deployer:
+    enabled: false
+    repository: https://github.com/TOSSI-Foundation/magma-ocr8r.git
+    ref: main
+    targetHost: ""
+    ansibleUser: ubuntu
+    ssh:
+      existingSecret: ""
+      privateKeyKey: id_rsa
+      knownHostsKey: known_hosts
+    actions:
+      deployOrc8r: false
+      configureNms: false
+      exportRootCA: false
+    kubeconfig:
+      existingSecret: ""
+      secretKey: kubeconfig
+    nodeSelector: {}
+    tolerations: []
+    resources: {}
+  nmsAdmin:
+    email: admin
+    password: admin
+    existingSecret: ""
+    emailKey: email
+    passwordKey: password
   rootCA:
     existingSecret: ""
     secretKey: rootCA.pem

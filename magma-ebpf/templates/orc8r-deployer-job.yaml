@@ -1,0 +1,88 @@
+{{- if .Values.orc8r.deployer.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "magma-ebpf.fullname" . }}-orc8r-deployer
+  labels:
+    {{- include "magma-ebpf.labels" . | nindent 4 }}
+    app.kubernetes.io/component: orc8r-deployer
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        {{- include "magma-ebpf.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: orc8r-deployer
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "magma-ebpf.serviceAccountName" . }}
+      {{- with .Values.orc8r.deployer.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.orc8r.deployer.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: orc8r-deployer
+          image: {{ .Values.image.deployer | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/bash", "/chart-config/orc8r-deploy.sh"]
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: DEPLOY_ORC8R
+              value: {{ ternary "true" "false" .Values.orc8r.deployer.actions.deployOrc8r | quote }}
+            - name: CONFIGURE_NMS
+              value: {{ ternary "true" "false" .Values.orc8r.deployer.actions.configureNms | quote }}
+            - name: EXPORT_ROOT_CA
+              value: {{ ternary "true" "false" .Values.orc8r.deployer.actions.exportRootCA | quote }}
+            - name: NMS_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "magma-ebpf.nmsSecretName" . }}
+                  key: {{ .Values.orc8r.nmsAdmin.emailKey }}
+            - name: NMS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "magma-ebpf.nmsSecretName" . }}
+                  key: {{ .Values.orc8r.nmsAdmin.passwordKey }}
+          resources:
+            {{- toYaml .Values.orc8r.deployer.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /chart-config
+            - name: work
+              mountPath: /work
+            {{- if .Values.orc8r.deployer.kubeconfig.existingSecret }}
+            - name: kubeconfig
+              mountPath: /kubeconfig
+              readOnly: true
+            {{- end }}
+            {{- if .Values.orc8r.deployer.ssh.existingSecret }}
+            - name: ssh
+              mountPath: /ssh
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "magma-ebpf.fullname" . }}-config
+            defaultMode: 0755
+        - name: work
+          emptyDir: {}
+        {{- if .Values.orc8r.deployer.kubeconfig.existingSecret }}
+        - name: kubeconfig
+          secret:
+            secretName: {{ .Values.orc8r.deployer.kubeconfig.existingSecret }}
+        {{- end }}
+        {{- if .Values.orc8r.deployer.ssh.existingSecret }}
+        - name: ssh
+          secret:
+            secretName: {{ .Values.orc8r.deployer.ssh.existingSecret }}
+            defaultMode: 0400
+        {{- end }}
+{{- end }}
