@@ -16,13 +16,13 @@ secret:
   certs: agwc-secret-certs
 
 image:
-  repository: public.ecr.aws/z2g3r6f7
+  repository: ghcr.io/infinitydon/telco-helm-charts
   pullPolicy: IfNotPresent
-  tag: "1.9.0"
+  tag: "1.9.0-upstream"
   # Arch is blank for x86 and _arm for ARM64
   arch:
-  gatewayGoRepository: public.ecr.aws/z2g3r6f7
-  gatewayGoTag: "1.9.0"
+  gatewayGoRepository: ghcr.io/infinitydon/telco-helm-charts
+  gatewayGoTag: "1.9.0-upstream"
   test: alpine:3.20.3
 
 config:

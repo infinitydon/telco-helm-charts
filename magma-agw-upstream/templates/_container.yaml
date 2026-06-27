@@ -17,7 +17,16 @@ securityContext:
   privileged: true
 volumeMounts:
   - name: "magma-config"
-    mountPath: /etc/magma/
+    mountPath: /etc/magma/magmad.yml
+    subPath: magmad.yml
+    readOnly: true
+  - name: "magma-config"
+    mountPath: /etc/magma/service_registry.yml
+    subPath: service_registry.yml
+    readOnly: true
+  - name: "magma-config"
+    mountPath: /etc/magma/gateway.mconfig
+    subPath: gateway.mconfig
     readOnly: true
   - name: {{ .Values.persistent.name }}
     mountPath: /var/opt/magma

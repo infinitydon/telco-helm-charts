@@ -1,0 +1,21 @@
+{{/*
+Copyright 2026.
+
+This chart packages upstream Magma gateway config files so containerized AGW
+services can start without requiring host-preinstalled /etc/magma content.
+*/}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/component: gateway-config
+  name: gateway-config
+  namespace: {{ .Values.namespace }}
+data:
+  magmad.yml: |
+{{ .Files.Get "files/configs/magmad.yml" | indent 4 }}
+  service_registry.yml: |
+{{ .Files.Get "files/configs/service_registry.yml" | indent 4 }}
+  gateway.mconfig: |
+{{ .Files.Get "files/configs/gateway.mconfig" | indent 4 }}

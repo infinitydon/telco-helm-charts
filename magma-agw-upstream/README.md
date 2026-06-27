@@ -15,7 +15,7 @@ It intentionally remains close to upstream:
 Changes from upstream:
 
 - chart name/version are repo-local: `magma-agw-upstream` `0.1.0`
-- image tags default to `1.9.0`, not `latest`
+- image tags default to `1.9.0-upstream`, not `latest`
 - Helm rendering fails if any chart image uses `latest`
 - adds missing Docker Compose services `envoy_controller` and `liagentd`
 - adds `nodeSelector` and `tolerations`
@@ -27,10 +27,10 @@ Default image values:
 
 ```yaml
 image:
-  repository: public.ecr.aws/z2g3r6f7
-  tag: "1.9.0"
-  gatewayGoRepository: public.ecr.aws/z2g3r6f7
-  gatewayGoTag: "1.9.0"
+  repository: ghcr.io/infinitydon/telco-helm-charts
+  tag: "1.9.0-upstream"
+  gatewayGoRepository: ghcr.io/infinitydon/telco-helm-charts
+  gatewayGoTag: "1.9.0-upstream"
   test: alpine:3.20.3
 ```
 

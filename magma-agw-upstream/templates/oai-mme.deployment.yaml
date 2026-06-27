@@ -28,9 +28,8 @@ spec:
     spec:
       volumes:
         - name: magma-config
-          hostPath:
-            path: /etc/magma
-            type: Directory
+          configMap:
+            name: gateway-config
         - name: agwc-claim
           persistentVolumeClaim:
             claimName: agwc-claim
@@ -60,8 +59,18 @@ securityContext:
       - NET_ADMIN
       - NET_RAW
 volumeMounts:
-  - mountPath: /etc/magma
-    name: magma-config
+  - name: magma-config
+    mountPath: /etc/magma/magmad.yml
+    subPath: magmad.yml
+    readOnly: true
+  - name: magma-config
+    mountPath: /etc/magma/service_registry.yml
+    subPath: service_registry.yml
+    readOnly: true
+  - name: magma-config
+    mountPath: /etc/magma/gateway.mconfig
+    subPath: gateway.mconfig
+    readOnly: true
   - mountPath: /var/opt/magma
     name: agwc-claim
   - mountPath: /tmp

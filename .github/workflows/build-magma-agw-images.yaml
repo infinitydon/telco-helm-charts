@@ -49,6 +49,21 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Include envoy controller in gateway_go image
+        if: matrix.image == 'gateway_go'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("magma/feg/gateway/docker/go/Dockerfile")
+          text = path.read_text()
+          old = "RUN make -C $MAGMA_ROOT/feg/gateway build"
+          new = "RUN make -C $MAGMA_ROOT/feg/gateway build install_envoy_controller"
+          if old not in text:
+              raise SystemExit(f"could not find expected build line in {path}")
+          path.write_text(text.replace(old, new))
+          PY
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:

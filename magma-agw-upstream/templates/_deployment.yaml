@@ -49,9 +49,8 @@ spec:
       {{- end }}
       volumes:
         - name: magma-config
-          hostPath:
-            path: /etc/magma
-            type: DirectoryOrCreate
+          configMap:
+            name: gateway-config
         - name: agwc-claim
           persistentVolumeClaim:
             claimName: {{ .Values.persistent.name }}

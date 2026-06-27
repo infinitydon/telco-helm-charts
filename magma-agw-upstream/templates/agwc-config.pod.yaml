@@ -41,14 +41,25 @@ spec:
           - -c
           - mkdir -p /var/opt/magma/configs && cp -f /configs/control_proxy.yml /var/opt/magma/configs/  &&
             mkdir -p /var/opt/magma/certs &&  cp -f /certs/rootCA.pem /var/opt/magma/certs/ &&
-            /usr/local/bin/generate_nghttpx_config.py
+            /usr/local/bin/generate_nghttpx_config.py &&
+            /usr/local/bin/generate_oai_config.py
           image: "{{ .Values.image.repository }}/agw_gateway_python{{ .Values.image.arch}}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           name: agwc-config
           resources: {}
           volumeMounts:
-            - mountPath: /etc/magma
-              name: magma-config
+            - name: magma-config
+              mountPath: /etc/magma/magmad.yml
+              subPath: magmad.yml
+              readOnly: true
+            - name: magma-config
+              mountPath: /etc/magma/service_registry.yml
+              subPath: service_registry.yml
+              readOnly: true
+            - name: magma-config
+              mountPath: /etc/magma/gateway.mconfig
+              subPath: gateway.mconfig
+              readOnly: true
             - mountPath: /var/opt/magma
               name: agwc-claim
             - mountPath: /certs
@@ -57,9 +68,8 @@ spec:
               name: controlproxy-config
       volumes:
         - name: magma-config
-          hostPath:
-            path: /etc/magma
-            type: DirectoryOrCreate
+          configMap:
+            name: gateway-config
         - name: agwc-claim
           persistentVolumeClaim:
             claimName: agwc-claim
