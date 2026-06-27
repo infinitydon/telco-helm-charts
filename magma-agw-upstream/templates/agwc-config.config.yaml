@@ -18,9 +18,6 @@ metadata:
     app.kubernetes.io/component: orc8r-config
   name: orc8r-config
   namespace: {{ .Values.namespace }}
-  annotations:
-    "helm.sh/hook": "pre-install"
-    "helm.sh/hook-weight": "-5"
 data:
   gw_challenge.b64: |
     {{ print .Values.config.gwChallenge | trim | nospace }}

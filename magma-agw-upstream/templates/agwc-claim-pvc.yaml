@@ -18,9 +18,6 @@ metadata:
     app.kubernetes.io/component: agwc-claim
   name: agwc-claim
   namespace: {{ .Values.namespace }}
-  annotations:
-    "helm.sh/hook": "pre-install"
-    "helm.sh/hook-weight": "-5"
 spec:
   accessModes:
     - ReadWriteOnce
