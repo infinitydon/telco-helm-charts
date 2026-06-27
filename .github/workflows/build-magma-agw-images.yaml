@@ -1,0 +1,69 @@
+name: Build Magma AGW Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      magma_ref:
+        description: Magma git ref to build
+        required: true
+        default: v1.9.0
+      image_tag:
+        description: Container image tag to publish
+        required: true
+        default: 1.9.0-upstream
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ${{ github.repository_owner }}/telco-helm-charts
+
+jobs:
+  build:
+    name: Build ${{ matrix.image }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: agw_gateway_python
+            dockerfile: lte/gateway/docker/services/python/Dockerfile
+            target: gateway_python
+          - image: agw_gateway_c
+            dockerfile: lte/gateway/docker/services/c/Dockerfile
+            target: gateway_c
+          - image: gateway_go
+            dockerfile: feg/gateway/docker/go/Dockerfile
+            target: gateway_go
+
+    steps:
+      - name: Checkout Magma source
+        uses: actions/checkout@v4
+        with:
+          repository: magma/magma
+          ref: ${{ inputs.magma_ref }}
+          path: magma
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: magma
+          file: magma/${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.image }}:${{ inputs.image_tag }}
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
