@@ -21,7 +21,7 @@ only a lab shortcut and should be disabled for this full-stack path.
 ```powershell
 helm upgrade --install magma-fullstack .\magma-fullstack-upstream `
   -n magma --create-namespace `
-  --wait --timeout 30m
+  --wait --timeout 60m
 ```
 
 Do not run `helm dependency build` unless you intend to re-apply the local
@@ -32,6 +32,7 @@ versions and NMS container startup requirements.
 Check NMS and Orc8r:
 
 ```powershell
+helm status magma-fullstack -n magma
 kubectl -n magma get pods
 kubectl -n magma get svc nginx-proxy magma-fullstack-nginx-proxy magma-fullstack-clientcert-nginx bootstrapper-orc8r-nginx
 ```
