@@ -10,7 +10,6 @@ data:
     domain: {{ .Values.orc8r.domain | quote }}
     nmsOrg: {{ .Values.orc8r.nmsOrg | quote }}
     nmsUrl: {{ .Values.orc8r.nmsUrl | quote }}
-    serviceType: {{ .Values.orc8r.service.type | quote }}
     deployerRepository: {{ .Values.orc8r.deployer.repository | quote }}
     deployerRef: {{ .Values.orc8r.deployer.ref | quote }}
     targetHost: {{ .Values.orc8r.deployer.targetHost | quote }}
@@ -74,7 +73,6 @@ data:
       vars:
         ansible_user: {{ .Values.orc8r.deployer.ansibleUser | quote }}
         orc8r_domain: {{ .Values.orc8r.domain | quote }}
-        magma_service_type: {{ .Values.orc8r.service.type | quote }}
         nms_org: {{ .Values.orc8r.nmsOrg | quote }}
         nms_id: "${NMS_EMAIL}"
         nms_pass: "${NMS_PASSWORD}"

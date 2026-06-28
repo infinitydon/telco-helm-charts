@@ -7,6 +7,8 @@ baseline before adding any eBPF datapath work.
 It intentionally remains close to upstream:
 
 - one Deployment per AGW component
+- one replica per AGW component
+- `Recreate` deployment strategy
 - `hostNetwork: true`
 - shared `/etc/magma`, `/var/opt/magma`, `/tmp`, and `/var/run` assumptions
 - privileged datapath-related components such as `oai-mme`, `pipelined`, `sctpd`,
@@ -28,6 +30,35 @@ Changes from upstream:
 `liagentd` is present but disabled by default because the packaged upstream
 `liagentd.yml` sets `enable: false`; deploying it in that state causes the
 process to exit cleanly and Kubernetes to report a restart loop.
+
+## AGW scale model
+
+Magma AGW is containerized in the upstream `v1.9.0` release, but the upstream
+AGWC Helm chart still models an Access Gateway as a single gateway instance, not
+as a horizontally scaled replica set.
+
+In this chart, every AGW service inherits the upstream deployment template with:
+
+- `replicas: 1`
+- `strategy.type: Recreate`
+- `hostNetwork: true`
+- shared host/PVC state such as `/etc/snowflake`, `/var/opt/magma`, OVS, and
+  `gtp_br0`
+
+Do not run multiple replicas of the same AGW instance on one node. To deploy
+multiple gateways in one Kubernetes cluster, use separate gateway identities,
+node selectors, interface/IP assignments, secrets/certificates, and persistent
+state. The supported operational model for this chart is:
+
+```text
+one AGW gateway identity == one AGW instance == one selected Kubernetes node
+```
+
+Running more than one distinct AGW on the same node is not covered by the
+upstream chart and would require explicit isolation of host networking, OVS
+bridges, interface names, IPs, gateway IDs, certificates, host paths, and
+persistent volumes. Treat that as custom engineering rather than a supported
+replica mode.
 
 ## Images
 

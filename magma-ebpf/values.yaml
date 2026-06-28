@@ -19,8 +19,6 @@ orc8r:
   domain: magma.local
   nmsOrg: magma-test
   nmsUrl: https://magma-test.magma.local
-  service:
-    type: NodePort
   deployer:
     enabled: false
     repository: https://github.com/TOSSI-Foundation/magma-ocr8r.git
