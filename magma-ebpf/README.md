@@ -83,6 +83,8 @@ orc8r:
   domain: magma.local
   nmsOrg: magma-test
   nmsUrl: https://magma-test.magma.local
+  service:
+    type: NodePort
   nmsAdmin:
     email: admin
     password: admin
@@ -97,6 +99,48 @@ orc8r:
       configureNms: true
       exportRootCA: true
 ```
+
+`orc8r.service.type` is passed to the TOSSI `magma-ocr8r` inventory as
+`magma_service_type`. It defaults to `NodePort` in this chart so the deployed
+`nginx-proxy`, `orc8r-nginx-proxy`, `orc8r-clientcert-nginx`, and Fluentd
+services are reachable from outside the cluster without requiring a cloud load
+balancer. Set it to `LoadBalancer` or `ClusterIP` if your environment expects
+that.
+
+## GUI and API access
+
+After the deployer has run `deployOrc8r=true` and `configureNms=true`, check the
+Orc8r namespace services:
+
+```powershell
+kubectl -n orc8r get svc nginx-proxy orc8r-nginx-proxy orc8r-clientcert-nginx
+```
+
+With the default `NodePort` service type, use any reachable Kubernetes node IP
+and the allocated HTTPS node ports:
+
+```powershell
+kubectl -n orc8r get svc nginx-proxy -o jsonpath='{.spec.ports[?(@.port==443)].nodePort}'
+kubectl -n orc8r get svc orc8r-nginx-proxy -o jsonpath='{.spec.ports[?(@.port==443)].nodePort}'
+```
+
+Access paths:
+
+- NMS GUI: `https://<node-ip>:<nginx-proxy-nodeport>`
+- Orc8r REST API: `https://<node-ip>:<orc8r-nginx-proxy-nodeport>`
+- Gateway controller endpoint: `https://<node-ip>:<orc8r-clientcert-nginx-nodeport>`
+
+For DNS/SNI based access, map these hostnames to the node IP or external load
+balancer address:
+
+- `*.nms.<orc8r.domain>` for the NMS GUI
+- `api.<orc8r.domain>` for the REST API
+- `controller.<orc8r.domain>` for AGW control proxy traffic
+- `bootstrapper-controller.<orc8r.domain>` for bootstrap traffic
+
+The TOSSI HAProxy role routes those SNI names to the matching backend services.
+If HAProxy is exposed with `LoadBalancer`, use the HAProxy external IP instead
+of individual NodePorts.
 
 If the deployer must use an out-of-cluster kubeconfig, create a Secret and point
 the chart at it:

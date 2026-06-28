@@ -109,6 +109,11 @@ initial registration, PDU session establishment, and brought up `uesimtun0`.
 
 ## Installation
 
+This chart deploys the Access Gateway only. Magma NMS GUI and Orc8r REST API
+access are provided by the Orchestrator side, not by the AGW pods. In this repo,
+see the `magma-ebpf` chart for the TOSSI Orc8r/NMS deployer wrapper and its
+NodePort access notes.
+
 ### Prerequisites
 
 Before installing, confirm the target cluster has:

@@ -13,3 +13,7 @@ until the target AGW node, root CA, and N3 interface are confirmed.
 orc8r deployment is disabled unless values.orc8r.deployer.enabled=true. The
 deployer can run the TOSSI magma-ocr8r Ansible workflow, configure NMS, and
 export rootCA.pem when its action flags are enabled.
+
+orc8r service type default: {{ .Values.orc8r.service.type }}
+After orc8r deployment, inspect GUI/API NodePorts with:
+  kubectl -n orc8r get svc nginx-proxy orc8r-nginx-proxy orc8r-clientcert-nginx
