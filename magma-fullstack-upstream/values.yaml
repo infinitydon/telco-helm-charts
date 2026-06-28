@@ -19,6 +19,7 @@ postgresql:
 
 secrets:
   create: true
+  reuseExisting: true
   certsName: orc8r-secrets-certs
   envdirName: orc8r-secrets-envdir
   configsName: orc8r-secrets-configs-orc8r
@@ -59,15 +60,15 @@ orc8r:
         mysql_pass: postgres
         mysql_dialect: postgres
       service:
-        type: ClusterIP
+        type: NodePort
     nginx:
-      create: true
+      create: false
       image:
         repository: linuxfoundation.jfrog.io/magma-docker/nginx
         tag: "1.9.0"
         pullPolicy: IfNotPresent
       service:
-        type: NodePort
+        type: ClusterIP
   secret:
     certs: orc8r-secrets-certs
     configs:

@@ -11,7 +11,7 @@ It deploys:
 - lab certificate/config Secrets.
 - NMS admin bootstrap Job. The Job first registers the `admin_operator`
   certificate with Orc8r `accessd`, then creates the NMS admin user.
-- NodePort NMS and Orc8r nginx services.
+- NodePort NMS MagmaLTE and Orc8r nginx services.
 
 Provisioning belongs in NMS/Orc8r. The AGW chart's standalone subscriber Job is
 only a lab shortcut and should be disabled for this full-stack path.
@@ -34,13 +34,13 @@ Check NMS and Orc8r:
 ```powershell
 helm status magma-fullstack -n magma
 kubectl -n magma get pods
-kubectl -n magma get svc nginx-proxy magma-fullstack-nginx-proxy magma-fullstack-clientcert-nginx bootstrapper-orc8r-nginx
+kubectl -n magma get svc magmalte magma-fullstack-nginx-proxy magma-fullstack-clientcert-nginx bootstrapper-orc8r-nginx
 ```
 
-Open NMS with the `nginx-proxy` NodePort:
+Open NMS with the `magmalte` NodePort:
 
 ```text
-https://<node-ip>:<nginx-proxy-nodeport>
+http://<node-ip>:<magmalte-nodeport>/user/login
 ```
 
 Default login:
@@ -82,8 +82,10 @@ This chart intentionally wraps the upstream `orc8r` and `lte-orc8r` Magma
 include small compatibility patches:
 
 - `policy/v1beta1` PodDisruptionBudgets are updated for current Kubernetes.
-- NMS nginx gets the environment and certificate mounts required by the
-  upstream `linuxfoundation.jfrog.io/magma-docker/nginx:1.9.0` image.
+- NMS is exposed through the MagmaLTE service directly. The upstream NMS nginx
+  proxy is disabled because the Magma 1.9.0 nginx image generates an Orc8r
+  nginx configuration and does not listen on the upstream NMS chart's `443`
+  service target in this cluster.
 - The dependency service names are aligned with the parent release name.
 - The old upstream TCP probes are removed because they do not match the
   listening behavior observed in this lab cluster.
