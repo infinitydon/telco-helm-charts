@@ -95,7 +95,7 @@ simulator:
     pullPolicy: IfNotPresent
   multus:
     enabled: true
-    type: host-device
+    type: macvlan
     mode: bridge
     n2:
       name: magma-ueransim-n2

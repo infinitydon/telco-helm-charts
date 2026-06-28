@@ -82,9 +82,9 @@ nodePrep:
 
 ## 5G Simulator
 
-`simulator.enabled` deploys UERANSIM. The tested default uses Multus
-`host-device` for the simulator gNB and schedules it on node-01 so NGAP/SCTP is
-a real inter-node association. Magma AGW remains on node-02.
+`simulator.enabled` deploys UERANSIM. The tested default uses Multus `macvlan`
+for the simulator gNB and schedules it on node-01 so NGAP/SCTP is a real
+inter-node association. Magma AGW remains on node-02.
 
 ```yaml
 simulator:
@@ -92,7 +92,7 @@ simulator:
   nodeSelector:
     kubernetes.io/hostname: ebpf-bng-node-01
   multus:
-    type: host-device
+    type: macvlan
     n2:
       master: enp8s19
       ip: 10.88.99.150/24
