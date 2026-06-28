@@ -27,4 +27,26 @@ name: envoy-controller
 args:
   - /var/opt/magma/bin/envoy_controller
 image: "{{ .Values.image.gatewayGoRepository }}/gateway_go{{ .Values.image.arch }}:{{ .Values.image.gatewayGoTag | default .Chart.AppVersion }}"
+volumeMounts:
+  - name: magma-config
+    mountPath: /etc/magma/magmad.yml
+    subPath: magmad.yml
+    readOnly: true
+  - name: magma-config
+    mountPath: /etc/magma/service_registry.yml
+    subPath: service_registry.yml
+    readOnly: true
+  - name: magma-config
+    mountPath: /etc/magma/gateway.mconfig
+    subPath: gateway.mconfig
+    readOnly: true
+  - name: {{ .Values.persistent.name }}
+    mountPath: /var/opt/magma/configs
+    subPath: configs
+  - name: {{ .Values.persistent.name }}
+    mountPath: /var/opt/magma/certs
+    subPath: certs
+  - name: {{ .Values.persistent.name }}
+    mountPath: /var/opt/magma/tmp
+    subPath: tmp
 {{- end -}}
