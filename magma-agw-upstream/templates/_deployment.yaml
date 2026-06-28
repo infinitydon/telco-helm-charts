@@ -19,6 +19,7 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     app.kubernetes.io/component: agwc
+{{ include "agw-instance-label" . | indent 4 }}
 {{ include "default-labels" . | indent 4 }}
 {{ include "image-version-label" . | indent 4 }}
 spec:
@@ -34,11 +35,13 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/component: agwc
+{{ include "agw-instance-label" . | indent 8 }}
 {{ include "default-selector-labels" . | indent 8 }}
 {{ include "image-version-label" . | indent 8 }}
     spec:
       restartPolicy: Always
       hostNetwork: true
+      {{- include "agw.podAntiAffinity" . | nindent 6 }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
 {{ toYaml . | indent 8 }}

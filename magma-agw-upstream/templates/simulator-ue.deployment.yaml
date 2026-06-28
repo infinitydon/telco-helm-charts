@@ -23,6 +23,7 @@ spec:
       annotations:
         checksum/simulator-values: {{ toJson .Values.simulator | sha256sum }}
     spec:
+      {{- include "simulator.agwAntiAffinity" . | nindent 6 }}
       {{- with (default .Values.nodeSelector .Values.simulator.nodeSelector) }}
       nodeSelector:
 {{ toYaml . | indent 8 }}

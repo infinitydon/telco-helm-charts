@@ -35,6 +35,7 @@ spec:
           ]
       {{- end }}
     spec:
+      {{- include "simulator.agwAntiAffinity" . | nindent 6 }}
       {{- with (default .Values.nodeSelector .Values.simulator.nodeSelector) }}
       nodeSelector:
 {{ toYaml . | indent 8 }}
@@ -66,6 +67,7 @@ spec:
             - /bin/bash
             - -ceu
             - |
+              sleep {{ .Values.simulator.gnb.startDelaySeconds | int }}
               exec /ueransim/nr-gnb -c /config/gnb.yaml
           securityContext:
             privileged: true

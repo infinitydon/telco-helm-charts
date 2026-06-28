@@ -31,8 +31,13 @@ config:
   gwChallenge: ""
 
 nodeSelector:
+  magma.io/agw-node: "true"
   kubernetes.io/hostname: ebpf-bng-node-02
 tolerations: []
+
+agwAntiAffinity:
+  enabled: true
+  topologyKey: kubernetes.io/hostname
 
 persistent:
   name: agwc-claim
@@ -84,7 +89,11 @@ nodePrep:
 simulator:
   enabled: true
   nodeSelector:
+    magma.io/ueransim-node: "true"
     kubernetes.io/hostname: ebpf-bng-node-01
+  antiAffinity:
+    separateFromAgw: true
+    topologyKey: kubernetes.io/hostname
   image:
     repository: free5gc/ueransim
     tag: "v4.2.2"
@@ -111,6 +120,7 @@ simulator:
       gateway: ""
   gnb:
     name: magma-ueransim-gnb
+    startDelaySeconds: 120
     nci: "0x000000010"
     idLength: 32
     tac: "000001"
@@ -128,7 +138,7 @@ simulator:
     imei: "356938035643803"
     imeiSv: "4370816125816151"
     apn: magma.ipv4
-    startDelaySeconds: 60
+    startDelaySeconds: 180
   subscriber:
     provision: true
     nextSeq: "000000000000"

@@ -30,6 +30,44 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/version: {{ .Values.image.tag | quote }}
 {{- end -}}
 
+{{- define "agw-instance-label" -}}
+magma.infinitydon.com/agw-instance: "true"
+{{- end -}}
+
+{{- define "agw.podAntiAffinity" -}}
+{{- if .Values.agwAntiAffinity.enabled }}
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: magma.infinitydon.com/agw-instance
+              operator: In
+              values:
+                - "true"
+            - key: app.kubernetes.io/instance
+              operator: NotIn
+              values:
+                - {{ .Release.Name | quote }}
+        topologyKey: {{ .Values.agwAntiAffinity.topologyKey | quote }}
+{{- end }}
+{{- end -}}
+
+{{- define "simulator.agwAntiAffinity" -}}
+{{- if and .Values.simulator.enabled .Values.simulator.antiAffinity.separateFromAgw }}
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: magma.infinitydon.com/agw-instance
+              operator: In
+              values:
+                - "true"
+        topologyKey: {{ .Values.simulator.antiAffinity.topologyKey | quote }}
+{{- end }}
+{{- end -}}
+
 {{- define "magma-agw-upstream.assertNoLatest" -}}
 {{- if regexMatch "(:latest$|^latest$)" .Values.image.tag -}}
 {{- fail "image.tag must not use latest" -}}

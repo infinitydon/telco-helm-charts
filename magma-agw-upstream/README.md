@@ -42,6 +42,7 @@ In this chart, every AGW service inherits the upstream deployment template with:
 - `replicas: 1`
 - `strategy.type: Recreate`
 - `hostNetwork: true`
+- required pod anti-affinity against AGW pods from other Helm releases
 - shared host/PVC state such as `/etc/snowflake`, `/var/opt/magma`, OVS, and
   `gtp_br0`
 
@@ -53,6 +54,26 @@ state. The supported operational model for this chart is:
 ```text
 one AGW gateway identity == one AGW instance == one selected Kubernetes node
 ```
+
+Nodes that are allowed to host AGW must be labelled:
+
+```sh
+kubectl label node ebpf-bng-node-02 magma.io/agw-node=true --overwrite
+```
+
+The default `nodeSelector` requires both the participation label and the tested
+node hostname:
+
+```yaml
+nodeSelector:
+  magma.io/agw-node: "true"
+  kubernetes.io/hostname: ebpf-bng-node-02
+```
+
+For multiple AGWs, install one Helm release per gateway and set each release's
+`nodeSelector.kubernetes.io/hostname` to a different labelled AGW node. The
+chart also adds anti-affinity so AGW pods from another Helm release cannot land
+on the same node.
 
 Running more than one distinct AGW on the same node is not covered by the
 upstream chart and would require explicit isolation of host networking, OVS
@@ -117,11 +138,25 @@ nodePrep:
 for the simulator gNB and schedules it on node-01 so NGAP/SCTP is a real
 inter-node association. Magma AGW remains on node-02.
 
+UERANSIM must run on a completely separate worker node from the AGW. Do not
+schedule the simulator onto the AGW worker node; the chart defaults enforce this
+with a separate simulator node label, hostname selector, and pod anti-affinity
+against AGW pods.
+
+Label the simulator worker:
+
+```sh
+kubectl label node ebpf-bng-node-01 magma.io/ueransim-node=true --overwrite
+```
+
 ```yaml
 simulator:
   enabled: true
   nodeSelector:
+    magma.io/ueransim-node: "true"
     kubernetes.io/hostname: ebpf-bng-node-01
+  antiAffinity:
+    separateFromAgw: true
   multus:
     type: macvlan
     n2:
@@ -133,6 +168,10 @@ simulator:
   subscriber:
     provision: true
 ```
+
+`simulator.gnb.startDelaySeconds` defaults to `120` so the AGW SCTP listener is
+up before UERANSIM attempts NG setup. If the AGW node is slow to initialize OVS
+or services, increase the gNB and UE delays together.
 
 The subscriber provisioning Job adds/updates `IMSI001010000000001` and the
 `magma.ipv4` APN profile. In cluster testing, UERANSIM completed NG setup,
@@ -150,8 +189,10 @@ NodePort access notes.
 Before installing, confirm the target cluster has:
 
 - Multus installed and the `NetworkAttachmentDefinition` CRD present.
-- A Linux node selected for AGW, default `ebpf-bng-node-02`.
-- A separate Linux node selected for UERANSIM, default `ebpf-bng-node-01`.
+- A Linux node labelled for AGW, default `ebpf-bng-node-02` with
+  `magma.io/agw-node=true`.
+- A separate Linux node labelled for UERANSIM, default `ebpf-bng-node-01` with
+  `magma.io/ueransim-node=true`.
 - Usable host interfaces for AGW N2/N3 and simulator N2/N3. The tested defaults
   are `enp8s19` and `enp8s20` on both nodes.
 - SCTP and GTP kernel support. `nodePrep` attempts to load `gtp`,
@@ -165,6 +206,8 @@ Quick checks:
 kubectl get crd network-attachment-definitions.k8s.cni.cncf.io
 kubectl get pods -n kube-system -l app=multus -o wide
 kubectl get nodes -o wide
+kubectl get nodes -l magma.io/agw-node=true
+kubectl get nodes -l magma.io/ueransim-node=true
 ```
 
 On each selected node, verify the interface names before using the defaults:
