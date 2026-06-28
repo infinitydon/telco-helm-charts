@@ -39,7 +39,10 @@ spec:
         - args:
           - sh
           - -c
-          - mkdir -p /var/opt/magma/configs && cp -f /configs/control_proxy.yml /var/opt/magma/configs/  &&
+          - mkdir -p /var/opt/magma/configs &&
+            cp -f /gateway-config-source/*.yml /var/opt/magma/configs/ &&
+            cp -f /gateway-config-source/gateway.mconfig /var/opt/magma/configs/gateway.mconfig &&
+            cp -f /configs/control_proxy.yml /var/opt/magma/configs/  &&
             mkdir -p /var/opt/magma/certs &&  cp -f /certs/rootCA.pem /var/opt/magma/certs/ &&
             /usr/local/bin/generate_nghttpx_config.py &&
             /usr/local/bin/generate_oai_config.py
@@ -66,6 +69,9 @@ spec:
               name: agwc-secret
             - mountPath: /configs
               name: controlproxy-config
+            - mountPath: /gateway-config-source
+              name: gateway-config
+              readOnly: true
       volumes:
         - name: magma-config
           configMap:
@@ -79,3 +85,6 @@ spec:
         - name: controlproxy-config
           configMap:
             name: controlproxy-config
+        - name: gateway-config
+          configMap:
+            name: gateway-config

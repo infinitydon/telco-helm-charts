@@ -40,4 +40,7 @@ app.kubernetes.io/version: {{ .Values.image.tag | quote }}
 {{- if regexMatch "(:latest$|^latest$)" .Values.image.test -}}
 {{- fail "image.test must not use latest" -}}
 {{- end -}}
+{{- if and .Values.nodePrep.enabled (regexMatch "(:latest$|^latest$)" .Values.nodePrep.image) -}}
+{{- fail "nodePrep.image must not use latest" -}}
+{{- end -}}
 {{- end -}}

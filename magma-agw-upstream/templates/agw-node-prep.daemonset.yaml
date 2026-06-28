@@ -1,0 +1,177 @@
+{{- if .Values.nodePrep.enabled }}
+{{ include "magma-agw-upstream.assertNoLatest" . }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: agw-node-prep
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/component: agw-node-prep
+{{ include "default-labels" . | indent 4 }}
+{{ include "image-version-label" . | indent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: agw-node-prep
+{{ include "default-selector-labels" . | indent 6 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: agw-node-prep
+{{ include "default-selector-labels" . | indent 8 }}
+    spec:
+      hostNetwork: true
+      hostPID: true
+      restartPolicy: Always
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      containers:
+        - name: agw-node-prep
+          image: {{ .Values.nodePrep.image | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          command:
+            - /bin/bash
+            - -ceu
+            - |
+              log() { printf '[agw-node-prep] %s\n' "$*"; }
+              host() { nsenter -t 1 -m -u -i -n -p -- "$@"; }
+              host_sh() { nsenter -t 1 -m -u -i -n -p -- /bin/bash -ceu "$1"; }
+
+              ensure_host_cmd() {
+                local cmd="$1"
+                if host_sh "command -v ${cmd} >/dev/null 2>&1"; then
+                  log "${cmd} already present on host"
+                  return
+                fi
+                {{- if .Values.nodePrep.installOpenvSwitch }}
+                log "${cmd} missing; installing AGW host prerequisites"
+                host_sh 'if ! command -v apt-get >/dev/null 2>&1; then echo "apt-get not found on host" >&2; exit 1; fi'
+                host_sh 'export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y openvswitch-switch iproute2 iptables kmod'
+                {{- else }}
+                log "${cmd} missing and nodePrep.installOpenvSwitch=false"
+                return 1
+                {{- end }}
+              }
+
+              ensure_module() {
+                local module="$1"
+                if host_sh "lsmod | awk '{print \$1}' | grep -qx ${module}"; then
+                  log "kernel module ${module} already loaded"
+                else
+                  log "loading kernel module ${module} if available"
+                  host modprobe "${module}" || true
+                fi
+              }
+
+              ensure_sysctl() {
+                local key="$1"
+                local value="$2"
+                local current
+                current="$(host sysctl -n "${key}" 2>/dev/null || true)"
+                if [ "${current}" = "${value}" ]; then
+                  log "sysctl ${key}=${value} already set"
+                else
+                  log "setting sysctl ${key}=${value}"
+                  host sysctl -w "${key}=${value}"
+                fi
+              }
+
+              ensure_ovs_started() {
+                if host_sh 'ovs-vsctl show >/dev/null 2>&1'; then
+                  log "Open vSwitch database already reachable"
+                  return
+                fi
+                log "starting Open vSwitch"
+                host_sh 'systemctl enable --now openvswitch-switch >/dev/null 2>&1 || service openvswitch-switch start >/dev/null 2>&1 || /usr/share/openvswitch/scripts/ovs-ctl start'
+                host_sh 'ovs-vsctl show >/dev/null'
+              }
+
+              ensure_bridge() {
+                local bridge="$1"
+                if host ovs-vsctl br-exists "${bridge}"; then
+                  log "OVS bridge ${bridge} already exists"
+                else
+                  log "creating OVS bridge ${bridge}"
+                  host ovs-vsctl add-br "${bridge}"
+                fi
+                host ip link set "${bridge}" up
+                host ovs-vsctl set bridge "${bridge}" protocols={{ .Values.nodePrep.bridge.protocols | quote }} other-config:disable-in-band=true
+              }
+
+              ensure_addr() {
+                local iface="$1"
+                local cidr="$2"
+                [ -n "${cidr}" ] || return
+                if host ip addr show dev "${iface}" | grep -qw "${cidr}"; then
+                  log "${iface} already has ${cidr}"
+                else
+                  log "adding ${cidr} to ${iface}"
+                  host ip addr add "${cidr}" dev "${iface}" || true
+                fi
+              }
+
+              ensure_dummy_iface() {
+                local iface="$1"
+                if host ip link show "${iface}" >/dev/null 2>&1; then
+                  log "interface ${iface} already exists"
+                else
+                  {{- if .Values.nodePrep.interfaces.createMissing }}
+                  log "creating dummy interface ${iface}"
+                  host ip link add name "${iface}" type dummy
+                  {{- else }}
+                  log "interface ${iface} missing and nodePrep.interfaces.createMissing=false"
+                  return 1
+                  {{- end }}
+                fi
+                host ip link set "${iface}" up
+              }
+
+              ensure_ovs_internal_port() {
+                local bridge="$1"
+                local iface="$2"
+                if host ip link show "${iface}" >/dev/null 2>&1; then
+                  log "interface ${iface} already exists"
+                else
+                  log "creating OVS internal port ${iface} on ${bridge}"
+                  host ovs-vsctl --may-exist add-port "${bridge}" "${iface}" -- set Interface "${iface}" type=internal
+                fi
+                host ip link set "${iface}" up
+              }
+
+              ensure_host_cmd ovs-vsctl
+              ensure_module openvswitch
+              ensure_module nf_conntrack
+              ensure_module gtp
+              {{- range $key, $value := .Values.nodePrep.sysctl }}
+              ensure_sysctl {{ $key | quote }} {{ $value | quote }}
+              {{- end }}
+              ensure_ovs_started
+              ensure_bridge {{ .Values.nodePrep.bridge.name | quote }}
+              ensure_addr {{ .Values.nodePrep.bridge.name | quote }} {{ .Values.nodePrep.bridge.address | quote }}
+
+              ensure_dummy_iface {{ .Values.nodePrep.interfaces.s1.name | quote }}
+              ensure_addr {{ .Values.nodePrep.interfaces.s1.name | quote }} {{ .Values.nodePrep.interfaces.s1.address | quote }}
+              ensure_dummy_iface {{ .Values.nodePrep.interfaces.nat.name | quote }}
+              ensure_addr {{ .Values.nodePrep.interfaces.nat.name | quote }} {{ .Values.nodePrep.interfaces.nat.address | quote }}
+              {{- range .Values.nodePrep.interfaces.internal }}
+              {{- if eq .type "internal" }}
+              ensure_ovs_internal_port {{ .bridge | quote }} {{ .name | quote }}
+              {{- else }}
+              ensure_dummy_iface {{ .name | quote }}
+              {{- end }}
+              {{- end }}
+
+              log "node preparation complete"
+              {{- if .Values.nodePrep.sleepAfterPrep }}
+              sleep infinity
+              {{- end }}
+{{- end }}

@@ -2,8 +2,10 @@
 Adds the upstream Docker Compose liagentd service that is missing from the
 experimental upstream agwc Helm chart.
 */}}
+{{- if .Values.services.liagentd.enabled }}
 ---
 {{ include "agwc.deployment" (list . "liagentd.deployment") -}}
+{{- end }}
 {{- define "liagentd.deployment" -}}
 metadata:
   labels:
