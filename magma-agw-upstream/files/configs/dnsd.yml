@@ -11,7 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-enodeb_interface: eth1  # NOTE: this value must be consistent with enodeb.yml
+enodeb_interface: magma-n2  # NOTE: this value must be consistent with enodeb.yml
 dhcp_block_size: 15
 dns_iface_name: gtp_br0
 

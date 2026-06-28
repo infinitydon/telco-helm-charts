@@ -17,7 +17,7 @@
 print_grpc_payload: false
 
 tr069:
-  interface: eth1 # NOTE: this value must be consistent with dnsmasq.conf
+  interface: magma-n2 # NOTE: this value must be consistent with dnsmasq.conf
   port: 48080
   perf_mgmt_port: 8081
   # NOTE: this is the IP which enodeb will communicate with enodebd
@@ -103,4 +103,4 @@ reboot_enodeb_on_mme_disconnected: True
 web_ui_enable_list: []
 
 # Network interface to terminate S1
-s1_interface: eth1
+s1_interface: magma-n2

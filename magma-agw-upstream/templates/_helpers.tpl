@@ -43,4 +43,10 @@ app.kubernetes.io/version: {{ .Values.image.tag | quote }}
 {{- if and .Values.nodePrep.enabled (regexMatch "(:latest$|^latest$)" .Values.nodePrep.image) -}}
 {{- fail "nodePrep.image must not use latest" -}}
 {{- end -}}
+{{- if and .Values.simulator.enabled (regexMatch "(:latest$|^latest$)" .Values.simulator.image.tag) -}}
+{{- fail "simulator.image.tag must not use latest" -}}
+{{- end -}}
+{{- if and .Values.simulator.enabled (regexMatch "(:latest$|^latest$)" .Values.simulator.initImage.tag) -}}
+{{- fail "simulator.initImage.tag must not use latest" -}}
+{{- end -}}
 {{- end -}}

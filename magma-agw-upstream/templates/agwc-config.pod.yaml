@@ -16,10 +16,11 @@ kind: Job
 metadata:
   labels:
     app.kubernetes.io/component: agwc-config
-  name: agwc-config
+  name: {{ .Release.Name }}-config-{{ .Release.Revision }}
   namespace: {{ .Values.namespace }}
 spec:
   backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
   template:
     metadata:
       labels:
@@ -43,7 +44,7 @@ spec:
             cp -f /gateway-config-source/*.yml /var/opt/magma/configs/ &&
             cp -f /gateway-config-source/gateway.mconfig /var/opt/magma/configs/gateway.mconfig &&
             cp -f /configs/control_proxy.yml /var/opt/magma/configs/  &&
-            mkdir -p /var/opt/magma/certs &&  cp -f /certs/rootCA.pem /var/opt/magma/certs/ &&
+            mkdir -p /var/opt/magma/certs && cp -f /certs/* /var/opt/magma/certs/ &&
             /usr/local/bin/generate_nghttpx_config.py &&
             /usr/local/bin/generate_oai_config.py
           image: "{{ .Values.image.repository }}/agw_gateway_python{{ .Values.image.arch}}:{{ .Values.image.tag | default .Chart.AppVersion }}"

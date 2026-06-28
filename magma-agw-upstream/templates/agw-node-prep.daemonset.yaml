@@ -110,7 +110,17 @@ spec:
               ensure_addr() {
                 local iface="$1"
                 local cidr="$2"
+                local replace="${3:-false}"
                 [ -n "${cidr}" ] || return
+                if [ "${replace}" = "true" ]; then
+                  while read -r existing; do
+                    [ -n "${existing}" ] || continue
+                    if [ "${existing}" != "${cidr}" ]; then
+                      log "removing stale address ${existing} from ${iface}"
+                      host ip addr del "${existing}" dev "${iface}" || true
+                    fi
+                  done < <(host_sh "ip -4 -o addr show dev ${iface}" | awk '{print $4}')
+                fi
                 if host ip addr show dev "${iface}" | grep -qw "${cidr}"; then
                   log "${iface} already has ${cidr}"
                 else
@@ -135,6 +145,62 @@ spec:
                 host ip link set "${iface}" up
               }
 
+              ensure_macvlan_iface() {
+                local iface="$1"
+                local parent="$2"
+                local mode="$3"
+                if host ip link show "${iface}" >/dev/null 2>&1; then
+                  log "interface ${iface} already exists"
+                else
+                  {{- if .Values.nodePrep.interfaces.createMissing }}
+                  if ! host ip link show "${parent}" >/dev/null 2>&1; then
+                    log "parent interface ${parent} missing for ${iface}"
+                    return 1
+                  fi
+                  log "creating macvlan interface ${iface} on ${parent}"
+                  host ip link add name "${iface}" link "${parent}" type macvlan mode "${mode}"
+                  {{- else }}
+                  log "interface ${iface} missing and nodePrep.interfaces.createMissing=false"
+                  return 1
+                  {{- end }}
+                fi
+                host ip link set "${iface}" up
+              }
+
+              ensure_data_iface() {
+                local iface="$1"
+                local type="$2"
+                local parent="$3"
+                local mode="$4"
+                case "${type}" in
+                  macvlan) ensure_macvlan_iface "${iface}" "${parent}" "${mode:-bridge}" ;;
+                  physical|host-device)
+                    if host ip link show "${iface}" >/dev/null 2>&1; then
+                      log "using existing host interface ${iface}"
+                      host ip link set "${iface}" up
+                    else
+                      log "host interface ${iface} missing"
+                      return 1
+                    fi
+                    ;;
+                  dummy|"") ensure_dummy_iface "${iface}" ;;
+                  *)
+                    log "unsupported nodePrep interface type ${type} for ${iface}"
+                    return 1
+                    ;;
+                esac
+              }
+
+              cleanup_legacy_iface() {
+                local iface="$1"
+                if ! host ip link show "${iface}" >/dev/null 2>&1; then
+                  log "legacy interface ${iface} is already absent"
+                  return
+                fi
+                log "removing legacy interface ${iface}"
+                host ip link del "${iface}" || true
+              }
+
               ensure_ovs_internal_port() {
                 local bridge="$1"
                 local iface="$2"
@@ -156,12 +222,15 @@ spec:
               {{- end }}
               ensure_ovs_started
               ensure_bridge {{ .Values.nodePrep.bridge.name | quote }}
-              ensure_addr {{ .Values.nodePrep.bridge.name | quote }} {{ .Values.nodePrep.bridge.address | quote }}
+              ensure_addr {{ .Values.nodePrep.bridge.name | quote }} {{ .Values.nodePrep.bridge.address | quote }} "false"
+              {{- range .Values.nodePrep.interfaces.cleanupLegacy }}
+              cleanup_legacy_iface {{ . | quote }}
+              {{- end }}
 
-              ensure_dummy_iface {{ .Values.nodePrep.interfaces.s1.name | quote }}
-              ensure_addr {{ .Values.nodePrep.interfaces.s1.name | quote }} {{ .Values.nodePrep.interfaces.s1.address | quote }}
-              ensure_dummy_iface {{ .Values.nodePrep.interfaces.nat.name | quote }}
-              ensure_addr {{ .Values.nodePrep.interfaces.nat.name | quote }} {{ .Values.nodePrep.interfaces.nat.address | quote }}
+              ensure_data_iface {{ .Values.nodePrep.interfaces.s1.name | quote }} {{ default "dummy" .Values.nodePrep.interfaces.s1.type | quote }} {{ default "" .Values.nodePrep.interfaces.s1.parent | quote }} {{ default "bridge" .Values.nodePrep.interfaces.s1.mode | quote }}
+              ensure_addr {{ .Values.nodePrep.interfaces.s1.name | quote }} {{ .Values.nodePrep.interfaces.s1.address | quote }} {{ default false .Values.nodePrep.interfaces.s1.replaceAddresses | quote }}
+              ensure_data_iface {{ .Values.nodePrep.interfaces.nat.name | quote }} {{ default "dummy" .Values.nodePrep.interfaces.nat.type | quote }} {{ default "" .Values.nodePrep.interfaces.nat.parent | quote }} {{ default "bridge" .Values.nodePrep.interfaces.nat.mode | quote }}
+              ensure_addr {{ .Values.nodePrep.interfaces.nat.name | quote }} {{ .Values.nodePrep.interfaces.nat.address | quote }} {{ default false .Values.nodePrep.interfaces.nat.replaceAddresses | quote }}
               {{- range .Values.nodePrep.interfaces.internal }}
               {{- if eq .type "internal" }}
               ensure_ovs_internal_port {{ .bridge | quote }} {{ .name | quote }}

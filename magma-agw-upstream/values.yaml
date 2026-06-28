@@ -14,6 +14,7 @@ namespace: magma
 # Define which secrets should be mounted by pods.
 secret:
   certs: agwc-secret-certs
+  create: true
 
 image:
   repository: ghcr.io/infinitydon/telco-helm-charts
@@ -29,7 +30,8 @@ config:
   domainName: iot.magmacore.click
   gwChallenge: ""
 
-nodeSelector: {}
+nodeSelector:
+  kubernetes.io/hostname: ebpf-bng-node-02
 tolerations: []
 
 persistent:
@@ -50,12 +52,23 @@ nodePrep:
     protocols: OpenFlow10,OpenFlow13,OpenFlow14
   interfaces:
     createMissing: true
+    cleanupLegacy:
+      - eth1
+      - eth2
     s1:
-      name: eth1
-      address: 192.88.99.142/24
+      name: magma-n2
+      type: macvlan
+      parent: enp8s19
+      mode: bridge
+      address: 10.88.99.142/24
+      replaceAddresses: true
     nat:
-      name: eth2
+      name: magma-n3
+      type: macvlan
+      parent: enp8s20
+      mode: bridge
       address: 192.168.60.142/24
+      replaceAddresses: false
     internal:
       - name: mtr0
         type: dummy
@@ -67,5 +80,59 @@ nodePrep:
         bridge: gtp_br0
   sysctl:
     net.ipv4.ip_forward: "1"
+
+simulator:
+  enabled: true
+  nodeSelector:
+    kubernetes.io/hostname: ebpf-bng-node-01
+  image:
+    repository: free5gc/ueransim
+    tag: "v4.2.2"
+    pullPolicy: IfNotPresent
+  initImage:
+    repository: alpine
+    tag: "3.21.7"
+    pullPolicy: IfNotPresent
+  multus:
+    enabled: true
+    type: host-device
+    mode: bridge
+    n2:
+      name: magma-ueransim-n2
+      master: enp8s19
+      interface: n2
+      ip: 10.88.99.150/24
+      gateway: ""
+    n3:
+      name: magma-ueransim-n3
+      master: enp8s20
+      interface: n3
+      ip: 192.168.60.150/24
+      gateway: ""
+  gnb:
+    name: magma-ueransim-gnb
+    nci: "0x000000010"
+    idLength: 32
+    tac: "000001"
+    amfAddress: 10.88.99.142
+    slices:
+      sst: 1
+      sd: ""
+  ue:
+    supi: "imsi-001010000000001"
+    mcc: "001"
+    mnc: "01"
+    key: "465B5CE8B199B49FAA5F0A2EE238A6BC"
+    opc: "E8ED289DEBA952E4283B54E88E6183CA"
+    amf: "8000"
+    imei: "356938035643803"
+    imeiSv: "4370816125816151"
+    apn: magma.ipv4
+    startDelaySeconds: 60
+  subscriber:
+    provision: true
+    nextSeq: "000000000000"
+    apnConfig: "magma.ipv4,9,1,0,0,300000000,300000000,0,,,,"
+  resources: {}
 
 resources: {}
