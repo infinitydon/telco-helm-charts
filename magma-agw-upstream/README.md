@@ -109,10 +109,38 @@ initial registration, PDU session establishment, and brought up `uesimtun0`.
 
 ## Installation
 
-Create the namespace:
+### Prerequisites
+
+Before installing, confirm the target cluster has:
+
+- Multus installed and the `NetworkAttachmentDefinition` CRD present.
+- A Linux node selected for AGW, default `ebpf-bng-node-02`.
+- A separate Linux node selected for UERANSIM, default `ebpf-bng-node-01`.
+- Usable host interfaces for AGW N2/N3 and simulator N2/N3. The tested defaults
+  are `enp8s19` and `enp8s20` on both nodes.
+- SCTP and GTP kernel support. `nodePrep` attempts to load `gtp`,
+  `openvswitch`, and `nf_conntrack`, but it does not build kernel modules.
+- Open vSwitch. If it is missing and `nodePrep.installOpenvSwitch=true`, the
+  node prep DaemonSet installs it with `apt-get`.
+
+Quick checks:
 
 ```sh
-~ kubectl create namespace magma
+kubectl get crd network-attachment-definitions.k8s.cni.cncf.io
+kubectl get pods -n kube-system -l app=multus -o wide
+kubectl get nodes -o wide
+```
+
+On each selected node, verify the interface names before using the defaults:
+
+```sh
+kubectl debug node/<node-name> -it --image=ubuntu:22.04 -- chroot /host ip -br addr
+```
+
+### Bring-Up
+
+```sh
+kubectl create namespace magma
 ```
 
 For lab use, the chart can create a self-signed cert Secret when
@@ -120,19 +148,179 @@ For lab use, the chart can create a self-signed cert Secret when
 the root CA Secret needed to communicate with orc8r:
 
 ```sh
-~ kubectl create secret generic agwc-secret-certs --from-file=rootCA.pem=rootCA.pem --namespace magma
+kubectl create secret generic agwc-secret-certs \
+  --from-file=rootCA.pem=rootCA.pem \
+  --from-file=gateway.crt=gateway.crt \
+  --from-file=gateway.key=gateway.key \
+  --from-file=controller.crt=controller.crt \
+  --from-file=controller.key=controller.key \
+  --namespace magma
 ```
 
 Deploy after reviewing `values.yaml`:
 
 ```sh
-~ helm upgrade --install agwc ./magma-agw-upstream --namespace magma --values=values.yaml
+helm upgrade --install agwc ./magma-agw-upstream \
+  --namespace magma \
+  --values values.yaml \
+  --wait \
+  --timeout 20m
+```
+
+For the tested lab defaults:
+
+```sh
+helm upgrade --install agwc ./magma-agw-upstream \
+  --namespace magma-agw-test \
+  --set namespace=magma-agw-test \
+  --wait \
+  --timeout 20m
+```
+
+### Verification
+
+Check the release and pods:
+
+```sh
+helm status agwc -n magma-agw-test
+kubectl get pods -n magma-agw-test -o wide
+kubectl logs -n magma-agw-test deploy/agwc-ueransim-gnb --tail=100
+kubectl logs -n magma-agw-test deploy/agwc-ueransim-ue --tail=120
+```
+
+Expected successful simulator messages:
+
+```text
+NG Setup procedure is successful
+Initial Registration is successful
+PDU Session establishment is successful PSI[1]
+TUN interface[uesimtun0, 192.168.128.x] is up.
+```
+
+Check AGW N2 SCTP listener:
+
+```sh
+kubectl exec -n magma-agw-test deploy/oai-mme -- \
+  sh -c 'cat /proc/net/sctp/eps | grep 38412'
+```
+
+The tested default binds `10.88.99.142:38412`. Avoid `192.88.99.0/24` for N2;
+it caused SCTP client failures even though ICMP worked.
+
+## Provisioning
+
+When `simulator.subscriber.provision=true`, the chart creates a revision-scoped
+Job named like `agwc-subscriber-provision-<revision>`.
+
+The Job is idempotent:
+
+- waits for local `subscriberdb`
+- checks whether the subscriber exists
+- adds the subscriber if missing
+- updates the APN/DNN profile on every run
+
+Default subscriber values:
+
+```yaml
+simulator:
+  ue:
+    supi: imsi-001010000000001
+    key: 465B5CE8B199B49FAA5F0A2EE238A6BC
+    opc: E8ED289DEBA952E4283B54E88E6183CA
+    apn: magma.ipv4
+  subscriber:
+    provision: true
+    nextSeq: "000000000000"
+    apnConfig: "magma.ipv4,9,1,0,0,300000000,300000000,0,,,,"
+```
+
+Manual verification:
+
+```sh
+kubectl logs -n magma-agw-test job/agwc-subscriber-provision-<revision>
+kubectl exec -n magma-agw-test deploy/subscriberdb -- \
+  /usr/local/bin/subscriber_cli.py get IMSI001010000000001
+```
+
+To use your own UE/SIM values, update `simulator.ue.*` and
+`simulator.subscriber.apnConfig` together. If using an external orchestrator for
+subscribers, set `simulator.subscriber.provision=false`.
+
+## Certificates
+
+The chart supports two certificate modes.
+
+Lab mode:
+
+```yaml
+secret:
+  create: true
+  certs: agwc-secret-certs
+```
+
+Helm generates a self-signed CA plus gateway/controller certificates and stores
+them in `agwc-secret-certs`. This is suitable for local chart testing and for
+the standalone AGW workflow in this repo. Because Helm `genCA`/`genSignedCert`
+generates new material on render, do not treat lab certificates as stable
+identity for production.
+
+Production/orc8r mode:
+
+```yaml
+secret:
+  create: false
+  certs: agwc-secret-certs
+```
+
+Create `agwc-secret-certs` yourself with the certificate material issued for the
+gateway and controller trust chain:
+
+- `rootCA.pem`
+- `gateway.crt`
+- `gateway.key`
+- `controller.crt`
+- `controller.key`
+
+Update or rotate certificates when:
+
+- certificates are expired or near expiry
+- the gateway is re-enrolled or its identity changes
+- the orc8r/controller CA changes
+- a private key is suspected to be exposed
+- moving from lab mode to real orc8r mode
+
+After updating the Secret, rerun Helm so the revision-scoped config Job copies
+the files into the AGW PVC, then restart the affected control-plane pods:
+
+```sh
+helm upgrade --install agwc ./magma-agw-upstream \
+  --namespace magma \
+  --values values.yaml \
+  --wait \
+  --timeout 20m
+
+kubectl rollout restart -n magma \
+  deployment/control-proxy deployment/oai-mme deployment/sctpd
+```
+
+If switching from `secret.create=true` to externally managed certificates,
+delete and recreate the Secret before the Helm upgrade:
+
+```sh
+kubectl delete secret agwc-secret-certs -n magma
+kubectl create secret generic agwc-secret-certs \
+  --from-file=rootCA.pem=rootCA.pem \
+  --from-file=gateway.crt=gateway.crt \
+  --from-file=gateway.key=gateway.key \
+  --from-file=controller.crt=controller.crt \
+  --from-file=controller.key=controller.key \
+  --namespace magma
 ```
 
 Delete:
 
 ```sh
-~ helm uninstall agwc --namespace magma
-~ kubectl delete -n magma secret agwc-secret-certs
-~ kubectl delete namespace magma
+helm uninstall agwc --namespace magma
+kubectl delete -n magma secret agwc-secret-certs
+kubectl delete namespace magma
 ```
