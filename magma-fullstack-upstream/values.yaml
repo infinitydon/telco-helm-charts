@@ -1,0 +1,130 @@
+global:
+  domainName: magma.local
+
+image:
+  postgres: postgres:14.13-alpine
+  test: alpine:3.20.3
+  pullPolicy: IfNotPresent
+
+postgresql:
+  enabled: true
+  name: postgresql
+  database: magma
+  username: postgres
+  password: postgres
+  storage:
+    size: 8Gi
+    storageClassName: ""
+  resources: {}
+
+secrets:
+  create: true
+  certsName: orc8r-secrets-certs
+  envdirName: orc8r-secrets-envdir
+  configsName: orc8r-secrets-configs-orc8r
+  caDays: 3650
+  certDays: 3650
+
+nmsAdmin:
+  enabled: true
+  organization: magma-test
+  email: admin
+  password: admin
+
+orc8r:
+  secrets:
+    create: false
+  certs:
+    enabled: false
+    create: false
+  metrics:
+    enabled: false
+  logging:
+    enabled: false
+  nms:
+    enabled: true
+    controllerHostname: controller.magma.local
+    magmalte:
+      create: true
+      image:
+        repository: linuxfoundation.jfrog.io/magma-docker/magmalte
+        tag: "1.9.0"
+        pullPolicy: IfNotPresent
+      env:
+        api_host: magma-fullstack-nginx-proxy
+        mysql_host: postgresql
+        mysql_port: 5432
+        mysql_db: magma
+        mysql_user: postgres
+        mysql_pass: postgres
+        mysql_dialect: postgres
+      service:
+        type: ClusterIP
+    nginx:
+      create: true
+      image:
+        repository: linuxfoundation.jfrog.io/magma-docker/nginx
+        tag: "1.9.0"
+        pullPolicy: IfNotPresent
+      service:
+        type: NodePort
+  secret:
+    certs: orc8r-secrets-certs
+    configs:
+      orc8r: orc8r-secrets-configs-orc8r
+    envdir: orc8r-secrets-envdir
+  nginx:
+    create: true
+    service:
+      enabled: true
+      legacyEnabled: true
+      type: NodePort
+    spec:
+      hostname: controller.magma.local
+  controller:
+    image:
+      repository: linuxfoundation.jfrog.io/magma-docker/controller
+      tag: "1.9.0"
+      pullPolicy: IfNotPresent
+      env:
+        orc8r_domain_name: magma.local
+    spec:
+      database:
+        driver: postgres
+        sql_dialect: psql
+        db: magma
+        protocol: tcp
+        host: postgresql
+        port: 5432
+        user: postgres
+        pass: postgres
+      service_registry:
+        mode: k8s
+
+lte-orc8r:
+  certs:
+    enabled: false
+  secret:
+    certs: orc8r-secrets-certs
+    configs:
+      orc8r: orc8r-secrets-configs-orc8r
+    envdir: orc8r-secrets-envdir
+  controller:
+    image:
+      repository: linuxfoundation.jfrog.io/magma-docker/controller
+      tag: "1.9.0"
+      pullPolicy: IfNotPresent
+      env:
+        orc8r_domain_name: magma.local
+    spec:
+      database:
+        driver: postgres
+        sql_dialect: psql
+        db: magma
+        protocol: tcp
+        host: postgresql
+        port: 5432
+        user: postgres
+        pass: postgres
+      service_registry:
+        mode: k8s

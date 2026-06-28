@@ -140,7 +140,7 @@ simulator:
     apn: magma.ipv4
     startDelaySeconds: 180
   subscriber:
-    provision: true
+    provision: false
     nextSeq: "000000000000"
     apnConfig: "magma.ipv4,9,1,0,0,300000000,300000000,0,,,,"
   resources: {}

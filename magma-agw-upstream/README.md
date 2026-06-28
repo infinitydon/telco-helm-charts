@@ -166,16 +166,18 @@ simulator:
       master: enp8s20
       ip: 192.168.60.150/24
   subscriber:
-    provision: true
+    provision: false
 ```
 
 `simulator.gnb.startDelaySeconds` defaults to `120` so the AGW SCTP listener is
 up before UERANSIM attempts NG setup. If the AGW node is slow to initialize OVS
 or services, increase the gNB and UE delays together.
 
-The subscriber provisioning Job adds/updates `IMSI001010000000001` and the
-`magma.ipv4` APN profile. In cluster testing, UERANSIM completed NG setup,
-initial registration, PDU session establishment, and brought up `uesimtun0`.
+For a full Magma deployment, create the subscriber and APN in NMS/Orc8r. The
+local subscriber provisioning Job is disabled by default and is intended only
+for standalone AGW datapath testing. In cluster testing, UERANSIM completed NG
+setup, initial registration, PDU session establishment, and brought up
+`uesimtun0` after the subscriber was present.
 
 ## Installation
 
@@ -288,8 +290,17 @@ it caused SCTP client failures even though ICMP worked.
 
 ## Provisioning
 
+For the full deployment path, provisioning should be done through NMS/Orc8r:
+
+- create the LTE/5G network
+- register the gateway
+- configure APNs/DNNs
+- add subscribers/SIM credentials
+- keep UERANSIM SIM values aligned with the NMS subscriber
+
 When `simulator.subscriber.provision=true`, the chart creates a revision-scoped
-Job named like `agwc-subscriber-provision-<revision>`.
+Job named like `agwc-subscriber-provision-<revision>`. This is a standalone lab
+shortcut and should stay disabled when Orc8r/NMS is managing the gateway.
 
 The Job is idempotent:
 
