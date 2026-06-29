@@ -131,7 +131,7 @@ nodePrep:
       parent: enp8s20
       mode: bridge
       address: 192.168.60.142/24
-      replaceAddresses: false
+      replaceAddresses: true
     internal:
       - name: mtr0
         type: internal
