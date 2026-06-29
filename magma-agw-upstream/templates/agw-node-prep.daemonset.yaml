@@ -95,24 +95,97 @@ spec:
                 host_sh 'ovs-vsctl show >/dev/null'
               }
 
-              ensure_magma_ovs_kmod() {
-                local script="$1"
-                local run_upgrade="$2"
-                local required="$3"
-                if [ "${run_upgrade}" != "true" ]; then
-                  log "Magma OVS kmod upgrade disabled"
-                  return
-                fi
-                if host test -x "${script}"; then
-                  log "running Magma OVS kmod upgrade script ${script}"
-                  host "${script}"
-                  return
-                fi
-                if [ "${required}" = "true" ]; then
-                  log "required Magma OVS kmod upgrade script ${script} is missing"
+              ovs_gtpu_supported() {
+                local bridge="$1"
+                local probe_port="$2"
+                local type="$3"
+                local ofport
+                local error
+                host ovs-vsctl --if-exists del-port "${bridge}" "${probe_port}" || true
+                if ! host ovs-vsctl --may-exist add-port "${bridge}" "${probe_port}" -- \
+                  set Interface "${probe_port}" type="${type}" options:remote_ip=flow options:key=flow ofport_request=32000; then
+                  log "OVS GTP-U probe failed while adding ${probe_port}"
+                  host ovs-vsctl --if-exists del-port "${bridge}" "${probe_port}" || true
                   return 1
                 fi
-                log "Magma OVS kmod upgrade script ${script} not present; continuing"
+                ofport="$(host ovs-vsctl --if-exists get Interface "${probe_port}" ofport 2>/dev/null || true)"
+                error="$(host ovs-vsctl --if-exists get Interface "${probe_port}" error 2>/dev/null || true)"
+                host ovs-vsctl --if-exists del-port "${bridge}" "${probe_port}" || true
+                if [ -n "${error}" ] && [ "${error}" != '""' ] && [ "${error}" != "[]" ]; then
+                  log "OVS GTP-U probe reported error: ${error}"
+                  return 1
+                fi
+                if [ -z "${ofport}" ] || [ "${ofport}" = "-1" ]; then
+                  log "OVS GTP-U probe did not receive a usable ofport"
+                  return 1
+                fi
+                log "OVS GTP-U probe succeeded with ofport ${ofport}"
+              }
+
+              install_ovs_kmod_package() {
+                local package_url="$1"
+                local package_sha256="$2"
+                local package_path="$3"
+                [ -n "${package_url}" ] || return 1
+                log "installing Magma OVS kmod package from ${package_url}"
+                if host_sh 'command -v curl >/dev/null 2>&1'; then
+                  host curl -fsSL "${package_url}" -o "${package_path}"
+                elif host_sh 'command -v wget >/dev/null 2>&1'; then
+                  host wget -qO "${package_path}" "${package_url}"
+                else
+                  log "neither curl nor wget is available on host"
+                  return 1
+                fi
+                if [ -n "${package_sha256}" ]; then
+                  host_sh "echo '${package_sha256}  ${package_path}' | sha256sum -c -"
+                fi
+                host_sh "export DEBIAN_FRONTEND=noninteractive; dpkg -i '${package_path}' || apt-get install -f -y"
+              }
+
+              ensure_magma_ovs_kmod() {
+                local bridge="$1"
+                local probe_port="$2"
+                local type="$3"
+                local script="$4"
+                local run_upgrade="$5"
+                local required="$6"
+                local install_command="$7"
+                local package_url="$8"
+                local package_sha256="$9"
+                local package_path="${10}"
+                if [ {{ .Values.nodePrep.ovsKmod.validateGtpu | quote }} = "true" ] && ovs_gtpu_supported "${bridge}" "${probe_port}" "${type}"; then
+                  log "Magma-compatible OVS GTP-U datapath is already available"
+                  return
+                fi
+                if [ "${run_upgrade}" != "true" ]; then
+                  log "Magma OVS kmod upgrade disabled"
+                  if [ "${required}" = "true" ]; then
+                    log "Magma OVS kmod is required but upgrade is disabled"
+                    return 1
+                  fi
+                  return
+                fi
+                if [ -n "${install_command}" ]; then
+                  log "running Magma OVS kmod install command"
+                  host_sh "${install_command}"
+                elif [ -n "${package_url}" ]; then
+                  install_ovs_kmod_package "${package_url}" "${package_sha256}" "${package_path}"
+                elif host test -x "${script}"; then
+                  log "running Magma OVS kmod upgrade script ${script}"
+                  host "${script}"
+                else
+                  if [ "${required}" = "true" ]; then
+                    log "Magma OVS GTP-U datapath is required, but no install command, package URL, or executable ${script} was found"
+                    return 1
+                  fi
+                  log "Magma OVS kmod installer not configured; continuing"
+                  return
+                fi
+                ensure_ovs_started
+                if [ {{ .Values.nodePrep.ovsKmod.validateGtpu | quote }} = "true" ] && ! ovs_gtpu_supported "${bridge}" "${probe_port}" "${type}"; then
+                  log "Magma OVS kmod installer completed, but OVS GTP-U datapath is still unavailable"
+                  return 1
+                fi
               }
 
               ensure_bridge() {
@@ -254,6 +327,35 @@ spec:
                 fi
               }
 
+              ensure_ovs_patch_port() {
+                local bridge="$1"
+                local iface="$2"
+                local peer="$3"
+                local ofport="${4:-}"
+                log "ensuring OVS patch port ${iface} on ${bridge} peers with ${peer}"
+                host ovs-vsctl --may-exist add-port "${bridge}" "${iface}" -- set Interface "${iface}" type=patch options:peer="${peer}"
+                if [ -n "${ofport}" ]; then
+                  local current_ofport
+                  current_ofport="$(host ovs-vsctl --if-exists get Interface "${iface}" ofport 2>/dev/null || true)"
+                  if [ "${current_ofport}" != "${ofport}" ]; then
+                    log "setting requested ofport ${ofport} for patch port ${iface}"
+                    host ovs-vsctl set Interface "${iface}" ofport_request="${ofport}"
+                  fi
+                fi
+              }
+
+              ensure_ovs_system_port() {
+                local bridge="$1"
+                local iface="$2"
+                if ! host ip link show "${iface}" >/dev/null 2>&1; then
+                  log "host interface ${iface} missing for OVS bridge ${bridge}"
+                  return 1
+                fi
+                log "ensuring host interface ${iface} is attached to OVS bridge ${bridge}"
+                host ovs-vsctl --may-exist add-port "${bridge}" "${iface}"
+                host ip link set "${iface}" up
+              }
+
               ensure_ovs_gtpu_port() {
                 local bridge="$1"
                 local iface="$2"
@@ -301,7 +403,8 @@ spec:
               ensure_sysctl {{ $key | quote }} {{ $value | quote }}
               {{- end }}
               ensure_ovs_started
-              ensure_magma_ovs_kmod {{ .Values.nodePrep.magmaOvsKmodUpgradePath | quote }} {{ .Values.nodePrep.runMagmaOvsKmodUpgrade | quote }} {{ .Values.nodePrep.requireMagmaOvsKmod | quote }}
+              ensure_bridge {{ .Values.nodePrep.bridge.name | quote }}
+              ensure_magma_ovs_kmod {{ .Values.nodePrep.bridge.name | quote }} {{ .Values.nodePrep.ovsKmod.probePort | quote }} {{ default "gtpu" .Values.nodePrep.gtpu.type | quote }} {{ .Values.nodePrep.magmaOvsKmodUpgradePath | quote }} {{ .Values.nodePrep.runMagmaOvsKmodUpgrade | quote }} {{ .Values.nodePrep.requireMagmaOvsKmod | quote }} {{ .Values.nodePrep.ovsKmod.installCommand | quote }} {{ .Values.nodePrep.ovsKmod.packageUrl | quote }} {{ .Values.nodePrep.ovsKmod.packageSha256 | quote }} {{ .Values.nodePrep.ovsKmod.packagePath | quote }}
               ensure_ovs_started
               ensure_bridge {{ .Values.nodePrep.bridge.name | quote }}
               ensure_addr {{ .Values.nodePrep.bridge.name | quote }} {{ .Values.nodePrep.bridge.address | quote }} "false"
@@ -320,6 +423,12 @@ spec:
               ensure_addr {{ .Values.nodePrep.interfaces.s1.name | quote }} {{ .Values.nodePrep.interfaces.s1.address | quote }} {{ default false .Values.nodePrep.interfaces.s1.replaceAddresses | quote }}
               ensure_data_iface {{ .Values.nodePrep.interfaces.nat.name | quote }} {{ default "dummy" .Values.nodePrep.interfaces.nat.type | quote }} {{ default "" .Values.nodePrep.interfaces.nat.parent | quote }} {{ default "bridge" .Values.nodePrep.interfaces.nat.mode | quote }}
               ensure_addr {{ .Values.nodePrep.interfaces.nat.name | quote }} {{ .Values.nodePrep.interfaces.nat.address | quote }} {{ default false .Values.nodePrep.interfaces.nat.replaceAddresses | quote }}
+              {{- if .Values.nodePrep.uplinkBridge.enabled }}
+              ensure_bridge {{ .Values.nodePrep.uplinkBridge.name | quote }}
+              ensure_ovs_patch_port {{ .Values.nodePrep.bridge.name | quote }} {{ .Values.nodePrep.uplinkBridge.patchToGtp.name | quote }} {{ .Values.nodePrep.uplinkBridge.patchToGtp.peer | quote }} {{ default "" .Values.nodePrep.uplinkBridge.patchToGtp.ofport | quote }}
+              ensure_ovs_patch_port {{ .Values.nodePrep.uplinkBridge.name | quote }} {{ .Values.nodePrep.uplinkBridge.patchToUplink.name | quote }} {{ .Values.nodePrep.uplinkBridge.patchToUplink.peer | quote }} ""
+              ensure_ovs_system_port {{ .Values.nodePrep.uplinkBridge.name | quote }} {{ .Values.nodePrep.uplinkBridge.uplinkPort | quote }}
+              {{- end }}
               {{- range .Values.nodePrep.interfaces.internal }}
               {{- if eq .type "internal" }}
               ensure_ovs_internal_port {{ .bridge | quote }} {{ .name | quote }} {{ default "" .ofport | quote }}

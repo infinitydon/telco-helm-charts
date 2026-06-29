@@ -97,8 +97,10 @@ image:
 ## Node Prep DaemonSet
 
 `nodePrep.enabled` deploys a privileged DaemonSet on the selected AGW node. It is
-idempotent: it checks for Open vSwitch, kernel modules, `gtp_br0`, internal
-ports, interface addresses, and sysctls before changing host state.
+idempotent: it checks for Open vSwitch, kernel modules, `gtp_br0`,
+`uplink_br0`, patch ports, internal ports, interface addresses, and sysctls
+before changing host state. It also probes whether OVS can create a `type=gtpu`
+port before marking datapath prep successful when `requireMagmaOvsKmod=true`.
 
 For production, review these values and map them to the real AGW N2/N3/uplink
 interfaces before installing. The defaults use node-02 for Magma AGW and create
@@ -117,10 +119,20 @@ nodePrep:
   runMagmaOvsKmodUpgrade: true
   requireMagmaOvsKmod: false
   magmaOvsKmodUpgradePath: /usr/local/bin/ovs-kmod-upgrade.sh
+  ovsKmod:
+    validateGtpu: true
+    installCommand: ""
+    packageUrl: ""
+    packageSha256: ""
+    packagePath: /tmp/magma-ovs-kmod.deb
   bridge:
     name: gtp_br0
     address: 192.168.128.1/24
     datapathType: system
+  uplinkBridge:
+    enabled: true
+    name: uplink_br0
+    uplinkPort: magma-n3
   gtpu:
     enabled: false
     cleanupPorts:
@@ -229,13 +241,16 @@ Before installing, confirm the target cluster has:
   `openvswitch`, and `nf_conntrack`, but it does not build kernel modules.
 - Open vSwitch. If it is missing and `nodePrep.installOpenvSwitch=true`, the
   node prep DaemonSet installs it with `apt-get`.
-- Magma-compatible OVS/GTP kernel support. Upstream Magma troubleshooting
-  expects AGW hosts with the Magma OVS kernel module path available through
-  `/usr/local/bin/ovs-kmod-upgrade.sh` when OVS reports GTP-related datapath
-  errors. The node prep DaemonSet can run this script when it exists. Set
-  `nodePrep.requireMagmaOvsKmod=true` to fail fast when the script is missing.
-  The default keeps `gtp_br0` on the kernel `system` datapath and removes stale
-  static workaround ports such as `gtpu0`.
+- Magma-compatible OVS/GTP kernel support. Node prep probes the live host OVS by
+  trying to create a temporary `type=gtpu` port. If the probe fails and
+  `nodePrep.runMagmaOvsKmodUpgrade=true`, it can run one of three approved
+  installer paths: `nodePrep.ovsKmod.installCommand`,
+  `nodePrep.ovsKmod.packageUrl` with optional SHA256 validation, or the existing
+  executable at `nodePrep.magmaOvsKmodUpgradePath`. Set
+  `nodePrep.requireMagmaOvsKmod=true` to fail fast unless the GTP-U probe passes
+  after the installer runs. The default keeps the stack schedulable for control
+  plane testing, but real UE datapath validation should use
+  `requireMagmaOvsKmod=true`.
 
 The tested Ubuntu 24.04 node had only stock Ubuntu Open vSwitch packages and no
 `/usr/local/bin/ovs-kmod-upgrade.sh`. With that host state, UERANSIM control

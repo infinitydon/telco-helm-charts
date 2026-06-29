@@ -78,6 +78,13 @@ nodePrep:
   requireMagmaOvsKmod: false
   runMagmaOvsKmodUpgrade: true
   magmaOvsKmodUpgradePath: /usr/local/bin/ovs-kmod-upgrade.sh
+  ovsKmod:
+    validateGtpu: true
+    installCommand: ""
+    packageUrl: ""
+    packageSha256: ""
+    packagePath: /tmp/magma-ovs-kmod.deb
+    probePort: magma-gtpu-probe
   sleepAfterPrep: true
   bridge:
     name: gtp_br0
@@ -91,6 +98,17 @@ nodePrep:
     type: gtpu
     cleanupPorts:
       - gtpu0
+  uplinkBridge:
+    enabled: true
+    name: uplink_br0
+    patchToGtp:
+      name: patch-up
+      peer: patch-agw
+      ofport: 2
+    patchToUplink:
+      name: patch-agw
+      peer: patch-up
+    uplinkPort: magma-n3
   interfaces:
     createMissing: true
     cleanupLegacy:
