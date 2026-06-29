@@ -112,26 +112,59 @@ spec:
                 curl -skf -X POST --cert "$API_CERT_FILENAME" --key "$API_PRIVATE_KEY_FILENAME" -H "Content-Type: application/json" --data @/tmp/network.json "https://$API_HOST/magma/v1/lte" >/dev/null
               fi
 
+              {{- if .Values.provisioning.apn.enabled }}
+              cat >/tmp/apn.json <<EOF
+              {
+                "apn_name": {{ .Values.provisioning.apn.name | quote }},
+                "apn_configuration": {
+                  "ambr": {
+                    "max_bandwidth_dl": {{ .Values.provisioning.apn.maxDlBitRate | int64 }},
+                    "max_bandwidth_ul": {{ .Values.provisioning.apn.maxUlBitRate | int64 }}
+                  },
+                  "qos_profile": {
+                    "class_id": {{ .Values.provisioning.apn.qosClassId }},
+                    "priority_level": {{ .Values.provisioning.apn.priorityLevel }},
+                    "preemption_capability": {{ .Values.provisioning.apn.preemptionCapability }},
+                    "preemption_vulnerability": {{ .Values.provisioning.apn.preemptionVulnerability }}
+                  },
+                  "pdn_type": {{ .Values.provisioning.apn.pdnType }}
+                }
+              }
+              EOF
+              apn_code="$(curl -sk -o /tmp/apn-get.out -w '%{http_code}' --cert "$API_CERT_FILENAME" --key "$API_PRIVATE_KEY_FILENAME" "https://$API_HOST/magma/v1/lte/$NETWORK_ID/apns/$APN_NAME")"
+              if [ "$apn_code" = "200" ]; then
+                curl -skf -X PUT --cert "$API_CERT_FILENAME" --key "$API_PRIVATE_KEY_FILENAME" -H "Content-Type: application/json" --data @/tmp/apn.json "https://$API_HOST/magma/v1/lte/$NETWORK_ID/apns/$APN_NAME" >/dev/null
+              else
+                curl -skf -X POST --cert "$API_CERT_FILENAME" --key "$API_PRIVATE_KEY_FILENAME" -H "Content-Type: application/json" --data @/tmp/apn.json "https://$API_HOST/magma/v1/lte/$NETWORK_ID/apns" >/dev/null
+              fi
+              {{- end }}
+
               {{- if .Values.provisioning.subscriber.enabled }}
+              cat >/tmp/subscriber-one.json <<EOF
+              {
+                "id": {{ .Values.provisioning.subscriber.imsi | quote }},
+                "name": {{ .Values.provisioning.subscriber.name | quote }},
+                "lte": {
+                  "auth_algo": "MILENAGE",
+                  "auth_key": {{ .Values.provisioning.subscriber.authKey | quote }},
+                  "auth_opc": {{ .Values.provisioning.subscriber.authOpc | quote }},
+                  "state": "ACTIVE",
+                  "sub_profile": {{ .Values.provisioning.subscriber.subProfile | quote }}
+                }{{- if .Values.provisioning.apn.enabled }},
+                "active_apns": [{{ .Values.provisioning.apn.name | quote }}]{{- end }},
+                "forbidden_network_types": ["EPC"]
+              }
+              EOF
               subscriber_code="$(curl -sk -o /tmp/subscriber-get.out -w '%{http_code}' --cert "$API_CERT_FILENAME" --key "$API_PRIVATE_KEY_FILENAME" "https://$API_HOST/magma/v1/lte/$NETWORK_ID/subscribers/$SUBSCRIBER_IMSI")"
               if [ "$subscriber_code" != "200" ]; then
                 cat >/tmp/subscriber.json <<EOF
               [
-                {
-                  "id": {{ .Values.provisioning.subscriber.imsi | quote }},
-                  "name": {{ .Values.provisioning.subscriber.name | quote }},
-                  "lte": {
-                    "auth_algo": "MILENAGE",
-                    "auth_key": {{ .Values.provisioning.subscriber.authKey | quote }},
-                    "auth_opc": {{ .Values.provisioning.subscriber.authOpc | quote }},
-                    "state": "ACTIVE",
-                    "sub_profile": {{ .Values.provisioning.subscriber.subProfile | quote }}
-                  },
-                  "forbidden_network_types": []
-                }
+                $(cat /tmp/subscriber-one.json)
               ]
               EOF
                 curl -skf -X POST --cert "$API_CERT_FILENAME" --key "$API_PRIVATE_KEY_FILENAME" -H "Content-Type: application/json" --data @/tmp/subscriber.json "https://$API_HOST/magma/v1/lte/$NETWORK_ID/subscribers" >/dev/null
+              else
+                curl -skf -X PUT --cert "$API_CERT_FILENAME" --key "$API_PRIVATE_KEY_FILENAME" -H "Content-Type: application/json" --data @/tmp/subscriber-one.json "https://$API_HOST/magma/v1/lte/$NETWORK_ID/subscribers/$SUBSCRIBER_IMSI" >/dev/null
               fi
               {{- end }}
           env:
@@ -159,6 +192,8 @@ spec:
               value: {{ .Values.provisioning.network.id | quote }}
             - name: SUBSCRIBER_IMSI
               value: {{ .Values.provisioning.subscriber.imsi | quote }}
+            - name: APN_NAME
+              value: {{ .Values.provisioning.apn.name | quote }}
           volumeMounts:
             - name: orc8r-secrets-certs
               mountPath: /run/secrets/admin_operator.pem

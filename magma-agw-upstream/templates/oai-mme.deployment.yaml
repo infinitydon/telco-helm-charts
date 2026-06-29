@@ -30,6 +30,9 @@ spec:
         - name: magma-config
           configMap:
             name: gateway-config
+        - name: controlproxy-config
+          configMap:
+            name: controlproxy-config
         - name: agwc-claim
           persistentVolumeClaim:
             claimName: agwc-claim
@@ -70,6 +73,10 @@ volumeMounts:
   - name: magma-config
     mountPath: /etc/magma/gateway.mconfig
     subPath: gateway.mconfig
+    readOnly: true
+  - name: controlproxy-config
+    mountPath: /etc/magma/control_proxy.yml
+    subPath: control_proxy.yml
     readOnly: true
   - mountPath: /var/opt/magma
     name: agwc-claim

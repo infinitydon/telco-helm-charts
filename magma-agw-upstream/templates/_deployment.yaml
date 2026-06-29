@@ -60,6 +60,9 @@ spec:
         - name: magma-config
           configMap:
             name: gateway-config
+        - name: controlproxy-config
+          configMap:
+            name: controlproxy-config
         - name: agwc-claim
           persistentVolumeClaim:
             claimName: {{ .Values.persistent.name }}

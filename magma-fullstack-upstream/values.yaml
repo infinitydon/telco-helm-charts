@@ -43,11 +43,21 @@ provisioning:
     mnc: "01"
     tac: 1
     enable5gFeatures: true
-    cloudSubscriberdbEnabled: true
+    cloudSubscriberdbEnabled: false
     defaultRuleId: default_rule_1
     subProfile: default
     maxDlBitRate: 300000000
     maxUlBitRate: 300000000
+  apn:
+    enabled: true
+    name: magma.ipv4
+    maxDlBitRate: 300000000
+    maxUlBitRate: 300000000
+    qosClassId: 9
+    priorityLevel: 15
+    preemptionCapability: true
+    preemptionVulnerability: false
+    pdnType: 0
   subscriber:
     enabled: true
     imsi: IMSI001010000000001
