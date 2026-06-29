@@ -3,6 +3,7 @@ global:
 
 image:
   postgres: postgres:14.13-alpine
+  elasticsearch: docker.elastic.co/elasticsearch/elasticsearch:7.17.23
   test: alpine:3.20.3
   pullPolicy: IfNotPresent
 
@@ -73,9 +74,57 @@ orc8r:
     enabled: false
     create: false
   metrics:
-    enabled: false
+    enabled: true
+    prometheus:
+      create: true
+      nodeSelector:
+        kubernetes.io/hostname: ebpf-bng-node-01
+    prometheusCache:
+      create: true
+      nodeSelector:
+        kubernetes.io/hostname: ebpf-bng-node-01
+    alertmanager:
+      create: true
+      nodeSelector:
+        kubernetes.io/hostname: ebpf-bng-node-01
+    alertmanagerConfigurer:
+      create: true
+      nodeSelector:
+        kubernetes.io/hostname: ebpf-bng-node-01
+    prometheusConfigurer:
+      create: true
+      nodeSelector:
+        kubernetes.io/hostname: ebpf-bng-node-01
+    userGrafana:
+      create: false
+    metrics:
+      volumes:
+        prometheusData:
+          volumeSpec:
+            hostPath:
+              path: /var/lib/magma/prometheus-data
+              type: DirectoryOrCreate
+        prometheusConfig:
+          volumeSpec:
+            hostPath:
+              path: /var/lib/magma/prometheus-config
+              type: DirectoryOrCreate
   logging:
-    enabled: false
+    enabled: true
+    fluentd_forward:
+      create: true
+      dp_output: false
+      image:
+        repository: fluent/fluentd-kubernetes-daemonset
+        tag: v1.16-debian-elasticsearch7-1
+        pullPolicy: IfNotPresent
+      env:
+        elastic_host: elasticsearch-master
+        elastic_port: "9200"
+        elastic_scheme: http
+        elastic_flush_interval: 5s
+    fluentd_daemon:
+      create: false
   nms:
     enabled: true
     controllerHostname: controller.magma.local
@@ -135,6 +184,25 @@ orc8r:
         pass: postgres
       service_registry:
         mode: k8s
+
+observability:
+  aliases:
+    enabled: true
+  elasticsearch:
+    enabled: true
+    name: elasticsearch-master
+    replicas: 1
+    storage:
+      enabled: false
+      size: 8Gi
+      storageClassName: ""
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
 
 lte-orc8r:
   certs:

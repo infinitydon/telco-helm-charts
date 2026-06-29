@@ -145,6 +145,11 @@ schedule the simulator onto the AGW worker node; the chart defaults enforce this
 with a separate simulator node label, hostname selector, and pod anti-affinity
 against AGW pods.
 
+UERANSIM is a simulator workload, not an NMS-managed eNodeB/CBSD inventory
+object. Its gNB establishes NGAP/SCTP toward the AGW and the UE/session should
+be visible through gateway/session state and logs, but it should not be expected
+to appear as a persistent "radio node" in the Magma NMS equipment views.
+
 Label the simulator worker:
 
 ```sh

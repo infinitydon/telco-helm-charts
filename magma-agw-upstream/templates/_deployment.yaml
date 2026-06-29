@@ -33,6 +33,9 @@ spec:
 {{ include "image-version-label" . | indent 6 }}
   template:
     metadata:
+      annotations:
+        checksum/gateway-config: {{ include (print $.Template.BasePath "/agwc-config.config.yaml") . | sha256sum }}
+        checksum/control-proxy-config: {{ include (print $.Template.BasePath "/control-proxy.config.yaml") . | sha256sum }}
       labels:
         app.kubernetes.io/component: agwc
 {{ include "agw-instance-label" . | indent 8 }}
@@ -41,6 +44,7 @@ spec:
     spec:
       restartPolicy: Always
       hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       {{- if and .Values.orc8r.hostAliases.enabled .Values.orc8r.hostAliases.ip }}
       hostAliases:
         - ip: {{ .Values.orc8r.hostAliases.ip | quote }}

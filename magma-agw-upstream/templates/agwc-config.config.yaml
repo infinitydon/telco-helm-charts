@@ -37,7 +37,7 @@ data:
     bootstrap_address: bootstrapper-controller.{{ .Values.config.domainName }}
     bootstrap_port: {{ .Values.config.bootstrapPort }}
 
-    fluentd_address: fluentd.{{ .Values.config.domainName }}
+    fluentd_address: {{ .Values.config.fluentdHost }}
     fluentd_port: {{ .Values.config.fluentdPort }}
 
     proxy_cloud_connections: True

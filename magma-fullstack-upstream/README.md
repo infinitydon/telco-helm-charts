@@ -8,6 +8,8 @@ It deploys:
 - Postgres for Orc8r and NMS state.
 - upstream `orc8r` chart with NMS enabled.
 - upstream `lte-orc8r` chart for LTE subscriber, policy, and mconfig APIs.
+- lab observability services used by NMS: Prometheus, Prometheus Cache,
+  Alertmanager, Fluentd forwarder, and single-node Elasticsearch.
 - lab certificate/config Secrets.
 - NMS admin bootstrap Job. The Job first registers the `admin_operator`
   certificate with Orc8r `accessd`, then creates the NMS admin user.
@@ -81,6 +83,24 @@ helm upgrade --install agwc .\magma-agw-upstream `
 
 The chart creates the default network and subscriber in Orc8r/NMS. Register the
 gateway in NMS, and keep UERANSIM SIM values aligned with the subscriber record.
+
+## Observability
+
+NMS metrics, alerts, event counts, and log counts depend on the Magma service
+names `prometheus`, `prometheus-cache`, `alertmanager`, `fluentd`, and
+`elasticsearch-master`. This wrapper enables the upstream metrics/logging
+subcharts, adds compatibility aliases for those service names, and deploys a
+lab Elasticsearch instance. The defaults are suitable for functional lab
+testing, not long-term production retention.
+
+Quick checks:
+
+```sh
+kubectl -n magma get pods | grep -E 'prometheus|alertmanager|fluentd|elastic'
+kubectl -n magma run obs-check --rm -it --restart=Never \
+  --image=curlimages/curl:8.10.1 -- \
+  http://orc8r-metricsd:8080/magma/v1/networks/mpk_test/prometheus/query?query=up
+```
 
 ## Upstream Chart Notes
 

@@ -30,6 +30,7 @@ config:
   domainName: magma.local
   cloudPort: 8443
   bootstrapPort: 8444
+  fluentdHost: fluentd.magma.svc.cluster.local
   fluentdPort: 24224
   gwChallenge: ""
 
