@@ -105,13 +105,16 @@ spec:
                 fi
                 host ip link set "${bridge}" up
                 host ovs-vsctl set bridge "${bridge}" protocols={{ .Values.nodePrep.bridge.protocols | quote }} other-config:disable-in-band=true
+                {{- if .Values.nodePrep.bridge.datapathType }}
+                host ovs-vsctl set bridge "${bridge}" datapath_type={{ .Values.nodePrep.bridge.datapathType | quote }}
+                {{- end }}
               }
 
               ensure_addr() {
                 local iface="$1"
                 local cidr="$2"
                 local replace="${3:-false}"
-                [ -n "${cidr}" ] || return
+                [ -n "${cidr}" ] || return 0
                 if [ "${replace}" = "true" ]; then
                   while read -r existing; do
                     [ -n "${existing}" ] || continue
@@ -204,13 +207,58 @@ spec:
               ensure_ovs_internal_port() {
                 local bridge="$1"
                 local iface="$2"
-                if host ip link show "${iface}" >/dev/null 2>&1; then
-                  log "interface ${iface} already exists"
+                local ofport="${3:-}"
+                if host ovs-vsctl --data=bare --no-heading --columns=name find Interface name="${iface}" | grep -qx "${iface}"; then
+                  log "OVS internal port ${iface} already exists on ${bridge}"
                 else
+                  if host ip link show "${iface}" >/dev/null 2>&1; then
+                    log "removing non-OVS interface ${iface} before creating internal port"
+                    host ip link del "${iface}" || true
+                  fi
                   log "creating OVS internal port ${iface} on ${bridge}"
                   host ovs-vsctl --may-exist add-port "${bridge}" "${iface}" -- set Interface "${iface}" type=internal
                 fi
-                host ip link set "${iface}" up
+                if [ -n "${ofport}" ]; then
+                  local current_ofport
+                  current_ofport="$(host ovs-vsctl --if-exists get Interface "${iface}" ofport 2>/dev/null || true)"
+                  if [ "${current_ofport}" != "${ofport}" ]; then
+                    log "setting requested ofport ${ofport} for ${iface}"
+                    host ovs-vsctl set Interface "${iface}" ofport_request="${ofport}"
+                  fi
+                fi
+                if host ip link show "${iface}" >/dev/null 2>&1; then
+                  host ip link set "${iface}" up || log "could not set OVS internal port ${iface} up; continuing"
+                else
+                  log "OVS internal port ${iface} has no host netdev yet; continuing"
+                fi
+              }
+
+              ensure_ovs_gtpu_port() {
+                local bridge="$1"
+                local iface="$2"
+                local ofport="$3"
+                local type="$4"
+                if host ovs-vsctl --data=bare --no-heading --columns=name find Interface name="${iface}" | grep -qx "${iface}"; then
+                  local current_ofport
+                  current_ofport="$(host ovs-vsctl --if-exists get Interface "${iface}" ofport 2>/dev/null || true)"
+                  if [ "${current_ofport}" = "${ofport}" ]; then
+                    log "OVS GTP-U port ${iface} already present on ${bridge} with ofport ${ofport}"
+                    return
+                  fi
+                  log "recreating OVS GTP-U port ${iface}; current ofport is ${current_ofport:-unset}, expected ${ofport}"
+                  host ovs-vsctl --if-exists del-port "${bridge}" "${iface}"
+                else
+                  log "creating OVS GTP-U port ${iface} on ${bridge}"
+                fi
+                host ovs-vsctl --may-exist add-port "${bridge}" "${iface}" -- \
+                  set Interface "${iface}" type="${type}" options:remote_ip=flow options:key=flow ofport_request="${ofport}"
+                local created_ofport
+                created_ofport="$(host ovs-vsctl --if-exists get Interface "${iface}" ofport 2>/dev/null || true)"
+                if [ "${created_ofport}" != "${ofport}" ]; then
+                  log "OVS GTP-U port ${iface} is not ready; ofport=${created_ofport:-unset}, expected ${ofport}"
+                  host ovs-vsctl --if-exists list Interface "${iface}" || true
+                  return 1
+                fi
               }
 
               ensure_host_cmd ovs-vsctl
@@ -223,6 +271,9 @@ spec:
               ensure_ovs_started
               ensure_bridge {{ .Values.nodePrep.bridge.name | quote }}
               ensure_addr {{ .Values.nodePrep.bridge.name | quote }} {{ .Values.nodePrep.bridge.address | quote }} "false"
+              {{- if .Values.nodePrep.gtpu.enabled }}
+              ensure_ovs_gtpu_port {{ .Values.nodePrep.bridge.name | quote }} {{ .Values.nodePrep.gtpu.name | quote }} {{ .Values.nodePrep.gtpu.ofport | quote }} {{ default "gtpu" .Values.nodePrep.gtpu.type | quote }}
+              {{- end }}
               {{- range .Values.nodePrep.interfaces.cleanupLegacy }}
               cleanup_legacy_iface {{ . | quote }}
               {{- end }}
@@ -233,9 +284,11 @@ spec:
               ensure_addr {{ .Values.nodePrep.interfaces.nat.name | quote }} {{ .Values.nodePrep.interfaces.nat.address | quote }} {{ default false .Values.nodePrep.interfaces.nat.replaceAddresses | quote }}
               {{- range .Values.nodePrep.interfaces.internal }}
               {{- if eq .type "internal" }}
-              ensure_ovs_internal_port {{ .bridge | quote }} {{ .name | quote }}
+              ensure_ovs_internal_port {{ .bridge | quote }} {{ .name | quote }} {{ default "" .ofport | quote }}
+              ensure_addr {{ .name | quote }} {{ default "" .address | quote }} "false"
               {{- else }}
               ensure_dummy_iface {{ .name | quote }}
+              ensure_addr {{ .name | quote }} {{ default "" .address | quote }} "false"
               {{- end }}
               {{- end }}
 

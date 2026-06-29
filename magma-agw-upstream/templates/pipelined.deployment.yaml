@@ -54,7 +54,7 @@ args:
   - /bin/bash
   - -c
   - /usr/bin/ovs-vsctl --all destroy Flow_Sample_Collector_Set &&
-    /usr/bin/ovs-vsctl set bridge gtp_br0 protocols=OpenFlow10,OpenFlow13,OpenFlow14 other-config:disable-in-band=true &&
+    /usr/bin/ovs-vsctl set bridge gtp_br0 protocols={{ .Values.nodePrep.bridge.protocols | quote }} other-config:disable-in-band=true &&
     /usr/bin/ovs-vsctl set-controller gtp_br0 tcp:127.0.0.1:6633 tcp:127.0.0.1:6654 &&
     /usr/bin/ovs-vsctl set-fail-mode gtp_br0 secure &&
     /usr/bin/ovs-vsctl set-manager ptcp:6640 &&
@@ -78,6 +78,10 @@ volumeMounts:
   - name: magma-config
     mountPath: /etc/magma/gateway.mconfig
     subPath: gateway.mconfig
+    readOnly: true
+  - name: magma-config
+    mountPath: /etc/magma/pipelined.yml_prod
+    subPath: pipelined.yml
     readOnly: true
   - name: controlproxy-config
     mountPath: /etc/magma/control_proxy.yml

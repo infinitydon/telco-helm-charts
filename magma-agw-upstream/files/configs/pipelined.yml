@@ -37,7 +37,7 @@ static_services: [
   'proxy',
   'ryu_rest_service',
   'startup_flows',
-  'ipv6_solicitation',
+#  'ipv6_solicitation',
 #  'li_mirror',
 #  'packet_tracer',
 ]
@@ -123,8 +123,8 @@ bridge_ip_address: 192.168.128.1
 
 # QoS parameters
 qos:
- enable: true
- impl: linux_tc
+ enable: false
+ impl: ovs_meter
  enable_pyroute2: true
  max_rate: 1000000000
  gbr_rate: 80Kbit
@@ -138,7 +138,7 @@ qos:
 
 monitored_ifaces: ['gtp_br0',
                    'gtp0',
-                   'gtp_sys_2152'
+                   'gtpu0'
                   ]
 
 # Whether pipelined should cleanup flows on restarts
@@ -150,6 +150,7 @@ magma_print_grpc_payload: false
 
 # MTR iface
 mtr_interface: mtr0
+mtr_ip: 192.168.128.2
 
 ###############
 ## IMPORTANT ##
@@ -175,8 +176,8 @@ uplink_eth_port_name: magma-n3
 uplink_gw_mac: 'ff:ff:ff:ff:ff:ff'
 dp_router_enabled: true
 sgi_management_iface_ip_addr: '192.168.129.1/24'
-sgi_management_iface_ipv6_addr: '3001::10/64'
-sgi_management_iface_ipv6_gw: '3001::2'
+# sgi_management_iface_ipv6_addr: '3001::10/64'
+# sgi_management_iface_ipv6_gw: '3001::2'
 ovs_gtp_stats_polling_interval: 180
 
 he_proxy_eth_mac: 'e6:8f:a2:80:80:80'
@@ -199,7 +200,7 @@ ovs_internal_conntrack_fwd_tbl_number: 202
 # precedence to Orc8r streamed config parameter in gateway.mcofnig file
 # enable5g_features: false
 
-upf_node_identifier: 192.168.200.1
+upf_node_identifier: 192.168.60.142
 
 dp_irq:
  enable: True

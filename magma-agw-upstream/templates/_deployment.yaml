@@ -34,7 +34,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/gateway-config: {{ include (print $.Template.BasePath "/agwc-config.config.yaml") . | sha256sum }}
+        checksum/gateway-config: {{ include (print $.Template.BasePath "/gateway-config.config.yaml") . | sha256sum }}
         checksum/control-proxy-config: {{ include (print $.Template.BasePath "/control-proxy.config.yaml") . | sha256sum }}
       labels:
         app.kubernetes.io/component: agwc

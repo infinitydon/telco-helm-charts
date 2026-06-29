@@ -78,7 +78,13 @@ nodePrep:
   bridge:
     name: gtp_br0
     address: 192.168.128.1/24
-    protocols: OpenFlow10,OpenFlow13,OpenFlow14
+    protocols: OpenFlow13,OpenFlow14
+    datapathType: netdev
+  gtpu:
+    enabled: true
+    name: gtpu0
+    ofport: 32768
+    type: gtpu
   interfaces:
     createMissing: true
     cleanupLegacy:
@@ -100,7 +106,10 @@ nodePrep:
       replaceAddresses: false
     internal:
       - name: mtr0
-        type: dummy
+        type: internal
+        bridge: gtp_br0
+        ofport: 15577
+        address: 192.168.128.2/32
       - name: ipfix0
         type: internal
         bridge: gtp_br0
@@ -144,7 +153,7 @@ simulator:
       gateway: ""
   gnb:
     name: magma-ueransim-gnb
-    startDelaySeconds: 120
+    startDelaySeconds: 30
     nci: "0x000000010"
     idLength: 32
     tac: "000001"
@@ -162,7 +171,7 @@ simulator:
     imei: "356938035643803"
     imeiSv: "4370816125816151"
     apn: magma.ipv4
-    startDelaySeconds: 180
+    startDelaySeconds: 60
   subscriber:
     provision: false
     nextSeq: "000000000000"

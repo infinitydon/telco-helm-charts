@@ -114,6 +114,11 @@ nodePrep:
   bridge:
     name: gtp_br0
     address: 192.168.128.1/24
+    datapathType: netdev
+  gtpu:
+    enabled: true
+    name: gtpu0
+    ofport: 32768
   interfaces:
     createMissing: true
     cleanupLegacy:
@@ -176,9 +181,10 @@ simulator:
     provision: false
 ```
 
-`simulator.gnb.startDelaySeconds` defaults to `120` so the AGW SCTP listener is
-up before UERANSIM attempts NG setup. If the AGW node is slow to initialize OVS
-or services, increase the gNB and UE delays together.
+`simulator.gnb.startDelaySeconds` defaults to `30` and
+`simulator.ue.startDelaySeconds` defaults to `60` so the AGW SCTP listener and
+gNB are up before the UE attempts registration. If the AGW node is slow to
+initialize OVS or services, increase the gNB and UE delays together.
 
 For a full Magma deployment, create the subscriber and APN in NMS/Orc8r. The
 local subscriber provisioning Job is disabled by default and is intended only
@@ -216,6 +222,10 @@ Before installing, confirm the target cluster has:
   `openvswitch`, and `nf_conntrack`, but it does not build kernel modules.
 - Open vSwitch. If it is missing and `nodePrep.installOpenvSwitch=true`, the
   node prep DaemonSet installs it with `apt-get`.
+- OVS GTP-U support. The tested Ubuntu 24.04 node rejected `gtpu` ports on the
+  kernel/system datapath, so the chart defaults `gtp_br0` to
+  `datapath_type=netdev` and creates `gtpu0` with OpenFlow port `32768`, which
+  matches Magma's `ovs_gtp_port_number`.
 
 Quick checks:
 
