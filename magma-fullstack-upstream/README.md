@@ -60,6 +60,11 @@ will browse, for example `192.168.88.165:31316`. The provisioning Job merges
 those domains into the NMS organization and links the organization to the
 provisioned network.
 
+For direct HTTP NodePort access, this chart sets MagmaLTE
+`SESSION_COOKIE_SECURE=false` while keeping `NODE_ENV=production`. Without that
+lab override, MagmaLTE marks the session cookie as secure and browser login POSTs
+fail CSRF validation over plain HTTP.
+
 For DNS/SNI based access, map these names to the node IP or external load
 balancer:
 

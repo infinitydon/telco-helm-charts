@@ -142,6 +142,7 @@ orc8r:
         mysql_user: postgres
         mysql_pass: postgres
         mysql_dialect: postgres
+        session_cookie_secure: "false"
       service:
         type: NodePort
     nginx:
