@@ -35,7 +35,7 @@ magma.infinitydon.com/agw-instance: "true"
 {{- end -}}
 
 {{- define "agw.snowflake" -}}
-{{- default .Values.config.gwChallenge .Values.gatewayIdentity.snowflake | trim | nospace -}}
+{{- .Values.gatewayIdentity.snowflake | trim | nospace -}}
 {{- end -}}
 
 {{- define "agw.podAntiAffinity" -}}

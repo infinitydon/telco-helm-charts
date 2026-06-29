@@ -37,8 +37,10 @@ volumeMounts:
     readOnly: false
   - mountPath: /etc/snowflake
     name: snowflake-file
+    {{- if .Values.gatewayIdentity.snowflake }}
     subPath: snowflake
     readOnly: true
+    {{- end }}
 resources:
 {{ toYaml .Values.resources | indent 2 }}
 {{- end -}}

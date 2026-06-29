@@ -1,3 +1,4 @@
+{{- if .Values.gatewayIdentity.snowflake }}
 {{/*
 Copyright 2026 The Magma Authors.
 
@@ -15,3 +16,4 @@ metadata:
 data:
   snowflake: |
     {{ include "agw.snowflake" . }}
+{{- end }}
