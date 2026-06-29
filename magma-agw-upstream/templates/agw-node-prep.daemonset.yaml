@@ -265,6 +265,8 @@ spec:
                     log "parent interface ${parent} missing for ${iface}"
                     return 1
                   fi
+                  log "ensuring parent interface ${parent} is up for ${iface}"
+                  host ip link set "${parent}" up
                   log "creating macvlan interface ${iface} on ${parent}"
                   host ip link add name "${iface}" link "${parent}" type macvlan mode "${mode}"
                   {{- else }}

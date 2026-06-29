@@ -96,12 +96,12 @@ nodePrep:
     protocols: OpenFlow10,OpenFlow13,OpenFlow14
     datapathType: system
   gtpu:
-    enabled: false
-    name: gtp0
+    enabled: true
+    name: gtpu0
     ofport: 32768
     type: gtpu
     cleanupPorts:
-      - gtpu0
+      - gtpu_sys_2152
   uplinkBridge:
     enabled: true
     name: uplink_br0
