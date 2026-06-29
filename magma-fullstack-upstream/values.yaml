@@ -96,7 +96,22 @@ orc8r:
       nodeSelector:
         kubernetes.io/hostname: ebpf-bng-node-01
     userGrafana:
-      create: false
+      create: true
+      nodeSelector:
+        kubernetes.io/hostname: ebpf-bng-node-01
+      volumes:
+        datasources:
+          volumeSpec:
+            configMap:
+              name: magma-grafana-datasources
+        dashboardproviders:
+          volumeSpec:
+            configMap:
+              name: magma-grafana-dashboardproviders
+        dashboards:
+          volumeSpec:
+            configMap:
+              name: magma-grafana-dashboards
     metrics:
       volumes:
         prometheusData:
