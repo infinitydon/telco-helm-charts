@@ -163,9 +163,9 @@ simulator:
     separateFromAgw: true
     topologyKey: kubernetes.io/hostname
   image:
-    repository: free5gc/ueransim
-    tag: "v4.2.2"
-    pullPolicy: IfNotPresent
+    repository: ghcr.io/infinitydon/ueransim
+    tag: "v3.2.4-x86-64"
+    pullPolicy: Always
   initImage:
     repository: alpine
     tag: "3.21.7"
@@ -187,6 +187,7 @@ simulator:
       ip: 192.168.60.150/24
       gateway: ""
   gnb:
+    commandPath: /opt/UERANSIM/build/nr-gnb
     name: magma-ueransim-gnb
     startDelaySeconds: 30
     nci: "0x000000010"
@@ -197,6 +198,7 @@ simulator:
       sst: 1
       sd: ""
   ue:
+    commandPath: /opt/UERANSIM/build/nr-ue
     supi: "imsi-001010000000001"
     mcc: "001"
     mnc: "01"

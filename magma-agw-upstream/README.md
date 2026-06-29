@@ -194,6 +194,10 @@ kubectl label node ebpf-bng-node-01 magma.io/ueransim-node=true --overwrite
 ```yaml
 simulator:
   enabled: true
+  image:
+    repository: ghcr.io/infinitydon/ueransim
+    tag: v3.2.4-x86-64
+    pullPolicy: Always
   nodeSelector:
     magma.io/ueransim-node: "true"
     kubernetes.io/hostname: ebpf-bng-node-01
@@ -210,6 +214,11 @@ simulator:
   subscriber:
     provision: false
 ```
+
+The simulator image defaults to a Magma 1.9-compatible UERANSIM v3.2.4 build
+and does not use a `latest` tag. The binary paths are configurable through
+`simulator.gnb.commandPath` and `simulator.ue.commandPath`; the defaults match
+the GHCR image above.
 
 `simulator.gnb.startDelaySeconds` defaults to `30` and
 `simulator.ue.startDelaySeconds` defaults to `60` so the AGW SCTP listener and
@@ -229,6 +238,12 @@ Recommended full-stack order:
 3. Deploy AGW and confirm it is registered/synced with Orc8r.
 4. Enable UERANSIM by setting `simulator.enabled=true`, keeping
    `simulator.subscriber.provision=false`.
+
+If UE registration and PDU establishment succeed but `ping -I uesimtun0`
+fails, check the gNB logs for `TEID -2147483647 not found on GTP-U Downlink`
+and the AGW `gtp_br0` flows for zero counters on the `qfi=9` rule. That points
+at the Magma 1.9 5G user-plane datapath/OVS QFI path rather than NMS
+subscriber provisioning.
 
 ## Installation
 

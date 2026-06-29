@@ -68,7 +68,7 @@ spec:
             - -ceu
             - |
               sleep {{ .Values.simulator.gnb.startDelaySeconds | int }}
-              exec /ueransim/nr-gnb -c /config/gnb.yaml
+              exec {{ .Values.simulator.gnb.commandPath | quote }} -c /config/gnb.yaml
           securityContext:
             privileged: true
             capabilities:

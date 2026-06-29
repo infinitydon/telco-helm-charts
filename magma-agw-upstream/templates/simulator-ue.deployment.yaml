@@ -41,7 +41,7 @@ spec:
             - -ceu
             - |
               sleep {{ .Values.simulator.ue.startDelaySeconds | int }}
-              exec /ueransim/nr-ue -c /config/ue.yaml
+              exec {{ .Values.simulator.ue.commandPath | quote }} -c /config/ue.yaml
           securityContext:
             privileged: true
             capabilities:

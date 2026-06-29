@@ -59,6 +59,9 @@ provisioning:
     preemptionCapability: true
     preemptionVulnerability: false
     pdnType: 0
+  policy:
+    enabled: true
+    priority: 10
   subscriber:
     enabled: true
     imsi: IMSI001010000000001

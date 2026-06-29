@@ -101,7 +101,7 @@ spec:
                     "tdd_config": {"earfcndl": 44390, "special_subframe_pattern": 7, "subframe_assignment": 2}
                   }
                 },
-                "subscriber_config": {"network_wide_base_names": [], "network_wide_rule_names": []}
+                "subscriber_config": {"network_wide_base_names": [], "network_wide_rule_names": [{{ .Values.provisioning.network.defaultRuleId | quote }}]}
               }
               EOF
 
@@ -111,6 +111,26 @@ spec:
               else
                 curl -skf -X POST --cert "$API_CERT_FILENAME" --key "$API_PRIVATE_KEY_FILENAME" -H "Content-Type: application/json" --data @/tmp/network.json "https://$API_HOST/magma/v1/lte" >/dev/null
               fi
+
+              {{- if and .Values.provisioning.policy .Values.provisioning.policy.enabled }}
+              cat >/tmp/default-policy-rule.json <<EOF
+              {
+                "id": {{ .Values.provisioning.network.defaultRuleId | quote }},
+                "priority": {{ default 10 .Values.provisioning.policy.priority }},
+                "flow_list": [
+                  {"action": "PERMIT", "match": {"ip_proto": "IPPROTO_IP", "direction": "UPLINK"}},
+                  {"action": "PERMIT", "match": {"ip_proto": "IPPROTO_IP", "direction": "DOWNLINK"}}
+                ],
+                "tracking_type": "NO_TRACKING"
+              }
+              EOF
+              policy_code="$(curl -sk -o /tmp/default-policy-get.out -w '%{http_code}' --cert "$API_CERT_FILENAME" --key "$API_PRIVATE_KEY_FILENAME" "https://$API_HOST/magma/v1/networks/$NETWORK_ID/policies/rules/{{ .Values.provisioning.network.defaultRuleId }}")"
+              if [ "$policy_code" = "200" ]; then
+                curl -skf -X PUT --cert "$API_CERT_FILENAME" --key "$API_PRIVATE_KEY_FILENAME" -H "Content-Type: application/json" --data @/tmp/default-policy-rule.json "https://$API_HOST/magma/v1/networks/$NETWORK_ID/policies/rules/{{ .Values.provisioning.network.defaultRuleId }}" >/dev/null
+              else
+                curl -skf -X POST --cert "$API_CERT_FILENAME" --key "$API_PRIVATE_KEY_FILENAME" -H "Content-Type: application/json" --data @/tmp/default-policy-rule.json "https://$API_HOST/magma/v1/networks/$NETWORK_ID/policies/rules" >/dev/null
+              fi
+              {{- end }}
 
               {{- if .Values.provisioning.apn.enabled }}
               cat >/tmp/apn.json <<EOF

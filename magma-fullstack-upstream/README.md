@@ -15,7 +15,7 @@ It deploys:
   certificate with Orc8r `accessd`, then creates the NMS admin user.
 - NodePort NMS MagmaLTE and Orc8r nginx services.
 - Idempotent lab provisioning for the NMS organization, LTE/5G network
-  `mpk_test`, and subscriber `IMSI001010000000001`.
+  `mpk_test`, default allow policy, and subscriber `IMSI001010000000001`.
 
 Provisioning belongs in NMS/Orc8r. The AGW chart's standalone subscriber Job is
 only a lab shortcut and should be disabled for this full-stack path.
@@ -88,6 +88,8 @@ helm upgrade --install agwc .\magma-agw-upstream `
 
 The chart creates the default network and subscriber in Orc8r/NMS. Register the
 gateway in NMS, and keep UERANSIM SIM values aligned with the subscriber record.
+Subscriber policy attachment is also handled here, so the AGW chart should not
+run local subscriberdb provisioning for the full-stack path.
 The default subscriber profile and APN AMBR are set to 1 Gbps/1 Gbps because
 some lower AMBR combinations can trigger an upstream Magma 1.9.0 5G issue where
 the NGAP PDU Session Resource Setup advertises a `0.0.0.0` GTP-U endpoint and

@@ -111,8 +111,9 @@ allow_unknown_arps: False
 # Interface to NAT traffic to
 nat_iface: magma-sgi
 
-# Interface to eNodeB
-enodeb_iface: magma-n2
+# Interface to eNodeB/gNB user plane. Magma's 5G UPF node association derives
+# the advertised N3 address from this interface.
+enodeb_iface: magma-n3
 
 # Bridge name comes from magma_magmad.service.j2
 bridge_name: gtp_br0
