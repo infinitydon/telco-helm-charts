@@ -24,10 +24,10 @@ data:
   control_proxy.yml: |
     # Cloud address for reaching out to the cloud.
     cloud_address: controller.{{ .Values.config.domainName }}
-    cloud_port: 443
+    cloud_port: {{ .Values.config.cloudPort }}
 
     bootstrap_address: bootstrapper-controller.{{ .Values.config.domainName }}
-    bootstrap_port: 443
+    bootstrap_port: {{ .Values.config.bootstrapPort }}
 
     fluentd_address: fluentd.{{ .Values.config.domainName }}
-    fluentd_port: 24224
+    fluentd_port: {{ .Values.config.fluentdPort }}

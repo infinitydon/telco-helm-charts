@@ -41,6 +41,12 @@ spec:
     spec:
       restartPolicy: Always
       hostNetwork: true
+      {{- if and .Values.orc8r.hostAliases.enabled .Values.orc8r.hostAliases.ip }}
+      hostAliases:
+        - ip: {{ .Values.orc8r.hostAliases.ip | quote }}
+          hostnames:
+{{ toYaml .Values.orc8r.hostAliases.hostnames | indent 12 }}
+      {{- end }}
       {{- include "agw.podAntiAffinity" . | nindent 6 }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

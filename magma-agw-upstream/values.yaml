@@ -27,8 +27,31 @@ image:
   test: alpine:3.20.3
 
 config:
-  domainName: iot.magmacore.click
+  domainName: magma.local
+  cloudPort: 8443
+  bootstrapPort: 8444
+  fluentdPort: 24224
   gwChallenge: ""
+
+orc8r:
+  hostAliases:
+    enabled: false
+    ip: ""
+    hostnames:
+      - controller.magma.local
+      - bootstrapper-controller.magma.local
+      - accessd-controller.magma.local
+      - certifier-controller.magma.local
+      - configurator-controller.magma.local
+      - device-controller.magma.local
+      - directoryd-controller.magma.local
+      - dispatcher-controller.magma.local
+      - eventd-controller.magma.local
+      - metricsd-controller.magma.local
+      - policydb-controller.magma.local
+      - state-controller.magma.local
+      - streamer-controller.magma.local
+      - subscriberdb-controller.magma.local
 
 nodeSelector:
   magma.io/agw-node: "true"
