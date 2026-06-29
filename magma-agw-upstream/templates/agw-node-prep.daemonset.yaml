@@ -68,7 +68,18 @@ spec:
                   log "kernel module ${module} already loaded"
                 else
                   log "loading kernel module ${module} if available"
-                  host modprobe "${module}" || true
+                  if host modprobe "${module}"; then
+                    return
+                  fi
+                  {{- if .Values.nodePrep.installKernelModulesExtra }}
+                  log "kernel module ${module} unavailable; installing linux-modules-extra for running kernel"
+                  host_sh 'if ! command -v apt-get >/dev/null 2>&1; then echo "apt-get not found on host" >&2; exit 1; fi'
+                  host_sh 'export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y "linux-modules-extra-$(uname -r)"'
+                  host modprobe "${module}"
+                  {{- else }}
+                  log "kernel module ${module} unavailable and nodePrep.installKernelModulesExtra=false"
+                  return 1
+                  {{- end }}
                 fi
               }
 

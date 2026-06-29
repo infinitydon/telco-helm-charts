@@ -74,6 +74,7 @@ nodePrep:
   enabled: true
   image: ubuntu:22.04
   installOpenvSwitch: true
+  installKernelModulesExtra: true
   nodeSelector: {}
   requireMagmaOvsKmod: false
   runMagmaOvsKmodUpgrade: true

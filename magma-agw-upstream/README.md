@@ -113,6 +113,7 @@ nodeSelector:
 
 nodePrep:
   enabled: true
+  installKernelModulesExtra: true
   nodeSelector:
     magma.io/agw-node: "true"
     kubernetes.io/hostname: ebpf-bng-node-02
@@ -238,7 +239,10 @@ Before installing, confirm the target cluster has:
 - Usable host interfaces for AGW N2/N3 and simulator N2/N3. The tested defaults
   are `enp8s19` and `enp8s20` on both nodes.
 - SCTP and GTP kernel support. `nodePrep` attempts to load `gtp`,
-  `openvswitch`, and `nf_conntrack`, but it does not build kernel modules.
+  `openvswitch`, and `nf_conntrack`. When
+  `nodePrep.installKernelModulesExtra=true`, a failed module load triggers an
+  idempotent install of `linux-modules-extra-$(uname -r)` and retries the
+  module load. It still does not build custom kernel modules.
 - Open vSwitch. If it is missing and `nodePrep.installOpenvSwitch=true`, the
   node prep DaemonSet installs it with `apt-get`.
 - Magma-compatible OVS/GTP kernel support. Node prep probes the live host OVS by
