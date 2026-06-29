@@ -47,13 +47,13 @@ provisioning:
     cloudSubscriberdbEnabled: false
     defaultRuleId: default_rule_1
     subProfile: default
-    maxDlBitRate: 300000000
-    maxUlBitRate: 300000000
+    maxDlBitRate: 1000000000
+    maxUlBitRate: 1000000000
   apn:
     enabled: true
     name: magma.ipv4
-    maxDlBitRate: 300000000
-    maxUlBitRate: 300000000
+    maxDlBitRate: 1000000000
+    maxUlBitRate: 1000000000
     qosClassId: 9
     priorityLevel: 15
     preemptionCapability: true

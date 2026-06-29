@@ -88,6 +88,10 @@ helm upgrade --install agwc .\magma-agw-upstream `
 
 The chart creates the default network and subscriber in Orc8r/NMS. Register the
 gateway in NMS, and keep UERANSIM SIM values aligned with the subscriber record.
+The default subscriber profile and APN AMBR are set to 1 Gbps/1 Gbps because
+some lower AMBR combinations can trigger an upstream Magma 1.9.0 5G issue where
+the NGAP PDU Session Resource Setup advertises a `0.0.0.0` GTP-U endpoint and
+placeholder TEID.
 
 ## Observability
 
