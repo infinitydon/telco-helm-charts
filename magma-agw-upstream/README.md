@@ -111,6 +111,9 @@ nodeSelector:
 
 nodePrep:
   enabled: true
+  nodeSelector:
+    magma.io/agw-node: "true"
+    kubernetes.io/hostname: ebpf-bng-node-02
   runMagmaOvsKmodUpgrade: true
   requireMagmaOvsKmod: false
   magmaOvsKmodUpgradePath: /usr/local/bin/ovs-kmod-upgrade.sh
@@ -239,6 +242,12 @@ The tested Ubuntu 24.04 node had only stock Ubuntu Open vSwitch packages and no
 plane reached NG setup, UE registration, and PDU establishment, but UE user-plane
 traffic failed because `pipelined` hit OpenFlow `BAD_FIELD` errors. Resolve the
 host Magma OVS/GTP prerequisite before treating the datapath test as complete.
+
+When this chart is driven by the Magma operator, the operator can set
+`nodePrep.nodeSelector` to the raw AGW node label and set the AGW workload
+`nodeSelector` to include `magma.io/agw-datapath-ready=true`. This lets node
+prep run first, then schedules AGW pods only after the operator marks the node
+ready.
 
 Quick checks:
 

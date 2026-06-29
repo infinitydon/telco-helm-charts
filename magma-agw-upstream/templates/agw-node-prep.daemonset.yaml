@@ -24,7 +24,7 @@ spec:
       hostNetwork: true
       hostPID: true
       restartPolicy: Always
-      {{- with .Values.nodeSelector }}
+      {{- with (default .Values.nodeSelector .Values.nodePrep.nodeSelector) }}
       nodeSelector:
 {{ toYaml . | indent 8 }}
       {{- end }}
