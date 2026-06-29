@@ -95,6 +95,26 @@ spec:
                 host_sh 'ovs-vsctl show >/dev/null'
               }
 
+              ensure_magma_ovs_kmod() {
+                local script="$1"
+                local run_upgrade="$2"
+                local required="$3"
+                if [ "${run_upgrade}" != "true" ]; then
+                  log "Magma OVS kmod upgrade disabled"
+                  return
+                fi
+                if host test -x "${script}"; then
+                  log "running Magma OVS kmod upgrade script ${script}"
+                  host "${script}"
+                  return
+                fi
+                if [ "${required}" = "true" ]; then
+                  log "required Magma OVS kmod upgrade script ${script} is missing"
+                  return 1
+                fi
+                log "Magma OVS kmod upgrade script ${script} not present; continuing"
+              }
+
               ensure_bridge() {
                 local bridge="$1"
                 if host ovs-vsctl br-exists "${bridge}"; then
@@ -107,6 +127,7 @@ spec:
                 host ovs-vsctl set bridge "${bridge}" protocols={{ .Values.nodePrep.bridge.protocols | quote }} other-config:disable-in-band=true
                 {{- if .Values.nodePrep.bridge.datapathType }}
                 host ovs-vsctl set bridge "${bridge}" datapath_type={{ .Values.nodePrep.bridge.datapathType | quote }}
+                host ip link set "${bridge}" up || true
                 {{- end }}
               }
 
@@ -261,6 +282,17 @@ spec:
                 fi
               }
 
+              cleanup_ovs_port() {
+                local bridge="$1"
+                local iface="$2"
+                if host ovs-vsctl --if-exists get Interface "${iface}" name >/dev/null 2>&1; then
+                  log "removing stale OVS port ${iface} from ${bridge}"
+                  host ovs-vsctl --if-exists del-port "${bridge}" "${iface}"
+                else
+                  log "stale OVS port ${iface} is already absent"
+                fi
+              }
+
               ensure_host_cmd ovs-vsctl
               ensure_module openvswitch
               ensure_module nf_conntrack
@@ -269,10 +301,16 @@ spec:
               ensure_sysctl {{ $key | quote }} {{ $value | quote }}
               {{- end }}
               ensure_ovs_started
+              ensure_magma_ovs_kmod {{ .Values.nodePrep.magmaOvsKmodUpgradePath | quote }} {{ .Values.nodePrep.runMagmaOvsKmodUpgrade | quote }} {{ .Values.nodePrep.requireMagmaOvsKmod | quote }}
+              ensure_ovs_started
               ensure_bridge {{ .Values.nodePrep.bridge.name | quote }}
               ensure_addr {{ .Values.nodePrep.bridge.name | quote }} {{ .Values.nodePrep.bridge.address | quote }} "false"
               {{- if .Values.nodePrep.gtpu.enabled }}
               ensure_ovs_gtpu_port {{ .Values.nodePrep.bridge.name | quote }} {{ .Values.nodePrep.gtpu.name | quote }} {{ .Values.nodePrep.gtpu.ofport | quote }} {{ default "gtpu" .Values.nodePrep.gtpu.type | quote }}
+              {{- else }}
+              {{- range .Values.nodePrep.gtpu.cleanupPorts }}
+              cleanup_ovs_port {{ $.Values.nodePrep.bridge.name | quote }} {{ . | quote }}
+              {{- end }}
               {{- end }}
               {{- range .Values.nodePrep.interfaces.cleanupLegacy }}
               cleanup_legacy_iface {{ . | quote }}

@@ -74,17 +74,22 @@ nodePrep:
   enabled: true
   image: ubuntu:22.04
   installOpenvSwitch: true
+  requireMagmaOvsKmod: false
+  runMagmaOvsKmodUpgrade: true
+  magmaOvsKmodUpgradePath: /usr/local/bin/ovs-kmod-upgrade.sh
   sleepAfterPrep: true
   bridge:
     name: gtp_br0
     address: 192.168.128.1/24
-    protocols: OpenFlow13,OpenFlow14
-    datapathType: netdev
+    protocols: OpenFlow10,OpenFlow13,OpenFlow14
+    datapathType: system
   gtpu:
-    enabled: true
-    name: gtpu0
+    enabled: false
+    name: gtp0
     ofport: 32768
     type: gtpu
+    cleanupPorts:
+      - gtpu0
   interfaces:
     createMissing: true
     cleanupLegacy:

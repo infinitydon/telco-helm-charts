@@ -111,13 +111,17 @@ nodeSelector:
 
 nodePrep:
   enabled: true
+  runMagmaOvsKmodUpgrade: true
+  requireMagmaOvsKmod: false
+  magmaOvsKmodUpgradePath: /usr/local/bin/ovs-kmod-upgrade.sh
   bridge:
     name: gtp_br0
     address: 192.168.128.1/24
-    datapathType: netdev
+    datapathType: system
   gtpu:
-    enabled: true
-    name: gtpu0
+    enabled: false
+    cleanupPorts:
+      - gtpu0
     ofport: 32768
   interfaces:
     createMissing: true
@@ -222,10 +226,19 @@ Before installing, confirm the target cluster has:
   `openvswitch`, and `nf_conntrack`, but it does not build kernel modules.
 - Open vSwitch. If it is missing and `nodePrep.installOpenvSwitch=true`, the
   node prep DaemonSet installs it with `apt-get`.
-- OVS GTP-U support. The tested Ubuntu 24.04 node rejected `gtpu` ports on the
-  kernel/system datapath, so the chart defaults `gtp_br0` to
-  `datapath_type=netdev` and creates `gtpu0` with OpenFlow port `32768`, which
-  matches Magma's `ovs_gtp_port_number`.
+- Magma-compatible OVS/GTP kernel support. Upstream Magma troubleshooting
+  expects AGW hosts with the Magma OVS kernel module path available through
+  `/usr/local/bin/ovs-kmod-upgrade.sh` when OVS reports GTP-related datapath
+  errors. The node prep DaemonSet can run this script when it exists. Set
+  `nodePrep.requireMagmaOvsKmod=true` to fail fast when the script is missing.
+  The default keeps `gtp_br0` on the kernel `system` datapath and removes stale
+  static workaround ports such as `gtpu0`.
+
+The tested Ubuntu 24.04 node had only stock Ubuntu Open vSwitch packages and no
+`/usr/local/bin/ovs-kmod-upgrade.sh`. With that host state, UERANSIM control
+plane reached NG setup, UE registration, and PDU establishment, but UE user-plane
+traffic failed because `pipelined` hit OpenFlow `BAD_FIELD` errors. Resolve the
+host Magma OVS/GTP prerequisite before treating the datapath test as complete.
 
 Quick checks:
 

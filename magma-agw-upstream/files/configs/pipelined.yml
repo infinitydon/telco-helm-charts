@@ -123,8 +123,8 @@ bridge_ip_address: 192.168.128.1
 
 # QoS parameters
 qos:
- enable: false
- impl: ovs_meter
+ enable: true
+ impl: linux_tc
  enable_pyroute2: true
  max_rate: 1000000000
  gbr_rate: 80Kbit
@@ -138,7 +138,7 @@ qos:
 
 monitored_ifaces: ['gtp_br0',
                    'gtp0',
-                   'gtpu0'
+                   'gtp_sys_2152'
                   ]
 
 # Whether pipelined should cleanup flows on restarts
