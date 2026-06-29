@@ -87,7 +87,7 @@ nodePrep:
     net.ipv4.ip_forward: "1"
 
 simulator:
-  enabled: true
+  enabled: false
   nodeSelector:
     magma.io/ueransim-node: "true"
     kubernetes.io/hostname: ebpf-bng-node-01

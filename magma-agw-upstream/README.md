@@ -134,7 +134,9 @@ nodePrep:
 
 ## 5G Simulator
 
-`simulator.enabled` deploys UERANSIM. The tested default uses Multus `macvlan`
+`simulator.enabled` deploys UERANSIM. It defaults to `false` so a full
+Orc8r/NMS-backed deployment can register and configure the AGW before the UE
+attempts registration. When enabled, the tested default uses Multus `macvlan`
 for the simulator gNB and schedules it on node-01 so NGAP/SCTP is a real
 inter-node association. Magma AGW remains on node-02.
 
@@ -178,6 +180,14 @@ local subscriber provisioning Job is disabled by default and is intended only
 for standalone AGW datapath testing. In cluster testing, UERANSIM completed NG
 setup, initial registration, PDU session establishment, and brought up
 `uesimtun0` after the subscriber was present.
+
+Recommended full-stack order:
+
+1. Deploy Orc8r/NMS and confirm the GUI/API are reachable.
+2. Create the network, gateway, APN/DNN, and UE subscriber in NMS/Orc8r.
+3. Deploy AGW and confirm it is registered/synced with Orc8r.
+4. Enable UERANSIM by setting `simulator.enabled=true`, keeping
+   `simulator.subscriber.provision=false`.
 
 ## Installation
 
@@ -254,6 +264,7 @@ For the tested lab defaults:
 helm upgrade --install agwc ./magma-agw-upstream \
   --namespace magma-agw-test \
   --set namespace=magma-agw-test \
+  --set simulator.enabled=true \
   --wait \
   --timeout 20m
 ```
@@ -309,7 +320,7 @@ The Job is idempotent:
 - adds the subscriber if missing
 - updates the APN/DNN profile on every run
 
-Default subscriber values:
+Standalone lab subscriber override:
 
 ```yaml
 simulator:
