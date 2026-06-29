@@ -112,7 +112,7 @@ nodePrep:
     patchToUplink:
       name: patch-agw
       peer: patch-up
-    uplinkPort: magma-n3
+    uplinkPort: magma-sgi
   interfaces:
     createMissing: true
     cleanupLegacy:
@@ -125,12 +125,19 @@ nodePrep:
       mode: bridge
       address: 10.88.99.142/24
       replaceAddresses: true
-    nat:
+    n3:
       name: magma-n3
       type: macvlan
       parent: enp8s20
       mode: bridge
       address: 192.168.60.142/24
+      replaceAddresses: true
+    nat:
+      name: magma-sgi
+      type: macvlan
+      parent: enp8s21
+      mode: bridge
+      address: ""
       replaceAddresses: true
     internal:
       - name: mtr0

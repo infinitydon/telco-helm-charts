@@ -109,7 +109,7 @@ local_ue_eth_addr: True
 allow_unknown_arps: False
 
 # Interface to NAT traffic to
-nat_iface: magma-n3
+nat_iface: magma-sgi
 
 # Interface to eNodeB
 enodeb_iface: magma-n2
@@ -172,7 +172,7 @@ non_nat_gw_probe_frequency: 20
 ovs_uplink_port_name: patch-up
 # virtual_mac: '02:ff:bb:cc:dd:ee'
 uplink_bridge: uplink_br0
-uplink_eth_port_name: magma-n3
+uplink_eth_port_name: magma-sgi
 uplink_gw_mac: 'ff:ff:ff:ff:ff:ff'
 dp_router_enabled: true
 sgi_management_iface_ip_addr: '192.168.129.1/24'

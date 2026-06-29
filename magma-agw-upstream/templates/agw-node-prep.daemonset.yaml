@@ -444,6 +444,8 @@ spec:
 
               ensure_data_iface {{ .Values.nodePrep.interfaces.s1.name | quote }} {{ default "dummy" .Values.nodePrep.interfaces.s1.type | quote }} {{ default "" .Values.nodePrep.interfaces.s1.parent | quote }} {{ default "bridge" .Values.nodePrep.interfaces.s1.mode | quote }}
               ensure_addr {{ .Values.nodePrep.interfaces.s1.name | quote }} {{ .Values.nodePrep.interfaces.s1.address | quote }} {{ default false .Values.nodePrep.interfaces.s1.replaceAddresses | quote }}
+              ensure_data_iface {{ .Values.nodePrep.interfaces.n3.name | quote }} {{ default "dummy" .Values.nodePrep.interfaces.n3.type | quote }} {{ default "" .Values.nodePrep.interfaces.n3.parent | quote }} {{ default "bridge" .Values.nodePrep.interfaces.n3.mode | quote }}
+              ensure_addr {{ .Values.nodePrep.interfaces.n3.name | quote }} {{ .Values.nodePrep.interfaces.n3.address | quote }} {{ default false .Values.nodePrep.interfaces.n3.replaceAddresses | quote }}
               ensure_data_iface {{ .Values.nodePrep.interfaces.nat.name | quote }} {{ default "dummy" .Values.nodePrep.interfaces.nat.type | quote }} {{ default "" .Values.nodePrep.interfaces.nat.parent | quote }} {{ default "bridge" .Values.nodePrep.interfaces.nat.mode | quote }}
               ensure_addr {{ .Values.nodePrep.interfaces.nat.name | quote }} {{ .Values.nodePrep.interfaces.nat.address | quote }} {{ default false .Values.nodePrep.interfaces.nat.replaceAddresses | quote }}
               {{- if .Values.nodePrep.uplinkBridge.enabled }}

@@ -133,7 +133,7 @@ nodePrep:
   uplinkBridge:
     enabled: true
     name: uplink_br0
-    uplinkPort: magma-n3
+    uplinkPort: magma-sgi
   gtpu:
     enabled: false
     cleanupPorts:
@@ -150,12 +150,22 @@ nodePrep:
       parent: enp8s19
       address: 10.88.99.142/24
       replaceAddresses: true
-    nat:
+    n3:
       name: magma-n3
       type: macvlan
       parent: enp8s20
       address: 192.168.60.142/24
+      replaceAddresses: true
+    nat:
+      name: magma-sgi
+      type: macvlan
+      parent: enp8s21
+      address: ""
 ```
+
+Keep N3 and SGi/NAT on separate host interfaces. `pipelined` manages the SGi
+address and can replace it with the SGi management IP; using the same interface
+for N3 would remove the 5G GTP-U endpoint address.
 
 ## 5G Simulator
 
