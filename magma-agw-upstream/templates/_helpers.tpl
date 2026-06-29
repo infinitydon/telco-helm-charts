@@ -34,6 +34,10 @@ app.kubernetes.io/version: {{ .Values.image.tag | quote }}
 magma.infinitydon.com/agw-instance: "true"
 {{- end -}}
 
+{{- define "agw.snowflake" -}}
+{{- default .Values.config.gwChallenge .Values.gatewayIdentity.snowflake | trim | nospace -}}
+{{- end -}}
+
 {{- define "agw.podAntiAffinity" -}}
 {{- if .Values.agwAntiAffinity.enabled }}
 affinity:

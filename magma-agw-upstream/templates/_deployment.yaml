@@ -36,6 +36,7 @@ spec:
       annotations:
         checksum/gateway-config: {{ include (print $.Template.BasePath "/gateway-config.config.yaml") . | sha256sum }}
         checksum/control-proxy-config: {{ include (print $.Template.BasePath "/control-proxy.config.yaml") . | sha256sum }}
+        checksum/agw-identity: {{ include (print $.Template.BasePath "/agw-identity.config.yaml") . | sha256sum }}
       labels:
         app.kubernetes.io/component: agwc
 {{ include "agw-instance-label" . | indent 8 }}
@@ -71,9 +72,8 @@ spec:
           persistentVolumeClaim:
             claimName: {{ .Values.persistent.name }}
         - name: snowflake-file
-          hostPath:
-            path: /etc/snowflake
-            type: FileOrCreate
+          configMap:
+            name: agw-identity
       containers:
       -
 {{ include "agwc.container.tpl" . | indent 8 }}

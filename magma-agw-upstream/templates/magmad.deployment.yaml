@@ -37,9 +37,8 @@ spec:
           persistentVolumeClaim:
             claimName: agwc-claim
         - name: snowflake-file
-          hostPath:
-            path: /etc/snowflake
-            type: FileOrCreate
+          configMap:
+            name: agw-identity
         - name: profile-file
           hostPath:
             path: /etc/profile
@@ -81,6 +80,8 @@ volumeMounts:
     name: agwc-claim
   - mountPath: /etc/snowflake
     name: snowflake-file
+    subPath: snowflake
+    readOnly: true
   - mountPath: /etc/profile
     name: profile-file
   - name: systemctl-shim

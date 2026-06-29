@@ -34,6 +34,9 @@ config:
   fluentdPort: 24224
   gwChallenge: ""
 
+gatewayIdentity:
+  snowflake: ""
+
 orc8r:
   hostAliases:
     enabled: false
