@@ -44,6 +44,10 @@ spec:
           hostPath:
             path: /etc/profile
             type: FileOrCreate
+        - name: systemctl-shim
+          configMap:
+            name: magmad-systemctl-shim
+            defaultMode: 0755
       containers:
       -
 {{ include "agwc.container" (list . "magmad.container")}}
@@ -79,4 +83,8 @@ volumeMounts:
     name: snowflake-file
   - mountPath: /etc/profile
     name: profile-file
+  - name: systemctl-shim
+    mountPath: /usr/local/bin/systemctl
+    subPath: systemctl
+    readOnly: true
 {{- end -}}

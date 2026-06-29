@@ -17,9 +17,42 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
+  name: prometheus-configurer
+  labels:
+    app.kubernetes.io/name: prometheus-configurer
+    app.kubernetes.io/part-of: magma-fullstack-upstream
+spec:
+  type: ExternalName
+  externalName: {{ .Release.Name }}-prometheus-configurer.{{ .Release.Namespace }}.svc.cluster.local
+  ports:
+    - name: prometheus-configurer
+      port: 9100
+      targetPort: 9100
+---
+apiVersion: v1
+kind: Service
+metadata:
   name: prometheus-cache
   labels:
     app.kubernetes.io/name: prometheus-cache
+    app.kubernetes.io/part-of: magma-fullstack-upstream
+spec:
+  type: ExternalName
+  externalName: {{ .Release.Name }}-prometheus-cache.{{ .Release.Namespace }}.svc.cluster.local
+  ports:
+    - name: prometheus-cache
+      port: 9091
+      targetPort: 9091
+    - name: prometheus-cache-grpc
+      port: 9092
+      targetPort: 9092
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orc8r-prometheus-cache
+  labels:
+    app.kubernetes.io/name: orc8r-prometheus-cache
     app.kubernetes.io/part-of: magma-fullstack-upstream
 spec:
   type: ExternalName
@@ -46,6 +79,36 @@ spec:
     - name: alertmanager
       port: 9093
       targetPort: 9093
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orc8r-alertmanager
+  labels:
+    app.kubernetes.io/name: orc8r-alertmanager
+    app.kubernetes.io/part-of: magma-fullstack-upstream
+spec:
+  type: ExternalName
+  externalName: {{ .Release.Name }}-alertmanager.{{ .Release.Namespace }}.svc.cluster.local
+  ports:
+    - name: alertmanager
+      port: 9093
+      targetPort: 9093
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-configurer
+  labels:
+    app.kubernetes.io/name: alertmanager-configurer
+    app.kubernetes.io/part-of: magma-fullstack-upstream
+spec:
+  type: ExternalName
+  externalName: {{ .Release.Name }}-alertmanager-configurer.{{ .Release.Namespace }}.svc.cluster.local
+  ports:
+    - name: alertmanager-configurer
+      port: 9101
+      targetPort: 9101
 ---
 apiVersion: v1
 kind: Service
