@@ -101,14 +101,8 @@ spec:
                   log "Open vSwitch database already reachable"
                   return
                 fi
-                log "starting Open vSwitch"
-                host_sh 'systemctl enable --now openvswitch-switch >/dev/null 2>&1 || service openvswitch-switch start >/dev/null 2>&1 || /usr/share/openvswitch/scripts/ovs-ctl start --system-id=random || true'
-                if host_sh 'for i in {1..10}; do ovs-vsctl show >/dev/null 2>&1 && exit 0; sleep 1; done; exit 1'; then
-                  log "Open vSwitch database is reachable after start"
-                  return
-                fi
-                log "Open vSwitch start left the database unreachable; clearing stale runtime sockets and restarting"
-                host_sh 'mkdir -p /var/run/openvswitch; /usr/share/openvswitch/scripts/ovs-ctl stop || true; rm -f /var/run/openvswitch/*.pid /var/run/openvswitch/*.ctl /var/run/openvswitch/*.sock /var/run/openvswitch/*.mgmt /var/run/openvswitch/*.snoop; /usr/share/openvswitch/scripts/ovs-ctl start --system-id=random'
+                log "starting Open vSwitch with stale runtime cleanup"
+                host_sh 'mkdir -p /var/run/openvswitch; /usr/share/openvswitch/scripts/ovs-ctl stop || true; pkill ovs-vswitchd || true; pkill ovsdb-server || true; rm -f /var/run/openvswitch/*.pid /var/run/openvswitch/*.ctl /var/run/openvswitch/*.sock /var/run/openvswitch/*.mgmt /var/run/openvswitch/*.snoop; /usr/share/openvswitch/scripts/ovs-ctl start --system-id=random'
                 host_sh 'for i in {1..15}; do ovs-vsctl show >/dev/null 2>&1 && exit 0; sleep 1; done; ovs-vsctl show >/dev/null'
               }
 
