@@ -31,6 +31,30 @@ nmsAdmin:
   organization: magma-test
   email: admin
   password: admin
+  customDomains: []
+
+provisioning:
+  enabled: true
+  network:
+    id: mpk_test
+    name: mpk_test
+    description: Magma lab 5G network
+    mcc: "001"
+    mnc: "01"
+    tac: 1
+    enable5gFeatures: true
+    cloudSubscriberdbEnabled: true
+    defaultRuleId: default_rule_1
+    subProfile: default
+    maxDlBitRate: 300000000
+    maxUlBitRate: 300000000
+  subscriber:
+    enabled: true
+    imsi: IMSI001010000000001
+    name: UERANSIM UE 001
+    authKey: Rltc6LGZtJ+qXwou4jimvA==
+    authOpc: 6O0oneupUuQoO1TojmGDyg==
+    subProfile: default
 
 orc8r:
   secrets:

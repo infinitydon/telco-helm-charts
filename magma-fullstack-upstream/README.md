@@ -12,6 +12,8 @@ It deploys:
 - NMS admin bootstrap Job. The Job first registers the `admin_operator`
   certificate with Orc8r `accessd`, then creates the NMS admin user.
 - NodePort NMS MagmaLTE and Orc8r nginx services.
+- Idempotent lab provisioning for the NMS organization, LTE/5G network
+  `mpk_test`, and subscriber `IMSI001010000000001`.
 
 Provisioning belongs in NMS/Orc8r. The AGW chart's standalone subscriber Job is
 only a lab shortcut and should be disabled for this full-stack path.
@@ -21,7 +23,7 @@ only a lab shortcut and should be disabled for this full-stack path.
 ```powershell
 helm upgrade --install magma-fullstack .\magma-fullstack-upstream `
   -n magma --create-namespace `
-  --wait --timeout 60m
+  --wait --timeout 20m
 ```
 
 Do not run `helm dependency build` unless you intend to re-apply the local
@@ -51,6 +53,11 @@ username: admin
 password: admin
 ```
 
+When using NodePort, set `nmsAdmin.customDomains` to every `host:port` users
+will browse, for example `192.168.88.165:31316`. The provisioning Job merges
+those domains into the NMS organization and links the organization to the
+provisioned network.
+
 For DNS/SNI based access, map these names to the node IP or external load
 balancer:
 
@@ -72,8 +79,8 @@ helm upgrade --install agwc .\magma-agw-upstream `
   --wait --timeout 20m
 ```
 
-Create the network, gateway, APN, and subscriber in NMS. UERANSIM must use SIM
-values that match the NMS subscriber record.
+The chart creates the default network and subscriber in Orc8r/NMS. Register the
+gateway in NMS, and keep UERANSIM SIM values aligned with the subscriber record.
 
 ## Upstream Chart Notes
 
