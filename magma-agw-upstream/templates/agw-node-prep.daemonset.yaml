@@ -110,8 +110,18 @@ spec:
                 local bridge="$1"
                 local probe_port="$2"
                 local type="$3"
+                local existing_gtpu
                 local ofport
                 local error
+                existing_gtpu="$(host ovs-vsctl --data=bare --no-heading --columns=name find Interface type="${type}" 2>/dev/null | head -n1 || true)"
+                if [ -n "${existing_gtpu}" ]; then
+                  ofport="$(host ovs-vsctl --if-exists get Interface "${existing_gtpu}" ofport 2>/dev/null || true)"
+                  error="$(host ovs-vsctl --if-exists get Interface "${existing_gtpu}" error 2>/dev/null || true)"
+                  if [ -n "${ofport}" ] && [ "${ofport}" != "-1" ] && { [ -z "${error}" ] || [ "${error}" = '""' ] || [ "${error}" = "[]" ]; }; then
+                    log "OVS GTP-U interface ${existing_gtpu} is already healthy with ofport ${ofport}"
+                    return 0
+                  fi
+                fi
                 host ovs-vsctl --if-exists del-port "${bridge}" "${probe_port}" || true
                 if ! host ovs-vsctl --may-exist add-port "${bridge}" "${probe_port}" -- \
                   set Interface "${probe_port}" type="${type}" options:remote_ip=flow options:key=flow ofport_request=32000; then
