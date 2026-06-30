@@ -96,6 +96,28 @@ image:
   test: alpine:3.20.3
 ```
 
+## Reference Dockerfiles
+
+The chart does not build images at install time. For traceability, the tested
+UERANSIM simulator Dockerfile is kept at
+`docs/Dockerfile.ueransim-v3.2.4`. It builds UERANSIM from the upstream
+`v3.2.4` tag on Ubuntu 22.04 and includes operational troubleshooting tools
+used during validation: `ping`, `tcpdump`, `iperf3`, `iproute2`, and DNS tools.
+
+The validated image tag for this chart is:
+
+```yaml
+simulator:
+  image:
+    repository: ghcr.io/infinitydon/ueransim
+    tag: v3.2.4-x86-64
+    pullPolicy: Always
+```
+
+Do not publish or deploy the simulator with a `latest` tag. If rebuilding the
+reference image, push it with an immutable version tag such as
+`v3.2.4-x86-64`.
+
 ## Node Prep DaemonSet
 
 `nodePrep.enabled` deploys a privileged DaemonSet on the selected AGW node. It is
@@ -233,6 +255,14 @@ The simulator image defaults to a Magma 1.9-compatible UERANSIM v3.2.4 build
 and does not use a `latest` tag. The binary paths are configurable through
 `simulator.gnb.commandPath` and `simulator.ue.commandPath`; the defaults match
 the GHCR image above.
+
+Compatibility note: `ghcr.io/infinitydon/ueransim:v3.3.0-x86-64` was tested in
+the same lab. The image pulled successfully and both `nr-gnb`/`nr-ue` reported
+`v3.3.0`; NG setup, UE registration, PDU session establishment, and
+`uesimtun0` creation succeeded. User-plane ICMP through `uesimtun0` failed,
+while reverting to `v3.2.4-x86-64` restored ICMP with the same AGW and
+subscriber configuration. Keep `v3.2.4-x86-64` as the default until the
+v3.3.0 datapath difference is isolated.
 
 `simulator.gnb.startDelaySeconds` defaults to `30` and
 `simulator.ue.startDelaySeconds` defaults to `60` so the AGW SCTP listener and
