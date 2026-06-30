@@ -16,16 +16,12 @@ The throughput smoke test command is:
 
 ```sh
 kubectl -n magma-agw exec deploy/agwc-ueransim-ue -- \
-  iperf3 -c <iperf3-server-node-ip> -B <ue-tunnel-ip> -t 10
+  iperf3 -c <iperf3-server-ip> -p 5201 -B <ue-tunnel-ip> -t 10
 ```
 
-In the lab, this command did not work through the clean Magma enforcement path.
-It succeeded only after a temporary diagnostic OVS flow bypass was added for
-TCP/5201. That proved the refreshed UERANSIM image and host-networked iperf3
-server were functional, with `708 MBytes` transferred at `594 Mbits/sec` sender
-and `591 Mbits/sec` receiver. Do not treat that bypass as a production
-requirement or chart behavior. A normal deployment still needs the TCP/5201
-Magma enforcement issue resolved.
+The validated macvlan server result after the AMF timer and datapath cleanup was
+`653 MBytes` transferred at `548 Mbits/sec` sender and `545 Mbits/sec`
+receiver.
 
 ## Validated Versions
 
@@ -167,6 +163,37 @@ Expected shape:
 -A FORWARD -d 192.168.128.0/24 -i eth0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 ```
 
+## Required AMF Timer
+
+Magma 1.9's generated 5G AMF config used `T3512 = 10`, which made UERANSIM run
+periodic registration after 10 minutes. In the lab, that periodic update path
+failed and sessiond removed the active PDU session while the UE pod still had a
+stale `uesimtun0`.
+
+Use the chart default:
+
+```yaml
+config:
+  amf:
+    t3512Minutes: 54
+```
+
+Confirm the generated runtime config:
+
+```sh
+kubectl -n magma-agw exec deploy/oai-mme -- \
+  grep -n 'T3512' /var/opt/magma/tmp/mme.conf
+```
+
+Expected:
+
+```text
+T3512 = 54
+```
+
+After setting this value, the UE stayed registered beyond the previous
+10-minute failure point and both ping and iperf continued to work.
+
 ## Required UPF Association
 
 `pipelined` must publish the 5G UPF node state to `sessiond` before or during
@@ -210,25 +237,25 @@ simulator:
     provision: false
   iperf3Server:
     enabled: true
-    hostNetwork: true
+    hostNetwork: false
     port: 5201
+    multus:
+      enabled: true
+      networkName: iperf-macvlan
+      master: eth0
+      interface: net1
+      ip: 192.168.88.230/24
 ```
 
 Use `simulator.subscriber.provision=false` for NMS-managed deployments.
 
-`simulator.iperf3Server.enabled=true` starts an `iperf3 -s` process on the
-simulator worker using the same UERANSIM image. With `hostNetwork=true`, the
-server is reached through the simulator node's LAN IP, which exercises UE
-traffic through the AGW datapath and NAT instead of a Kubernetes ClusterIP.
-
-The tested server placement was a third worker node:
+`simulator.iperf3Server.enabled=true` starts an `iperf3 -s` process using the
+same UERANSIM image. The validated server used a Multus macvlan address on the
+simulator worker LAN:
 
 ```text
-iperf3 server node: ebpf-bng-node-02, 192.168.88.163
+iperf3 server IP: 192.168.88.230/24
 ```
-
-Running the server on the UE worker was avoided because same-node pod/host
-hairpin effects made troubleshooting less clear.
 
 The UE ping command should be sourced from `uesimtun0`; no additional UE route
 is required for this test when using:
@@ -317,10 +344,17 @@ UE_IP=$(kubectl -n magma-agw exec deploy/agwc-ueransim-ue -- \
   sh -c "ip -4 -o addr show uesimtun0 | awk '{print \$4}' | cut -d/ -f1")
 
 kubectl -n magma-agw exec deploy/agwc-ueransim-ue -- \
-  iperf3 -c <iperf3-server-node-ip> -B "$UE_IP" -t 10
+  iperf3 -c <iperf3-server-ip> -p 5201 -B "$UE_IP" -t 10
 ```
 
-Expected result shape after the TCP/5201 enforcement issue is resolved:
+Validated command in the lab:
+
+```sh
+kubectl -n magma-agw exec deploy/agwc-ueransim-ue -- \
+  iperf3 -c 192.168.88.230 -p 5201 -B 192.168.128.13 -t 10 --connect-timeout 5000
+```
+
+Expected result shape:
 
 ```text
 [ ID] Interval           Transfer     Bitrate
@@ -329,23 +363,13 @@ Expected result shape after the TCP/5201 enforcement issue is resolved:
 iperf Done.
 ```
 
-Observed diagnostic success with temporary OVS TCP/5201 bypass:
+Observed success after the datapath cleanup:
 
 ```text
-[  5]   0.00-10.00  sec   708 MBytes   594 Mbits/sec  606 sender
-[  5]   0.00-10.02  sec   706 MBytes   591 Mbits/sec      receiver
+[  5]   0.00-10.00  sec   653 MBytes   548 Mbits/sec  870 sender
+[  5]   0.00-10.05  sec   652 MBytes   545 Mbits/sec      receiver
 iperf Done.
 ```
-
-Observed clean-path issue still to resolve:
-
-```text
-iperf3: error - unable to send control message: Bad file descriptor
-```
-
-Packet capture showed the TCP SYN leaving `uesimtun0` and arriving at the AGW,
-but not leaving the AGW host as a NATed SYN. ICMP on the same UE tunnel path
-continued to work.
 
 ## Troubleshooting Ping Failure
 
@@ -385,8 +409,7 @@ If `iperf3` is missing in the UE container, restart the UERANSIM deployments
 with `simulator.image.pullPolicy=Always` so kubelet pulls the refreshed
 `v3.2.4-x86-64` image.
 
-If ICMP works but iperf3 fails with `unable to send control message`, capture on
-both sides before changing routes:
+If ICMP works but iperf3 fails, capture on both sides before changing routes:
 
 ```sh
 kubectl -n magma-agw exec deploy/agwc-ueransim-ue -- \
@@ -396,7 +419,8 @@ ssh <agw-node> -- \
   sudo tcpdump -nn -i any 'host <iperf3-server-ip> and (tcp port 5201 or icmp)'
 ```
 
-The lab failure mode was policy/enforcement related: the TCP SYN reached AGW
-from the UE tunnel but did not egress the host NAT path. A temporary OVS bypass
-validated throughput, but the durable fix should be an Orc8r/NMS policy or
-Magma enforcement fix, not a manual OVS flow.
+The chart's `qfi-classifier-fallback` sidecar intentionally keeps the workaround
+narrow. It installs the missing non-QFI GTP-U classifier fallback and table 11
+session pass flows only. Do not add table 13 or table 14 pass-through flows;
+Magma's table 12 already resubmits to table 20, and extra table 13/14 pass
+flows duplicate downlink packets.

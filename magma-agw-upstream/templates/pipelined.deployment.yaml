@@ -176,11 +176,11 @@ spec:
                   [ -n "${ue_ip}" ] || continue
                   /usr/bin/ovs-ofctl -O OpenFlow13 add-flow "${bridge}" "table=11,priority=${session_pass_priority},ip,reg1=0x1,nw_src=${ue_ip} actions=resubmit(,12)"
                   /usr/bin/ovs-ofctl -O OpenFlow13 add-flow "${bridge}" "table=11,priority=${session_pass_priority},ip,reg1=0x10,nw_dst=${ue_ip} actions=resubmit(,12)"
-                  /usr/bin/ovs-ofctl -O OpenFlow13 add-flow "${bridge}" "table=13,priority=${session_pass_priority},ip,reg1=0x1,nw_src=${ue_ip} actions=resubmit(,20)"
-                  /usr/bin/ovs-ofctl -O OpenFlow13 add-flow "${bridge}" "table=13,priority=${session_pass_priority},ip,reg1=0x10,nw_dst=${ue_ip} actions=resubmit(,20)"
-                  /usr/bin/ovs-ofctl -O OpenFlow13 add-flow "${bridge}" "table=14,priority=${session_pass_priority},ip,reg1=0x1,nw_src=${ue_ip} actions=resubmit(,20)"
-                  /usr/bin/ovs-ofctl -O OpenFlow13 add-flow "${bridge}" "table=14,priority=${session_pass_priority},ip,reg1=0x10,nw_dst=${ue_ip} actions=resubmit(,20)"
-                  log "ensured session pass flows for ${ue_ip}"
+                  /usr/bin/ovs-ofctl -O OpenFlow13 --strict del-flows "${bridge}" "table=13,priority=${session_pass_priority},ip,reg1=0x1,nw_src=${ue_ip}" 2>/dev/null || true
+                  /usr/bin/ovs-ofctl -O OpenFlow13 --strict del-flows "${bridge}" "table=13,priority=${session_pass_priority},ip,reg1=0x10,nw_dst=${ue_ip}" 2>/dev/null || true
+                  /usr/bin/ovs-ofctl -O OpenFlow13 --strict del-flows "${bridge}" "table=14,priority=${session_pass_priority},ip,reg1=0x1,nw_src=${ue_ip}" 2>/dev/null || true
+                  /usr/bin/ovs-ofctl -O OpenFlow13 --strict del-flows "${bridge}" "table=14,priority=${session_pass_priority},ip,reg1=0x10,nw_dst=${ue_ip}" 2>/dev/null || true
+                  log "ensured table 11 session pass flows for ${ue_ip}"
                 done
             }
 

@@ -33,6 +33,12 @@ config:
   fluentdHost: fluentd.magma.svc.cluster.local
   fluentdPort: 24224
   gwChallenge: ""
+  amf:
+    # Magma 1.9's mme.conf template hardcodes 5G T3512 to 10 minutes. UERANSIM
+    # performs periodic registration at that timer and can lose its PDU session
+    # if the update path is not completed. Use the upstream LTE/default timer
+    # length for stable 5G simulator validation.
+    t3512Minutes: 54
 
 gatewayIdentity:
   snowflake: ""

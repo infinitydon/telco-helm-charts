@@ -27,6 +27,8 @@ Changes from upstream:
   idempotent subscriber/APN provisioning Job
 - makes `pipelined` wait for sessiond before startup so native UPF node
   association is not lost to Kubernetes startup races
+- overrides the upstream generated 5G AMF `T3512` timer from 10 minutes to
+  54 minutes by default for stable UERANSIM datapath validation
 - adds a basic Helm test hook
 
 `liagentd` is present but disabled by default because the packaged upstream
@@ -202,6 +204,34 @@ egress. If `nodePrep.natEgress.interface` is empty, node prep detects the
 node's default-route interface. In the tested lab, `magma-sgi` was a private
 macvlan with no default route, so UE internet reachability required NAT egress
 through the node default interface `eth0`.
+
+## AMF Periodic Registration Timer
+
+The upstream Magma 1.9 `mme.conf.template` hardcodes the 5G AMF `T3512` value
+to 10 minutes. In this lab that caused UERANSIM to perform periodic
+registration after 10 minutes; the periodic update was not completed cleanly,
+the UE kept a stale `uesimtun0`, and sessiond removed the active PDU session.
+
+This chart rewrites the generated `mme.conf` in the config Job:
+
+```yaml
+config:
+  amf:
+    t3512Minutes: 54
+```
+
+The live AGW check is:
+
+```sh
+kubectl -n magma-agw exec deploy/oai-mme -- \
+  grep -n 'T3512' /var/opt/magma/tmp/mme.conf
+```
+
+Expected:
+
+```text
+T3512 = 54
+```
 
 ## 5G Simulator
 

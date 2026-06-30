@@ -46,7 +46,9 @@ spec:
             cp -f /configs/control_proxy.yml /var/opt/magma/configs/  &&
             mkdir -p /var/opt/magma/certs && cp -f /certs/* /var/opt/magma/certs/ &&
             /usr/local/bin/generate_nghttpx_config.py &&
-            /usr/local/bin/generate_oai_config.py
+            /usr/local/bin/generate_oai_config.py &&
+            sed -i -E 's/^([[:space:]]*)T3512[[:space:]]*=.*/\1T3512 = {{ .Values.config.amf.t3512Minutes }}/' /var/opt/magma/tmp/mme.conf &&
+            grep -n 'T3512' /var/opt/magma/tmp/mme.conf
           image: "{{ .Values.image.repository }}/agw_gateway_python{{ .Values.image.arch}}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           name: agwc-config
