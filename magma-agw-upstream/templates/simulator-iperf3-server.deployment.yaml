@@ -22,6 +22,12 @@ spec:
 {{ include "default-selector-labels" . | indent 8 }}
       annotations:
         checksum/simulator-values: {{ toJson .Values.simulator | sha256sum }}
+      {{- if and .Values.simulator.iperf3Server.multus.enabled .Values.simulator.iperf3Server.multus.ip }}
+        k8s.v1.cni.cncf.io/networks: |
+          [
+            {"name": "{{ .Values.simulator.iperf3Server.multus.networkName }}", "namespace": "{{ .Values.namespace }}", "interface": "{{ .Values.simulator.iperf3Server.multus.interface }}", "ips": ["{{ .Values.simulator.iperf3Server.multus.ip }}"]}
+          ]
+      {{- end }}
     spec:
       {{- include "simulator.agwAntiAffinity" . | nindent 6 }}
       {{- if .Values.simulator.iperf3Server.hostNetwork }}

@@ -283,9 +283,16 @@ simulator:
     apnConfig: "magma.ipv4,9,1,0,0,300000000,300000000,0,,,,"
   iperf3Server:
     enabled: false
-    hostNetwork: true
+    hostNetwork: false
     port: 5201
     nodeSelector: {}
-  resources: {}
+    multus:
+      enabled: false
+      networkName: iperf-macvlan
+      interface: net1
+      master: eth0
+      mode: bridge
+      ip: ""
+    resources: {}
 
 resources: {}
