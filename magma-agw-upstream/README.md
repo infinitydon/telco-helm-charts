@@ -25,6 +25,8 @@ Changes from upstream:
 - enables Magma 5G SA mconfig defaults
 - adds an optional UERANSIM 5G gNB/UE simulator with Multus NADs and an
   idempotent subscriber/APN provisioning Job
+- adds an idempotent UPF node association Job so sessiond advertises the AGW
+  N3 address to the 5G control plane
 - adds a basic Helm test hook
 
 `liagentd` is present but disabled by default because the packaged upstream
@@ -167,6 +169,33 @@ Keep N3 and SGi/NAT on separate host interfaces. `pipelined` manages the SGi
 address and can replace it with the SGi management IP; using the same interface
 for N3 would remove the 5G GTP-U endpoint address.
 
+## 5G UPF Node Association
+
+`upfNodeAssociation.enabled` creates a revision-scoped Job named like
+`agwc-upf-node-association-<revision>`. The Job runs with `hostNetwork: true` on
+the AGW node and calls sessiond's local `SetUPFNodeState` API so the 5G session
+response contains the real AGW N3 endpoint instead of the simulator gNB address.
+
+The Job is idempotent. Re-sending the same UPF node state is safe and makes Helm
+upgrades self-healing if sessiond restarts or the AGW N3 address is recreated by
+node prep.
+
+```yaml
+upfNodeAssociation:
+  enabled: true
+  sessiondHost: 127.0.0.1
+  sessiondPort: 50065
+  n3Interface: magma-n3
+  n3Address: ""
+  upfId: ""
+  retries: 60
+  retryIntervalSeconds: 2
+```
+
+When `n3Address` is empty, the Job discovers the IPv4 address from
+`n3Interface`. Set `n3Address` and `upfId` explicitly if the AGW N3 endpoint is
+managed outside node prep.
+
 ## 5G Simulator
 
 `simulator.enabled` deploys UERANSIM. It defaults to `false` so a full
@@ -240,10 +269,14 @@ Recommended full-stack order:
    `simulator.subscriber.provision=false`.
 
 If UE registration and PDU establishment succeed but `ping -I uesimtun0`
-fails, check the gNB logs for `TEID -2147483647 not found on GTP-U Downlink`
-and the AGW `gtp_br0` flows for zero counters on the `qfi=9` rule. That points
-at the Magma 1.9 5G user-plane datapath/OVS QFI path rather than NMS
-subscriber provisioning.
+fails, first confirm the gNB sends GTP-U to the AGW N3 address. A capture that
+shows `192.168.60.150.2152 > 192.168.60.150.2152` means sessiond has not
+advertised the correct UPF node state; check the
+`agwc-upf-node-association-<revision>` Job logs. If the gNB sends to the AGW N3
+address and the AGW receives the packets, then check the AGW `gtp_br0` flows and
+datapath drops for zero counters on the expected `qfi=9` rule. That points at
+the Magma 1.9 5G user-plane datapath/OVS QFI path rather than NMS subscriber
+provisioning or UERANSIM UE/gNB connectivity.
 
 ## Installation
 
@@ -359,6 +392,7 @@ helm status agwc -n magma-agw-test
 kubectl get pods -n magma-agw-test -o wide
 kubectl logs -n magma-agw-test deploy/agwc-ueransim-gnb --tail=100
 kubectl logs -n magma-agw-test deploy/agwc-ueransim-ue --tail=120
+kubectl logs -n magma-agw-test job/agwc-upf-node-association-<revision>
 ```
 
 Expected successful simulator messages:
@@ -379,6 +413,18 @@ kubectl exec -n magma-agw-test deploy/oai-mme -- \
 
 The tested default binds `10.88.99.142:38412`. Avoid `192.88.99.0/24` for N2;
 it caused SCTP client failures even though ICMP worked.
+
+Check the advertised UPF node state:
+
+```sh
+kubectl logs -n magma-agw-test job/agwc-upf-node-association-<revision>
+```
+
+Expected message:
+
+```text
+associated UPF node id=192.168.60.142 n3=192.168.60.142 target=127.0.0.1:50065
+```
 
 ## Provisioning
 

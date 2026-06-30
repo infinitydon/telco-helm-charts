@@ -154,6 +154,16 @@ nodePrep:
   sysctl:
     net.ipv4.ip_forward: "1"
 
+upfNodeAssociation:
+  enabled: true
+  sessiondHost: 127.0.0.1
+  sessiondPort: 50065
+  n3Interface: magma-n3
+  n3Address: ""
+  upfId: ""
+  retries: 60
+  retryIntervalSeconds: 2
+
 simulator:
   enabled: false
   nodeSelector:
