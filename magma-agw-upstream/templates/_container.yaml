@@ -16,18 +16,12 @@ imagePullPolicy: {{ .Values.image.pullPolicy }}
 securityContext:
   privileged: true
 volumeMounts:
+  {{- range $cfg := .Values.gatewayConfig.mountFiles }}
   - name: "magma-config"
-    mountPath: /etc/magma/magmad.yml
-    subPath: magmad.yml
+    mountPath: {{ printf "/etc/magma/%s" $cfg.path | quote }}
+    subPath: {{ $cfg.key | quote }}
     readOnly: true
-  - name: "magma-config"
-    mountPath: /etc/magma/service_registry.yml
-    subPath: service_registry.yml
-    readOnly: true
-  - name: "magma-config"
-    mountPath: /etc/magma/gateway.mconfig
-    subPath: gateway.mconfig
-    readOnly: true
+  {{- end }}
   - name: "controlproxy-config"
     mountPath: /etc/magma/control_proxy.yml
     subPath: control_proxy.yml

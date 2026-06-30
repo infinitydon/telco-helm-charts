@@ -44,6 +44,10 @@ static_services: [
 
 of_server_port: 3333
 
+# Upstream defaults this to 5 seconds. On lab Kubernetes nodes, 5G SMF session
+# setup and policy flow programming can exceed that while OVS is settling.
+call_timeout: 30
+
 default_priority: 10
 default_rule_tag: 0x1
 

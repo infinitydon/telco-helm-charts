@@ -37,6 +37,39 @@ config:
 gatewayIdentity:
   snowflake: ""
 
+gatewayConfig:
+  mountFiles:
+    - key: magmad.yml
+      path: magmad.yml
+    - key: service_registry.yml
+      path: service_registry.yml
+    - key: gateway.mconfig
+      path: gateway.mconfig
+    - key: connectiond.yml
+      path: connectiond.yml
+    - key: dnsd.yml
+      path: dnsd.yml
+    - key: enodebd.yml
+      path: enodebd.yml
+    - key: health.yml
+      path: health.yml
+    - key: liagentd.yml
+      path: liagentd.yml
+    - key: mme.yml
+      path: mme.yml
+    - key: monitord.yml
+      path: monitord.yml
+    - key: pipelined.yml
+      path: pipelined.yml_prod
+    - key: redis.yml
+      path: redis.yml
+    - key: redirectd.yml
+      path: redirectd.yml
+    - key: spgw.yml
+      path: spgw.yml
+    - key: subscriberdb.yml
+      path: subscriberdb.yml
+
 orc8r:
   hostAliases:
     enabled: false
@@ -121,6 +154,12 @@ nodePrep:
       name: patch-agw
       peer: patch-up
     uplinkPort: magma-sgi
+  natEgress:
+    enabled: true
+    # Empty means detect the node default-route interface. Set to a dedicated
+    # SGi/uplink interface when one exists.
+    interface: ""
+    sourceCidr: 192.168.128.0/24
   interfaces:
     createMissing: true
     cleanupLegacy:

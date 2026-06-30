@@ -96,6 +96,27 @@ spec:
                 fi
               }
 
+              ensure_nat_egress() {
+                local source_cidr="$1"
+                local egress_iface="$2"
+                [ -n "${source_cidr}" ] || return 0
+                if [ -z "${egress_iface}" ]; then
+                  egress_iface="$(host_sh "ip route show default 0.0.0.0/0 | awk '{print \$5; exit}'")"
+                fi
+                if [ -z "${egress_iface}" ]; then
+                  log "could not determine NAT egress interface"
+                  return 1
+                fi
+                if ! host ip link show "${egress_iface}" >/dev/null 2>&1; then
+                  log "NAT egress interface ${egress_iface} is missing"
+                  return 1
+                fi
+                log "ensuring NAT egress for ${source_cidr} via ${egress_iface}"
+                host_sh "iptables -t nat -C POSTROUTING -s '${source_cidr}' -o '${egress_iface}' -j MASQUERADE 2>/dev/null || iptables -t nat -I POSTROUTING 1 -s '${source_cidr}' -o '${egress_iface}' -j MASQUERADE"
+                host_sh "iptables -C FORWARD -s '${source_cidr}' -o '${egress_iface}' -j ACCEPT 2>/dev/null || iptables -I FORWARD 1 -s '${source_cidr}' -o '${egress_iface}' -j ACCEPT"
+                host_sh "iptables -C FORWARD -d '${source_cidr}' -i '${egress_iface}' -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || iptables -I FORWARD 1 -d '${source_cidr}' -i '${egress_iface}' -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT"
+              }
+
               ensure_ovs_started() {
                 if host_sh 'ovs-vsctl show >/dev/null 2>&1'; then
                   log "Open vSwitch database already reachable"
@@ -424,6 +445,9 @@ spec:
               ensure_module gtp
               {{- range $key, $value := .Values.nodePrep.sysctl }}
               ensure_sysctl {{ $key | quote }} {{ $value | quote }}
+              {{- end }}
+              {{- if .Values.nodePrep.natEgress.enabled }}
+              ensure_nat_egress {{ .Values.nodePrep.natEgress.sourceCidr | quote }} {{ default "" .Values.nodePrep.natEgress.interface | quote }}
               {{- end }}
               ensure_ovs_started
               ensure_bridge {{ .Values.nodePrep.bridge.name | quote }}

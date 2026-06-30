@@ -175,6 +175,12 @@ sessiond's local gRPC port is reachable; otherwise the native association loop
 can back off while UERANSIM is already creating a PDU session, causing the AMF
 to advertise `0.0.0.0` and `0x7fffffff` as the UPF tunnel endpoint.
 
+`nodePrep.natEgress` installs idempotent host iptables rules for UE subnet
+egress. If `nodePrep.natEgress.interface` is empty, node prep detects the
+node's default-route interface. In the tested lab, `magma-sgi` was a private
+macvlan with no default route, so UE internet reachability required NAT egress
+through the node default interface `eth0`.
+
 ## 5G Simulator
 
 `simulator.enabled` deploys UERANSIM. It defaults to `false` so a full
@@ -233,11 +239,13 @@ the GHCR image above.
 gNB are up before the UE attempts registration. If the AGW node is slow to
 initialize OVS or services, increase the gNB and UE delays together.
 
-For a full Magma deployment, create the subscriber and APN in NMS/Orc8r. The
-local subscriber provisioning Job is disabled by default and is intended only
-for standalone AGW datapath testing. In cluster testing, UERANSIM completed NG
-setup, initial registration, PDU session establishment, and brought up
-`uesimtun0` after the subscriber was present.
+For a full Magma deployment, create the subscriber, APN/DNN, and active policy
+assignment in NMS/Orc8r. The local subscriber provisioning Job is disabled by
+default and is intended only for standalone AGW datapath testing. In cluster
+testing, UERANSIM completed NG setup, initial registration, PDU session
+establishment, brought up `uesimtun0`, and passed internet ICMP after the
+subscriber had `default_rule_1` assigned from Orc8r and node prep installed NAT
+egress for `192.168.128.0/24`.
 
 Recommended full-stack order:
 
@@ -247,11 +255,23 @@ Recommended full-stack order:
 4. Enable UERANSIM by setting `simulator.enabled=true`, keeping
    `simulator.subscriber.provision=false`.
 
-If UE registration and PDU establishment succeed but `ping -I uesimtun0`
-fails, check the gNB logs for `TEID -2147483647 not found on GTP-U Downlink`
-and the AGW `gtp_br0` flows for zero counters on the `qfi=9` rule. That points
-at the Magma 1.9 5G user-plane datapath/OVS QFI path rather than NMS
-subscriber provisioning.
+If UE registration and PDU establishment succeed but `ping -I uesimtun0` fails,
+check these in order:
+
+1. `policydb_cli.py dump_data` in the AGW `policydb` pod must show the UE IMSI
+   with an Orc8r-streamed policy, for example `global_policies:
+   "default_rule_1"`.
+2. `ovs-ofctl -O OpenFlow13 dump-flows gtp_br0` on the AGW node should show
+   uplink packets matching the `qfi=9` tunnel flow, then matching the policy
+   rule for the UE IP.
+3. Host iptables must NAT the UE pool, default `192.168.128.0/24`, out an
+   interface with working upstream routing. `nodePrep.natEgress` handles this
+   idempotently.
+
+If the gNB log reports `TEID -2147483647 not found on GTP-U Downlink`, the UPF
+node association did not reach sessiond before the PDU session was created.
+Restart `pipelined`/`sessiond` only after node prep is complete, then reattach
+the UE.
 
 ## Installation
 
@@ -289,11 +309,10 @@ Before installing, confirm the target cluster has:
   plane testing, but real UE datapath validation should use
   `requireMagmaOvsKmod=true`.
 
-The tested Ubuntu 24.04 node had only stock Ubuntu Open vSwitch packages and no
-`/usr/local/bin/ovs-kmod-upgrade.sh`. With that host state, UERANSIM control
-plane reached NG setup, UE registration, and PDU establishment, but UE user-plane
-traffic failed because `pipelined` hit OpenFlow `BAD_FIELD` errors. Resolve the
-host Magma OVS/GTP prerequisite before treating the datapath test as complete.
+The tested working node was Ubuntu 20.04.6 LTS with kernel
+`5.4.0-216-generic`, Magma OVS `2.15.4-10-magma`, and the patched GTP/QFI OVS
+datapath loaded. Ubuntu 24.04 with stock OVS did not provide a compatible Magma
+GTP-U datapath for this chart.
 
 When this chart is driven by the Magma operator, the operator can set
 `nodePrep.nodeSelector` to the raw AGW node label and set the AGW workload
