@@ -269,6 +269,9 @@ v3.3.0 datapath difference is isolated.
 gNB are up before the UE attempts registration. If the AGW node is slow to
 initialize OVS or services, increase the gNB and UE delays together.
 
+For the exact requirements that made `ping -I uesimtun0 8.8.8.8` work in the
+validated lab, see `docs/ue-ping-validation.md`.
+
 For a full Magma deployment, create the subscriber, APN/DNN, and active policy
 assignment in NMS/Orc8r. The local subscriber provisioning Job is disabled by
 default and is intended only for standalone AGW datapath testing. In cluster
