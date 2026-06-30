@@ -9,7 +9,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ---
-namespace: magma
+namespace: magma-agw
 
 # Define which secrets should be mounted by pods.
 secret:
@@ -72,8 +72,10 @@ gatewayConfig:
 
 orc8r:
   hostAliases:
-    enabled: false
-    ip: ""
+    enabled: true
+    # Set this to the ClusterIP or routable address of the Orc8r nginx proxy
+    # that serves controller, bootstrapper, and service controller hostnames.
+    ip: "10.152.183.140"
     hostnames:
       - controller.magma.local
       - bootstrapper-controller.magma.local
@@ -92,7 +94,7 @@ orc8r:
 
 nodeSelector:
   magma.io/agw-node: "true"
-  kubernetes.io/hostname: ebpf-bng-node-02
+  kubernetes.io/hostname: ebpf-bng-node-03-ubuntu-focal
 tolerations: []
 
 agwAntiAffinity:
@@ -113,6 +115,21 @@ startup:
       host: 127.0.0.1
       port: 50065
       timeoutSeconds: 180
+    qfiClassifierFallback:
+      enabled: true
+      intervalSeconds: 5
+      bridge: gtp_br0
+      qfiPriority: 65503
+      fallbackPriority: 65502
+      gtpPort: 32768
+      upfAssociation:
+        enabled: true
+        sessiondTarget: 127.0.0.1:50065
+        nodeId: 192.168.60.142
+        n3Address: 192.168.60.142
+      sessionPass:
+        enabled: true
+        priority: 100
 
 nodePrep:
   enabled: true
@@ -141,8 +158,12 @@ nodePrep:
     name: gtpu0
     ofport: 32768
     type: gtpu
+    disableOffloads: true
     cleanupPorts:
       - gtpu_sys_2152
+  tcpMssClamp:
+    enabled: true
+    mss: 1400
   uplinkBridge:
     enabled: true
     name: uplink_br0

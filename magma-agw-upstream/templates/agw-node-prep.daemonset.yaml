@@ -117,6 +117,31 @@ spec:
                 host_sh "iptables -C FORWARD -d '${source_cidr}' -i '${egress_iface}' -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || iptables -I FORWARD 1 -d '${source_cidr}' -i '${egress_iface}' -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT"
               }
 
+              ensure_tcp_mss_clamp() {
+                local bridge="$1"
+                local mss="$2"
+                [ -n "${bridge}" ] || return 0
+                [ -n "${mss}" ] || return 0
+                log "ensuring TCP MSS clamp on ${bridge} with MSS ${mss}"
+                host_sh "iptables -t mangle -C FORWARD -i '${bridge}' -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss '${mss}' 2>/dev/null || iptables -t mangle -A FORWARD -i '${bridge}' -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss '${mss}'"
+                host_sh "iptables -t mangle -C FORWARD -o '${bridge}' -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss '${mss}' 2>/dev/null || iptables -t mangle -A FORWARD -o '${bridge}' -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss '${mss}'"
+              }
+
+              disable_iface_offloads() {
+                local iface="$1"
+                [ -n "${iface}" ] || return 0
+                if ! host ip link show "${iface}" >/dev/null 2>&1; then
+                  log "interface ${iface} is not present; skipping offload disable"
+                  return 0
+                fi
+                if ! host_sh 'command -v ethtool >/dev/null 2>&1'; then
+                  log "ethtool missing; installing for offload management"
+                  host_sh 'export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y ethtool'
+                fi
+                log "disabling GSO/GRO/TSO/checksum offloads on ${iface}"
+                host ethtool -K "${iface}" gso off gro off tso off tx off >/dev/null 2>&1 || true
+              }
+
               ensure_ovs_started() {
                 if host_sh 'ovs-vsctl show >/dev/null 2>&1'; then
                   log "Open vSwitch database already reachable"
@@ -457,6 +482,10 @@ spec:
               ensure_addr {{ .Values.nodePrep.bridge.name | quote }} {{ .Values.nodePrep.bridge.address | quote }} "false"
               {{- if .Values.nodePrep.gtpu.enabled }}
               ensure_ovs_gtpu_port {{ .Values.nodePrep.bridge.name | quote }} {{ .Values.nodePrep.gtpu.name | quote }} {{ .Values.nodePrep.gtpu.ofport | quote }} {{ default "gtpu" .Values.nodePrep.gtpu.type | quote }}
+              {{- if .Values.nodePrep.gtpu.disableOffloads }}
+              disable_iface_offloads {{ .Values.nodePrep.bridge.name | quote }}
+              disable_iface_offloads "gtpu_sys_2152"
+              {{- end }}
               {{- else }}
               {{- range .Values.nodePrep.gtpu.cleanupPorts }}
               cleanup_ovs_port {{ $.Values.nodePrep.bridge.name | quote }} {{ . | quote }}
@@ -464,6 +493,9 @@ spec:
               {{- end }}
               {{- range .Values.nodePrep.interfaces.cleanupLegacy }}
               cleanup_legacy_iface {{ . | quote }}
+              {{- end }}
+              {{- if .Values.nodePrep.tcpMssClamp.enabled }}
+              ensure_tcp_mss_clamp {{ .Values.nodePrep.bridge.name | quote }} {{ .Values.nodePrep.tcpMssClamp.mss | quote }}
               {{- end }}
 
               ensure_data_iface {{ .Values.nodePrep.interfaces.s1.name | quote }} {{ default "dummy" .Values.nodePrep.interfaces.s1.type | quote }} {{ default "" .Values.nodePrep.interfaces.s1.parent | quote }} {{ default "bridge" .Values.nodePrep.interfaces.s1.mode | quote }}

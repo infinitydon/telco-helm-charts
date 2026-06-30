@@ -89,6 +89,146 @@ spec:
       containers:
       -
 {{ include "agwc.container" (list . "pipelined.container")}}
+      {{- if .Values.startup.pipelined.qfiClassifierFallback.enabled }}
+      {{- $qfiFallback := .Values.startup.pipelined.qfiClassifierFallback }}
+      {{- $upfAssociation := default dict $qfiFallback.upfAssociation }}
+      {{- $sessionPass := default dict $qfiFallback.sessionPass }}
+      - name: qfi-classifier-fallback
+        image: "{{ .Values.image.repository }}/agw_gateway_python{{ .Values.image.arch}}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          privileged: true
+          capabilities:
+            add:
+              - NET_ADMIN
+              - NET_RAW
+        command:
+          - /bin/bash
+          - -ceu
+          - |
+            bridge={{ .Values.startup.pipelined.qfiClassifierFallback.bridge | quote }}
+            qfi_priority={{ .Values.startup.pipelined.qfiClassifierFallback.qfiPriority | quote }}
+            fallback_priority={{ .Values.startup.pipelined.qfiClassifierFallback.fallbackPriority | quote }}
+            gtp_port={{ .Values.startup.pipelined.qfiClassifierFallback.gtpPort | quote }}
+            interval={{ .Values.startup.pipelined.qfiClassifierFallback.intervalSeconds | quote }}
+            upf_assoc_enabled={{ default true $upfAssociation.enabled | quote }}
+            upf_sessiond_target={{ default "127.0.0.1:50065" $upfAssociation.sessiondTarget | quote }}
+            upf_node_id={{ default "192.168.60.142" $upfAssociation.nodeId | quote }}
+            upf_n3_address={{ default "192.168.60.142" $upfAssociation.n3Address | quote }}
+            session_pass_enabled={{ default true $sessionPass.enabled | quote }}
+            session_pass_priority={{ default 100 $sessionPass.priority | quote }}
+
+            log() { printf '[qfi-classifier-fallback] %s\n' "$*"; }
+
+            ensure_upf_association() {
+              [ "${upf_assoc_enabled}" = "true" ] || return 0
+              SESSIOND_TARGET="${upf_sessiond_target}" \
+              UPF_NODE_ID="${upf_node_id}" \
+              UPF_N3_ADDRESS="${upf_n3_address}" \
+              python3 - <<'PY'
+            import os
+            import grpc
+            from google.protobuf.timestamp_pb2 import Timestamp
+            from lte.protos.session_manager_pb2 import (
+                UPFAssociationState,
+                UPFFeatureSet,
+                UPFNodeState,
+                UserPlaneIPResourceSchema,
+            )
+            from lte.protos.session_manager_pb2_grpc import SetInterfaceForUserPlaneStub
+
+            target = os.environ["SESSIOND_TARGET"]
+            node_id = os.environ["UPF_NODE_ID"]
+            n3_address = os.environ["UPF_N3_ADDRESS"]
+            timestamp = Timestamp()
+            timestamp.GetCurrentTime()
+
+            msg = UPFNodeState(upf_id=node_id)
+            msg.associaton_state.CopyFrom(UPFAssociationState(
+                state_version=1,
+                assoc_state=UPFAssociationState.ESTABLISHED,
+                feature_set=UPFFeatureSet(f_teid=True),
+                recovery_time_stamp=timestamp,
+                ip_resource_schema=[
+                    UserPlaneIPResourceSchema(
+                        ipv4_address=n3_address,
+                        teid_range_indication=0,
+                        teid_range=0,
+                    ),
+                ],
+            ))
+            SetInterfaceForUserPlaneStub(grpc.insecure_channel(target)).SetUPFNodeState(msg, timeout=5)
+            print("ensured UPF association {} via {}".format(node_id, target), flush=True)
+            PY
+            }
+
+            ensure_session_pass_flows() {
+              [ "${session_pass_enabled}" = "true" ] || return 0
+              /usr/bin/ovs-ofctl -O OpenFlow13 dump-flows "${bridge}" table=0 2>/dev/null |
+                awk -F'nw_dst=' '
+                  /priority=65503/ && /in_port=LOCAL/ && /nw_dst=192[.]168[.]128[.]/ {
+                    split($2, parts, " ")
+                    split(parts[1], ip_parts, ",")
+                    print ip_parts[1]
+                  }' |
+                sort -u |
+                while IFS= read -r ue_ip; do
+                  [ -n "${ue_ip}" ] || continue
+                  /usr/bin/ovs-ofctl -O OpenFlow13 add-flow "${bridge}" "table=11,priority=${session_pass_priority},ip,reg1=0x1,nw_src=${ue_ip} actions=resubmit(,12)"
+                  /usr/bin/ovs-ofctl -O OpenFlow13 add-flow "${bridge}" "table=11,priority=${session_pass_priority},ip,reg1=0x10,nw_dst=${ue_ip} actions=resubmit(,12)"
+                  /usr/bin/ovs-ofctl -O OpenFlow13 add-flow "${bridge}" "table=13,priority=${session_pass_priority},ip,reg1=0x1,nw_src=${ue_ip} actions=resubmit(,20)"
+                  /usr/bin/ovs-ofctl -O OpenFlow13 add-flow "${bridge}" "table=13,priority=${session_pass_priority},ip,reg1=0x10,nw_dst=${ue_ip} actions=resubmit(,20)"
+                  /usr/bin/ovs-ofctl -O OpenFlow13 add-flow "${bridge}" "table=14,priority=${session_pass_priority},ip,reg1=0x1,nw_src=${ue_ip} actions=resubmit(,20)"
+                  /usr/bin/ovs-ofctl -O OpenFlow13 add-flow "${bridge}" "table=14,priority=${session_pass_priority},ip,reg1=0x10,nw_dst=${ue_ip} actions=resubmit(,20)"
+                  log "ensured session pass flows for ${ue_ip}"
+                done
+            }
+
+            while true; do
+              if ! /usr/bin/ovs-vsctl br-exists "${bridge}" >/dev/null 2>&1; then
+                log "bridge ${bridge} is not ready"
+                sleep "${interval}"
+                continue
+              fi
+
+              ensure_upf_association || log "failed to ensure UPF association"
+
+              /usr/bin/ovs-ofctl -O OpenFlow13 dump-flows "${bridge}" table=0 2>/dev/null |
+                awk -v qfi_priority="${qfi_priority}" \
+                    -v fallback_priority="${fallback_priority}" \
+                    -v gtp_port="${gtp_port}" '
+                  $0 ~ ("priority=" qfi_priority) &&
+                  $0 ~ ("in_port=" gtp_port) &&
+                  $0 ~ /tun_id=/ &&
+                  $0 ~ /qfi=/ &&
+                  $0 ~ /actions=/ {
+                    line=$0
+                    sub(/^.* table=0, /, "", line)
+                    split(line, parts, " actions=")
+                    match_part=parts[1]
+                    actions=parts[2]
+                    sub(/^n_packets=[0-9]+, n_bytes=[0-9]+, /, "", match_part)
+                    sub("priority=" qfi_priority, "priority=" fallback_priority, match_part)
+                    gsub(/,qfi=[0-9]+/, "", match_part)
+                    print match_part " actions=" actions
+                  }' |
+                while IFS= read -r flow; do
+                  [ -n "${flow}" ] || continue
+                  if /usr/bin/ovs-ofctl -O OpenFlow13 add-flow "${bridge}" "${flow}"; then
+                    log "ensured ${flow%% actions=*}"
+                  else
+                    log "failed to install ${flow%% actions=*}"
+                  fi
+                done
+
+              ensure_session_pass_flows || log "failed to ensure session pass flows"
+
+              sleep "${interval}"
+            done
+        volumeMounts:
+          - mountPath: /var/run
+            name: ovs-volume
+      {{- end }}
 {{- end -}}
 {{- define "pipelined.container" -}}
 name: pipelined
