@@ -260,6 +260,11 @@ simulator:
     provision: false
     nextSeq: "000000000000"
     apnConfig: "magma.ipv4,9,1,0,0,300000000,300000000,0,,,,"
+  iperf3Server:
+    enabled: false
+    hostNetwork: true
+    port: 5201
+    nodeSelector: {}
   resources: {}
 
 resources: {}

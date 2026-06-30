@@ -119,7 +119,27 @@ spec:
                 "priority": {{ default 10 .Values.provisioning.policy.priority }},
                 "flow_list": [
                   {"action": "PERMIT", "match": {"ip_proto": "IPPROTO_IP", "direction": "UPLINK"}},
-                  {"action": "PERMIT", "match": {"ip_proto": "IPPROTO_IP", "direction": "DOWNLINK"}}
+                  {"action": "PERMIT", "match": {"ip_proto": "IPPROTO_IP", "direction": "DOWNLINK"}}{{- if .Values.provisioning.iperf3Policy.enabled }},
+                  {
+                    "action": "PERMIT",
+                    "match": {
+                      "ip_proto": "IPPROTO_TCP",
+                      "direction": "UPLINK",
+                      "ipv4_src": {{ .Values.provisioning.iperf3Policy.ueCidr | quote }},
+                      "ipv4_dst": {{ .Values.provisioning.iperf3Policy.serverCidr | quote }},
+                      "tcp_dst": {{ .Values.provisioning.iperf3Policy.port | int }}
+                    }
+                  },
+                  {
+                    "action": "PERMIT",
+                    "match": {
+                      "ip_proto": "IPPROTO_TCP",
+                      "direction": "DOWNLINK",
+                      "ipv4_src": {{ .Values.provisioning.iperf3Policy.serverCidr | quote }},
+                      "ipv4_dst": {{ .Values.provisioning.iperf3Policy.ueCidr | quote }},
+                      "tcp_src": {{ .Values.provisioning.iperf3Policy.port | int }}
+                    }
+                  }{{- end }}
                 ],
                 "tracking_type": "NO_TRACKING"
               }

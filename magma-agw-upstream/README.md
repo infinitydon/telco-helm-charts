@@ -249,6 +249,10 @@ simulator:
       ip: 192.168.60.150/24
   subscriber:
     provision: false
+  iperf3Server:
+    enabled: false
+    hostNetwork: true
+    port: 5201
 ```
 
 The simulator image defaults to a Magma 1.9-compatible UERANSIM v3.2.4 build
@@ -271,6 +275,11 @@ initialize OVS or services, increase the gNB and UE delays together.
 
 For the exact requirements that made `ping -I uesimtun0 8.8.8.8` work in the
 validated lab, see `docs/ue-ping-validation.md`.
+
+The chart can also run a host-networked `iperf3` server on the simulator worker
+for UE throughput validation. See `docs/ue-ping-validation.md` for the tested
+command, observed diagnostic success, and the remaining clean-path TCP/5201
+policy/enforcement caveat.
 
 For a full Magma deployment, create the subscriber, APN/DNN, and active policy
 assignment in NMS/Orc8r. The local subscriber provisioning Job is disabled by

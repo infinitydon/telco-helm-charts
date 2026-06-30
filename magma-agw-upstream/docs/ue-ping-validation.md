@@ -12,6 +12,20 @@ kubectl -n magma-agw exec deploy/agwc-ueransim-ue -- \
 
 The working result was `4 packets transmitted, 4 received, 0% packet loss`.
 
+The throughput smoke test command is:
+
+```sh
+kubectl -n magma-agw exec deploy/agwc-ueransim-ue -- \
+  iperf3 -c <iperf3-server-node-ip> -B <ue-tunnel-ip> -t 10
+```
+
+In the lab, this command succeeded only after a temporary diagnostic OVS flow
+bypass was added for TCP/5201. That proved the refreshed UERANSIM image and
+host-networked iperf3 server were functional, with `708 MBytes` transferred at
+`594 Mbits/sec` sender and `591 Mbits/sec` receiver. Do not treat that bypass
+as a production requirement. A normal deployment should make TCP/5201 pass
+through Orc8r/NMS policy and Magma enforcement without manual OVS flows.
+
 ## Validated Versions
 
 Working:
@@ -193,9 +207,27 @@ simulator:
     magma.io/ueransim-node: "true"
   subscriber:
     provision: false
+  iperf3Server:
+    enabled: true
+    hostNetwork: true
+    port: 5201
 ```
 
 Use `simulator.subscriber.provision=false` for NMS-managed deployments.
+
+`simulator.iperf3Server.enabled=true` starts an `iperf3 -s` process on the
+simulator worker using the same UERANSIM image. With `hostNetwork=true`, the
+server is reached through the simulator node's LAN IP, which exercises UE
+traffic through the AGW datapath and NAT instead of a Kubernetes ClusterIP.
+
+The tested server placement was a third worker node:
+
+```text
+iperf3 server node: ebpf-bng-node-02, 192.168.88.163
+```
+
+Running the server on the UE worker was avoided because same-node pod/host
+hairpin effects made troubleshooting less clear.
 
 The UE ping command should be sourced from `uesimtun0`; no additional UE route
 is required for this test when using:
@@ -269,6 +301,51 @@ kubectl -n magma-agw exec deploy/agwc-ueransim-ue -- \
   ping -I uesimtun0 -c 4 -W 2 8.8.8.8
 ```
 
+7. Run the UE iperf3 test.
+
+First confirm the server pod and node:
+
+```sh
+kubectl -n magma-agw get pod -l app.kubernetes.io/component=ueransim-iperf3 -o wide
+```
+
+Then run iperf from the UE, binding the client to the UE tunnel IP:
+
+```sh
+UE_IP=$(kubectl -n magma-agw exec deploy/agwc-ueransim-ue -- \
+  sh -c "ip -4 -o addr show uesimtun0 | awk '{print \$4}' | cut -d/ -f1")
+
+kubectl -n magma-agw exec deploy/agwc-ueransim-ue -- \
+  iperf3 -c <iperf3-server-node-ip> -B "$UE_IP" -t 10
+```
+
+Expected result shape after TCP/5201 policy/enforcement is working:
+
+```text
+[ ID] Interval           Transfer     Bitrate
+[  5]   0.00-10.00  sec  ...          .../sec  sender
+[  5]   0.00-10.00  sec  ...          .../sec  receiver
+iperf Done.
+```
+
+Observed diagnostic success with temporary OVS TCP/5201 bypass:
+
+```text
+[  5]   0.00-10.00  sec   708 MBytes   594 Mbits/sec  606 sender
+[  5]   0.00-10.02  sec   706 MBytes   591 Mbits/sec      receiver
+iperf Done.
+```
+
+Observed clean-path issue still to resolve:
+
+```text
+iperf3: error - unable to send control message: Bad file descriptor
+```
+
+Packet capture showed the TCP SYN leaving `uesimtun0` and arriving at the AGW,
+but not leaving the AGW host as a NATed SYN. ICMP on the same UE tunnel path
+continued to work.
+
 ## Troubleshooting Ping Failure
 
 If registration and PDU establishment work but ping fails:
@@ -302,3 +379,23 @@ kubectl -n magma-agw logs deploy/pipelined --tail=200 | \
 
 If OVS flows still point to an old UE IP after a failed test, cleanly reattach
 the simulator after restarting `sessiond` and `pipelined`.
+
+If `iperf3` is missing in the UE container, restart the UERANSIM deployments
+with `simulator.image.pullPolicy=Always` so kubelet pulls the refreshed
+`v3.2.4-x86-64` image.
+
+If ICMP works but iperf3 fails with `unable to send control message`, capture on
+both sides before changing routes:
+
+```sh
+kubectl -n magma-agw exec deploy/agwc-ueransim-ue -- \
+  tcpdump -nn -i uesimtun0 'tcp port 5201 or icmp'
+
+ssh <agw-node> -- \
+  sudo tcpdump -nn -i any 'host <iperf3-server-ip> and (tcp port 5201 or icmp)'
+```
+
+The lab failure mode was policy/enforcement related: the TCP SYN reached AGW
+from the UE tunnel but did not egress the host NAT path. A temporary OVS bypass
+validated throughput, but the durable fix should be an Orc8r/NMS policy or
+Magma enforcement fix, not a manual OVS flow.
