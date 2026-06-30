@@ -19,12 +19,13 @@ kubectl -n magma-agw exec deploy/agwc-ueransim-ue -- \
   iperf3 -c <iperf3-server-node-ip> -B <ue-tunnel-ip> -t 10
 ```
 
-In the lab, this command succeeded only after a temporary diagnostic OVS flow
-bypass was added for TCP/5201. That proved the refreshed UERANSIM image and
-host-networked iperf3 server were functional, with `708 MBytes` transferred at
-`594 Mbits/sec` sender and `591 Mbits/sec` receiver. Do not treat that bypass
-as a production requirement. A normal deployment should make TCP/5201 pass
-through Orc8r/NMS policy and Magma enforcement without manual OVS flows.
+In the lab, this command did not work through the clean Magma enforcement path.
+It succeeded only after a temporary diagnostic OVS flow bypass was added for
+TCP/5201. That proved the refreshed UERANSIM image and host-networked iperf3
+server were functional, with `708 MBytes` transferred at `594 Mbits/sec` sender
+and `591 Mbits/sec` receiver. Do not treat that bypass as a production
+requirement or chart behavior. A normal deployment still needs the TCP/5201
+Magma enforcement issue resolved.
 
 ## Validated Versions
 
@@ -319,7 +320,7 @@ kubectl -n magma-agw exec deploy/agwc-ueransim-ue -- \
   iperf3 -c <iperf3-server-node-ip> -B "$UE_IP" -t 10
 ```
 
-Expected result shape after TCP/5201 policy/enforcement is working:
+Expected result shape after the TCP/5201 enforcement issue is resolved:
 
 ```text
 [ ID] Interval           Transfer     Bitrate

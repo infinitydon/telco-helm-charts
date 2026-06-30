@@ -62,11 +62,6 @@ provisioning:
   policy:
     enabled: true
     priority: 10
-  iperf3Policy:
-    enabled: false
-    serverCidr: 192.168.88.163/32
-    ueCidr: 192.168.128.20/32
-    port: 5201
   subscriber:
     enabled: true
     imsi: IMSI001010000000001
