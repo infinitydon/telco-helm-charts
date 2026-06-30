@@ -73,6 +73,14 @@ services:
   liagentd:
     enabled: false
 
+startup:
+  pipelined:
+    waitForSessiond:
+      enabled: true
+      host: 127.0.0.1
+      port: 50065
+      timeoutSeconds: 180
+
 nodePrep:
   enabled: true
   image: ubuntu:22.04

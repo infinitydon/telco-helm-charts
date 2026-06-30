@@ -44,6 +44,48 @@ spec:
           hostPath:
             path: /var/run
             type: Directory
+      {{- if .Values.startup.pipelined.waitForSessiond.enabled }}
+      initContainers:
+        - name: wait-for-sessiond
+          image: "{{ .Values.image.repository }}/agw_gateway_python{{ .Values.image.arch}}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ceu
+            - |
+              python3 - <<'PY'
+              import os
+              import socket
+              import sys
+              import time
+
+              host = os.environ["SESSIOND_HOST"]
+              port = int(os.environ["SESSIOND_PORT"])
+              deadline = time.time() + int(os.environ["WAIT_TIMEOUT_SECONDS"])
+
+              while time.time() < deadline:
+                  sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                  sock.settimeout(2)
+                  try:
+                      sock.connect((host, port))
+                      print("sessiond is reachable at {}:{}".format(host, port), flush=True)
+                      sys.exit(0)
+                  except OSError as exc:
+                      print("waiting for sessiond at {}:{}: {}".format(host, port, exc), flush=True)
+                      time.sleep(2)
+                  finally:
+                      sock.close()
+
+              raise SystemExit("timed out waiting for sessiond at {}:{}".format(host, port))
+              PY
+          env:
+            - name: SESSIOND_HOST
+              value: {{ .Values.startup.pipelined.waitForSessiond.host | quote }}
+            - name: SESSIOND_PORT
+              value: {{ .Values.startup.pipelined.waitForSessiond.port | quote }}
+            - name: WAIT_TIMEOUT_SECONDS
+              value: {{ .Values.startup.pipelined.waitForSessiond.timeoutSeconds | quote }}
+      {{- end }}
       containers:
       -
 {{ include "agwc.container" (list . "pipelined.container")}}

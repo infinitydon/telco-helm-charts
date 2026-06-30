@@ -25,6 +25,8 @@ Changes from upstream:
 - enables Magma 5G SA mconfig defaults
 - adds an optional UERANSIM 5G gNB/UE simulator with Multus NADs and an
   idempotent subscriber/APN provisioning Job
+- makes `pipelined` wait for sessiond before startup so native UPF node
+  association is not lost to Kubernetes startup races
 - adds a basic Helm test hook
 
 `liagentd` is present but disabled by default because the packaged upstream
@@ -166,6 +168,12 @@ nodePrep:
 Keep N3 and SGi/NAT on separate host interfaces. `pipelined` manages the SGi
 address and can replace it with the SGi management IP; using the same interface
 for N3 would remove the 5G GTP-U endpoint address.
+
+`pipelined` publishes the 5G UPF node state to sessiond from the configured
+`enodeb_iface`/`upf_node_identifier`. The chart starts `pipelined` only after
+sessiond's local gRPC port is reachable; otherwise the native association loop
+can back off while UERANSIM is already creating a PDU session, causing the AMF
+to advertise `0.0.0.0` and `0x7fffffff` as the UPF tunnel endpoint.
 
 ## 5G Simulator
 
