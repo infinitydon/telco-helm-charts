@@ -551,16 +551,29 @@ Production/orc8r mode:
 secret:
   create: false
   certs: agwc-secret-certs
+config:
+  # Base64-encoded PEM contents of /var/opt/magma/certs/gw_challenge.key.
+  # Keep this paired with the public challenge key stored on the NMS gateway.
+  gwChallenge: LS0tLS1CRUdJTi...
 ```
 
-Create `agwc-secret-certs` yourself with the certificate material issued for the
-gateway and controller trust chain:
+Create `agwc-secret-certs` yourself with the controller trust chain:
 
 - `rootCA.pem`
+
+For a bootstrap-based AGW, `gateway.crt` and `gateway.key` are issued into the
+AGW PVC by Orc8r after `magmad` proves possession of
+`/var/opt/magma/certs/gw_challenge.key`. If you delete the PVC and reuse the
+same NMS gateway object, set `config.gwChallenge` to the base64-encoded PEM
+private challenge key that matches the public key registered in NMS. Otherwise
+`magmad` will generate a new private key and bootstrap will fail with
+`signed challenge doesn't match`.
+
+For a fully pre-provisioned certificate workflow, include the static gateway
+certificate material in `agwc-secret-certs` as well:
+
 - `gateway.crt`
 - `gateway.key`
-- `controller.crt`
-- `controller.key`
 
 Update or rotate certificates when:
 
@@ -569,6 +582,9 @@ Update or rotate certificates when:
 - the orc8r/controller CA changes
 - a private key is suspected to be exposed
 - moving from lab mode to real orc8r mode
+
+Rotate `config.gwChallenge` together with the NMS gateway device public key.
+Treat it as secret material even though it is carried as a Helm value.
 
 After updating the Secret, rerun Helm so the revision-scoped config Job copies
 the files into the AGW PVC, then restart the affected control-plane pods:
