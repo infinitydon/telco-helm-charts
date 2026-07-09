@@ -35,6 +35,6 @@ http://<node-ip>:31380/
 
 ## Notes
 
-- The image tag is pinned to `v0.1.0`; do not use bare `latest`.
+- The image tag is pinned to `v0.1.1`; do not use bare `latest`.
 - `auth.existingSecret` can be used instead of putting PIN/token values in Helm values.
 - Self-service top-up is fictitious/demo behavior and can be disabled with `config.endUserSelfTopup=false`.

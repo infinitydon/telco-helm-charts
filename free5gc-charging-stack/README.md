@@ -19,7 +19,7 @@ helm upgrade --install free5gc-charging-stack ./free5gc-charging-stack \
   --create-namespace
 ```
 
-If `ghcr.io/infinitydon/free5gc-charging-portal:v0.1.0` is private, create a
+If `ghcr.io/infinitydon/free5gc-charging-portal:v0.1.1` is private, create a
 pull secret in the target namespace and add:
 
 ```bash
