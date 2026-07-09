@@ -348,15 +348,13 @@ ueransim:
     trustedSubscriberHeader: x-subscriber-supi
     browser:
       image:
-        repository: selenium/standalone-chromium
-        tag: 4.34.0-20250717
+        repository: kasmweb/chromium
+        tag: 1.17.0
         pullPolicy: IfNotPresent
-      port: 7900
+      port: 6901
       shmSize: 1Gi
       env:
-        SE_VNC_NO_PASSWORD: "1"
-        SE_START_VNC: "true"
-        SE_START_NO_VNC: "true"
+        VNC_PW: free5gc
     proxy:
       image:
         repository: nginxinc/nginx-unprivileged
@@ -365,7 +363,7 @@ ueransim:
       port: 18080
     service:
       type: NodePort
-      port: 7900
+      port: 6901
       nodePort: 31382
   global:
     free5gcReleaseName: free5gc-charging-stack
