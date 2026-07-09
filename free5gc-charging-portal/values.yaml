@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/infinitydon/free5gc-charging-portal
-  tag: "v0.1.1"
+  tag: "v0.2.0"
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
@@ -55,11 +55,16 @@ affinity: {}
 
 config:
   portalTitle: free5GC Charging Portal
+  portalMode: operator
   mongoUri: mongodb://mongodb:27017
   mongoDb: free5gc
   chfBaseUrl: http://chf:8000
   chfNotifyEnabled: true
   endUserSelfTopup: true
+  trustedSubscriberHeaderEnabled: false
+  trustedSubscriberHeader: x-subscriber-supi
+  subscriberBindingsJson: "{}"
+  defaultSubscriberSupi: ""
 
 auth:
   operatorPin: admin123

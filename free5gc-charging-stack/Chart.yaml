@@ -11,5 +11,8 @@ dependencies:
   - name: free5gc-charging-portal
     version: 0.1.0
     repository: file://charts/free5gc-charging-portal
+  - name: ueransim
+    version: 2.0.17
+    repository: file://charts/ueransim
 maintainers:
   - name: infinitydon

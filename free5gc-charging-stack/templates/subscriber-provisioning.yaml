@@ -1,0 +1,76 @@
+{{- if .Values.subscriberProvisioning.enabled -}}
+{{- if or (eq .Values.subscriberProvisioning.image.tag "latest") (regexMatch "(:latest$|^latest$)" .Values.subscriberProvisioning.image.tag) -}}
+{{- fail "subscriberProvisioning.image.tag must not use latest" -}}
+{{- end -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-subscriber-provisioning
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+data:
+  subscriber.json: |
+    {{- .Values.subscriberProvisioning.subscriber | toPrettyJson | nindent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-subscriber-provisioning
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "6"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        {{- toYaml .Values.labNodeSelector | nindent 8 }}
+      containers:
+        - name: provision
+          image: "{{ .Values.subscriberProvisioning.image.repository }}:{{ .Values.subscriberProvisioning.image.tag }}"
+          imagePullPolicy: {{ .Values.subscriberProvisioning.image.pullPolicy }}
+          env:
+            - name: WEBUI_BASE_URL
+              value: {{ .Values.subscriberProvisioning.webuiBaseUrl | quote }}
+            - name: WEBUI_USERNAME
+              value: {{ .Values.subscriberProvisioning.username | quote }}
+            - name: WEBUI_PASSWORD
+              value: {{ .Values.subscriberProvisioning.password | quote }}
+            - name: UE_ID
+              value: {{ .Values.subscriberProvisioning.subscriber.ueId | quote }}
+            - name: PLMN_ID
+              value: {{ .Values.subscriberProvisioning.subscriber.plmnID | quote }}
+          command:
+            - sh
+            - -ceu
+            - |
+              login_payload=$(printf '{"username":"%s","password":"%s"}' "$WEBUI_USERNAME" "$WEBUI_PASSWORD")
+              for i in $(seq 1 60); do
+                login_response="$(curl -fsS -H 'Content-Type: application/json' -d "$login_payload" "$WEBUI_BASE_URL/api/login" || true)"
+                token="$(printf '%s' "$login_response" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')"
+                if [ -n "$token" ]; then
+                  break
+                fi
+                sleep 2
+              done
+              test -n "$token"
+              url="$WEBUI_BASE_URL/api/subscriber/$UE_ID/$PLMN_ID"
+              code="$(curl -sS -o /tmp/subscriber-get.json -w '%{http_code}' -H "Token: $token" "$url" || true)"
+              if [ "$code" = "200" ]; then
+                curl -fsS -X PUT -H 'Content-Type: application/json' -H "Token: $token" --data-binary @/config/subscriber.json "$url"
+              else
+                curl -fsS -X POST -H 'Content-Type: application/json' -H "Token: $token" --data-binary @/config/subscriber.json "$url"
+              fi
+          volumeMounts:
+            - name: payload
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: payload
+          configMap:
+            name: {{ .Release.Name }}-subscriber-provisioning
+{{- end }}

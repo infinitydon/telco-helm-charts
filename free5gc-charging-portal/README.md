@@ -27,7 +27,7 @@ If the GHCR package is still private, create a pull secret in the target namespa
 --set imagePullSecrets[0].name=ghcr-pull
 ```
 
-For the lab NodePort default:
+For the standalone operator portal NodePort default:
 
 ```text
 http://<node-ip>:31380/
@@ -35,6 +35,7 @@ http://<node-ip>:31380/
 
 ## Notes
 
-- The image tag is pinned to `v0.1.1`; do not use bare `latest`.
+- The image tag is pinned to `v0.2.0`; do not use bare `latest`.
 - `auth.existingSecret` can be used instead of putting PIN/token values in Helm values.
+- Set `config.portalMode=user` only for a separate trusted self-service deployment.
 - Self-service top-up is fictitious/demo behavior and can be disabled with `config.endUserSelfTopup=false`.

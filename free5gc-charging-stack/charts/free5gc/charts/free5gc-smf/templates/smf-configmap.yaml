@@ -81,6 +81,27 @@ data:
         upNodes: # information of userplane node (AN or UPF)
           gNB1: # the name of the node
             type: AN # the type of the node (AN or UPF)
+{{- if eq $.Values.global.userPlaneArchitecture "single" }}
+          UPF:
+            type: UPF
+            nodeID: {{ $.Values.global.upf.multus.upf.n4if.ipAddress }} # PFCP address
+            sNssaiUpfInfos:
+              - sNssai:
+                  sst: 1
+                  sd: 010203
+                dnnUpfInfoList:
+                  - dnn: internet
+                    pools:
+                      - cidr: {{ $.Values.global.uesubnet }}
+                    dnaiList:
+                      - mec
+            interfaces:
+              - interfaceType: N3
+                endpoints:
+                  - {{ $.Values.global.upf.multus.upf.n3if.ipAddress }} # UPF N3 address
+                networkInstances:
+                  - internet
+{{- else }}
           BranchingUPF:
             type: UPF
             nodeID: {{ $.Values.global.upf.multus.iupf1.n4if.ipAddress }} # UPFB N4 interface IP
@@ -137,13 +158,19 @@ data:
                   - {{ $.Values.global.upf.multus.psaupf2.n9if.ipAddress }}
                 networkInstances: 
                   - internet
+{{- end }}
         links:
+{{- if eq $.Values.global.userPlaneArchitecture "single" }}
+          - A: gNB1
+            B: UPF
+{{- else }}
           - A: gNB1
             B: BranchingUPF
           - A: BranchingUPF
             B: AnchorUPF1
           - A: BranchingUPF
             B: AnchorUPF2
+{{- end }}
       locality: area1 # Name of the location where a set of AMF, SMF and UPFs are located
       t3591:
         enable: true # true or false
