@@ -51,6 +51,34 @@ spec:
           name: {{ .volume.name }}
         resources:
             {{- toYaml .resources | nindent 12 }}
+{{- if $.Values.ueBrowser.enabled }}
+      - image: {{ $.Values.ueBrowser.browser.image.repository }}:{{ $.Values.ueBrowser.browser.image.tag }}
+        name: ue-browser
+        imagePullPolicy: {{ $.Values.ueBrowser.browser.image.pullPolicy }}
+        ports:
+        - name: ue-browser
+          containerPort: {{ $.Values.ueBrowser.browser.port }}
+          protocol: TCP
+        env:
+        {{- range $name, $value := $.Values.ueBrowser.browser.env }}
+        - name: {{ $name }}
+          value: {{ $value | quote }}
+        {{- end }}
+        volumeMounts:
+        - name: dshm
+          mountPath: /dev/shm
+      - image: {{ $.Values.ueBrowser.proxy.image.repository }}:{{ $.Values.ueBrowser.proxy.image.tag }}
+        name: ue-portal-proxy
+        imagePullPolicy: {{ $.Values.ueBrowser.proxy.image.pullPolicy }}
+        ports:
+        - name: portal-proxy
+          containerPort: {{ $.Values.ueBrowser.proxy.port }}
+          protocol: TCP
+        volumeMounts:
+        - name: ue-browser-proxy
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: default.conf
+{{- end }}
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       nodeSelector:
@@ -70,5 +98,14 @@ spec:
           - key: wrapper.sh
             path: wrapper.sh
             mode: 0755
+{{- if $.Values.ueBrowser.enabled }}
+      - name: ue-browser-proxy
+        configMap:
+          name: {{ include "ueransim.fullname" $ }}-ue-browser-proxy
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ $.Values.ueBrowser.browser.shmSize }}
+{{- end }}
 {{- end }}
 {{- end }}

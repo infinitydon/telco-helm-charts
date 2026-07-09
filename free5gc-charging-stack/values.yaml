@@ -164,7 +164,7 @@ free5gc:
 free5gc-charging-portal:
   image:
     repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.2.0"
+    tag: "v0.3.2"
   service:
     type: NodePort
     nodePort: 31380
@@ -185,7 +185,7 @@ userPortal:
   enabled: true
   image:
     repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.2.0"
+    tag: "v0.3.2"
     pullPolicy: IfNotPresent
   imagePullSecrets: []
   replicaCount: 1
@@ -341,6 +341,32 @@ subscriberProvisioning:
         qosRef: 1
 
 ueransim:
+  ueBrowser:
+    enabled: true
+    subscriberSupi: imsi-208930000000001
+    portalServiceUrl: http://free5gc-charging-stack-user-charging-portal:8080
+    trustedSubscriberHeader: x-subscriber-supi
+    browser:
+      image:
+        repository: selenium/standalone-chromium
+        tag: 4.34.0-20250717
+        pullPolicy: IfNotPresent
+      port: 7900
+      shmSize: 1Gi
+      env:
+        SE_VNC_NO_PASSWORD: "1"
+        SE_START_VNC: "true"
+        SE_START_NO_VNC: "true"
+    proxy:
+      image:
+        repository: nginxinc/nginx-unprivileged
+        tag: 1.29.3-alpine
+        pullPolicy: IfNotPresent
+      port: 18080
+    service:
+      type: NodePort
+      port: 7900
+      nodePort: 31382
   global:
     free5gcReleaseName: free5gc-charging-stack
     gnb:

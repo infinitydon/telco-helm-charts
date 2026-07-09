@@ -41,6 +41,33 @@ global:
 
 projectName: ueransim
 
+ueBrowser:
+  enabled: false
+  subscriberSupi: imsi-208930000000001
+  portalServiceUrl: http://free5gc-charging-stack-user-charging-portal:8080
+  trustedSubscriberHeader: x-subscriber-supi
+  browser:
+    image:
+      repository: selenium/standalone-chromium
+      tag: 4.34.0-20250717
+      pullPolicy: IfNotPresent
+    port: 7900
+    shmSize: 1Gi
+    env:
+      SE_VNC_NO_PASSWORD: "1"
+      SE_START_VNC: "true"
+      SE_START_NO_VNC: "true"
+  proxy:
+    image:
+      repository: nginxinc/nginx-unprivileged
+      tag: 1.29.3-alpine
+      pullPolicy: IfNotPresent
+    port: 18080
+  service:
+    type: NodePort
+    port: 7900
+    nodePort: 31382
+
 initcontainers:
   sctp_test:
     enabled: false

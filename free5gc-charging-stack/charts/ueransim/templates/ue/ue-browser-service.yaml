@@ -1,0 +1,24 @@
+{{- if and .Values.ue.enabled .Values.ueBrowser.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ueransim.fullname" . }}-ue-browser
+  labels:
+    {{- include "ueransim.labels" . | nindent 4 }}
+    app: {{ .Values.projectName }}
+    component: {{ .Values.ue.name }}
+spec:
+  type: {{ .Values.ueBrowser.service.type }}
+  selector:
+    {{- include "ueransim.selectorLabels" . | nindent 4 }}
+    app: {{ .Values.projectName }}
+    component: {{ .Values.ue.name }}
+  ports:
+    - name: novnc
+      port: {{ .Values.ueBrowser.service.port }}
+      targetPort: ue-browser
+      protocol: TCP
+      {{- if and (eq .Values.ueBrowser.service.type "NodePort") .Values.ueBrowser.service.nodePort }}
+      nodePort: {{ .Values.ueBrowser.service.nodePort }}
+      {{- end }}
+{{- end }}

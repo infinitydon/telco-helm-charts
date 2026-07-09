@@ -20,7 +20,7 @@ helm upgrade --install free5gc-charging-stack ./free5gc-charging-stack \
   --create-namespace
 ```
 
-If `ghcr.io/infinitydon/free5gc-charging-portal:v0.2.0` is private, create a
+If `ghcr.io/infinitydon/free5gc-charging-portal:v0.3.2` is private, create a
 pull secret in the target namespace and add:
 
 ```bash
@@ -39,6 +39,7 @@ The user portal inherits that pull secret by default. You can also set:
 | --- | --- | --- |
 | Operator | `http://<node-ip>:31380/` | Operator PIN-protected top-up for any subscriber charging record. |
 | User | `http://<node-ip>:31381/` | Fictitious self top-up bound to the detected subscriber. |
+| UE Browser | `http://<node-ip>:31382/` | noVNC Chromium desktop embedded as sidecars in the UERANSIM UE pod. |
 
 The user portal does not trust a browser-supplied `ueId`. It resolves the
 subscriber from a trusted header (`x-subscriber-supi`) or the configured UE
@@ -47,6 +48,10 @@ source-IP/CIDR binding.
 The chart also provisions the default UERANSIM subscriber
 `imsi-208930000000001` through the free5GC WebConsole API during install and
 upgrade.
+
+When `ueransim.ueBrowser.enabled=true`, open the UE Browser URL and browse to
+`http://127.0.0.1:18080/` inside Chromium. That local proxy forwards to the
+user portal and injects the configured trusted subscriber header for the UE.
 
 ## Multus
 
