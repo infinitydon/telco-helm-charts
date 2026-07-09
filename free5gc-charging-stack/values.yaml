@@ -4,6 +4,21 @@ labNodeSelector:
 stackSmokeTest:
   enabled: false
 
+n6Gateway:
+  enabled: true
+  image:
+    repository: alpine
+    tag: "3.22.1"
+    pullPolicy: IfNotPresent
+  nodeSelector:
+    kubernetes.io/hostname: ebpf-bng-node-02
+  masterIf: enp8s22
+  gatewayIf: free5gc-n6-gw
+  gatewayIp: 10.201.60.1
+  cidr: 24
+  subnet: 10.201.60.0/24
+  uplinkIf: eth0
+
 free5gc:
   global:
     name: free5gc
@@ -164,7 +179,7 @@ free5gc:
 free5gc-charging-portal:
   image:
     repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.3.2"
+    tag: "v0.3.3"
   service:
     type: NodePort
     nodePort: 31380
@@ -185,7 +200,7 @@ userPortal:
   enabled: true
   image:
     repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.3.2"
+    tag: "v0.3.3"
     pullPolicy: IfNotPresent
   imagePullSecrets: []
   replicaCount: 1

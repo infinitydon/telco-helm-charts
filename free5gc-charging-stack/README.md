@@ -20,7 +20,7 @@ helm upgrade --install free5gc-charging-stack ./free5gc-charging-stack \
   --create-namespace
 ```
 
-If `ghcr.io/infinitydon/free5gc-charging-portal:v0.3.2` is private, create a
+If `ghcr.io/infinitydon/free5gc-charging-portal:v0.3.3` is private, create a
 pull secret in the target namespace and add:
 
 ```bash
@@ -70,6 +70,11 @@ The default lab values pin the workload to `ebpf-bng-node-02` and use:
 | N3 | `enp8s20` | `10.201.30.0/24` |
 | N4 | `enp8s21` | `10.201.40.0/24` |
 | N6 | `enp8s22` | `10.201.60.0/24` |
+
+With `n6Gateway.enabled=true`, the chart deploys a privileged host-network
+DaemonSet on the lab node that creates `10.201.60.1/24` as a host-side macvlan
+gateway on `enp8s22` and masquerades N6 traffic out through `eth0`. This gives
+the UPF's N6 default route a real next hop for UE internet browsing.
 
 Override those values for a different lab.
 
