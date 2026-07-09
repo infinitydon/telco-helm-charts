@@ -78,6 +78,49 @@ spec:
         - name: ue-browser-proxy
           mountPath: /etc/nginx/conf.d/default.conf
           subPath: default.conf
+{{- if $.Values.ueBrowser.internetProxy.enabled }}
+      - image: {{ $.Values.ueBrowser.internetProxy.image.repository }}:{{ $.Values.ueBrowser.internetProxy.image.tag }}
+        name: ue-internet-proxy
+        imagePullPolicy: {{ $.Values.ueBrowser.internetProxy.image.pullPolicy }}
+        command:
+        - sh
+        - -ceu
+        - |
+          apk add --no-cache tinyproxy
+          exec tinyproxy -d -c /etc/tinyproxy/tinyproxy.conf
+        ports:
+        - name: web-proxy
+          containerPort: {{ $.Values.ueBrowser.internetProxy.port }}
+          protocol: TCP
+        volumeMounts:
+        - name: ue-browser-proxy
+          mountPath: /etc/tinyproxy/tinyproxy.conf
+          subPath: tinyproxy.conf
+      - image: {{ $.Values.ueBrowser.routeManager.image.repository }}:{{ $.Values.ueBrowser.routeManager.image.tag }}
+        name: ue-5g-route-manager
+        imagePullPolicy: {{ $.Values.ueBrowser.routeManager.image.pullPolicy }}
+        securityContext:
+          capabilities:
+            add:
+            - NET_ADMIN
+        command:
+        - sh
+        - -ceu
+        - |
+          apk add --no-cache iproute2 iptables
+          while ! ip link show uesimtun0 >/dev/null 2>&1; do
+            echo "waiting for uesimtun0"
+            sleep 2
+          done
+          ip rule add fwmark {{ $.Values.ueBrowser.routeManager.mark }} table {{ $.Values.ueBrowser.routeManager.table }} 2>/dev/null || true
+          ip route replace default dev uesimtun0 table {{ $.Values.ueBrowser.routeManager.table }}
+          iptables -t mangle -C OUTPUT -p tcp -m owner --uid-owner {{ $.Values.ueBrowser.internetProxy.uid }} -j MARK --set-mark {{ $.Values.ueBrowser.routeManager.mark }} 2>/dev/null || \
+            iptables -t mangle -A OUTPUT -p tcp -m owner --uid-owner {{ $.Values.ueBrowser.internetProxy.uid }} -j MARK --set-mark {{ $.Values.ueBrowser.routeManager.mark }}
+          iptables -t nat -C POSTROUTING -o uesimtun0 -j MASQUERADE 2>/dev/null || \
+            iptables -t nat -A POSTROUTING -o uesimtun0 -j MASQUERADE
+          echo "Chromium proxy traffic is routed through uesimtun0"
+          tail -f /dev/null
+{{- end }}
 {{- end }}
       dnsPolicy: ClusterFirst
       restartPolicy: Always

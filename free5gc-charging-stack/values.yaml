@@ -355,12 +355,31 @@ ueransim:
       shmSize: 1Gi
       env:
         VNC_PW: free5gc
+        LAUNCH_URL: http://127.0.0.1:18080/
+        APP_ARGS: "--start-maximized --proxy-server=http://127.0.0.1:18888 --proxy-bypass-list=127.0.0.1;localhost;*.svc;*.svc.cluster.local;10.0.0.0/8;192.168.0.0/16"
     proxy:
       image:
         repository: nginxinc/nginx-unprivileged
         tag: 1.29.3-alpine
-        pullPolicy: IfNotPresent
+      pullPolicy: IfNotPresent
       port: 18080
+    internetProxy:
+      enabled: true
+      image:
+        repository: alpine
+        tag: 3.22.1
+        pullPolicy: IfNotPresent
+      port: 18888
+      user: nobody
+      group: nobody
+      uid: 65534
+    routeManager:
+      image:
+        repository: alpine
+        tag: 3.22.1
+        pullPolicy: IfNotPresent
+      mark: "0x5"
+      table: "105"
     service:
       type: NodePort
       port: 6901

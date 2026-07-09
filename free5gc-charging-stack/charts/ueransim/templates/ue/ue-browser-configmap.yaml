@@ -5,6 +5,12 @@
 {{- if or (eq .Values.ueBrowser.proxy.image.tag "latest") (regexMatch "(:latest$|^latest$)" .Values.ueBrowser.proxy.image.tag) }}
 {{- fail "ueBrowser.proxy.image.tag must not use latest" }}
 {{- end }}
+{{- if and .Values.ueBrowser.internetProxy.enabled (or (eq .Values.ueBrowser.internetProxy.image.tag "latest") (regexMatch "(:latest$|^latest$)" .Values.ueBrowser.internetProxy.image.tag)) }}
+{{- fail "ueBrowser.internetProxy.image.tag must not use latest" }}
+{{- end }}
+{{- if and .Values.ueBrowser.internetProxy.enabled (or (eq .Values.ueBrowser.routeManager.image.tag "latest") (regexMatch "(:latest$|^latest$)" .Values.ueBrowser.routeManager.image.tag)) }}
+{{- fail "ueBrowser.routeManager.image.tag must not use latest" }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -25,4 +31,17 @@ data:
         proxy_set_header {{ .Values.ueBrowser.trustedSubscriberHeader }} "{{ .Values.ueBrowser.subscriberSupi }}";
       }
     }
+  tinyproxy.conf: |
+    User {{ .Values.ueBrowser.internetProxy.user }}
+    Group {{ .Values.ueBrowser.internetProxy.group }}
+    Port {{ .Values.ueBrowser.internetProxy.port }}
+    Listen 127.0.0.1
+    Timeout 600
+    DefaultErrorFile "/usr/share/tinyproxy/default.html"
+    StatFile "/usr/share/tinyproxy/stats.html"
+    LogLevel Info
+    MaxClients 100
+    Allow 127.0.0.1
+    ConnectPort 443
+    ConnectPort 563
 {{- end }}

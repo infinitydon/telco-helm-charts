@@ -54,6 +54,12 @@ When `ueransim.ueBrowser.enabled=true`, open the UE Browser URL and sign in as
 inside Chromium. That local proxy forwards to the user portal and injects the
 configured trusted subscriber header for the UE.
 
+Chromium is launched with an HTTP/HTTPS proxy on `127.0.0.1:18888`. The proxy
+runs as a dedicated user and the UE pod installs policy routing so that proxy
+TCP traffic is marked and sent through `uesimtun0`. Local, Kubernetes service,
+and RFC1918 destinations bypass the proxy so noVNC and in-cluster portal access
+remain reachable. DNS lookup is still performed by the proxy using pod DNS.
+
 ## Multus
 
 The default lab values pin the workload to `ebpf-bng-node-02` and use:
