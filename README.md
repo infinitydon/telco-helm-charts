@@ -13,6 +13,7 @@ high-availability Ella Core private 5G deployments.
 | [`open5gs-openupf-dra`](open5gs-openupf-dra/) | Open5GS 5G core with OpenUPF split UPF | DRA macvlan for Open5GS/SMU N4 and Intel VF DPDK for LBU/FPU | OpenUPF backend validation, 10-UE registration, ping, and iperf3 |
 | [`magma-ebpf`](magma-ebpf/) | Guarded workflow for Magma AGW with the TOSSI eBPF GTP-U datapath | Host-level AGW N3/S1-U eBPF TC attachment | Helm lint/template, server dry-run, and safe Helm test |
 | [`magma-agw-upstream`](magma-agw-upstream/) | Magma 1.9.0 upstream containerized AGW baseline | Host-networked AGW services | Helm lint/template and server dry-run |
+| [`free5gc-charging-portal`](free5gc-charging-portal/) | Lab top-up portal for free5GC CHF charging quota | Uses existing free5GC MongoDB and CHF services | Operator and self-service fictitious credit top-up |
 | [`ella-core-5g-chart`](ella-core/ella-core-5g-chart/) | HA Ella Core cluster using stable N2 addresses for Raft | N2, N3, and N6 | Bootstrap provisioning and HA failover workflow |
 | [`ella-core-5g-chart-fqdn`](ella-core/ella-core-5g-chart-fqdn/) | HA Ella Core cluster using Kubernetes pod FQDNs for Raft | N2, N3, and N6 | Bootstrap provisioning and HA failover workflow |
 | [`ueransim-5g-chart`](ella-core/ueransim-5g-chart/) | UERANSIM gNB and UE for Ella Core | gNB N2 and N3 | Dynamic Ella Core leader discovery and UE registration |
