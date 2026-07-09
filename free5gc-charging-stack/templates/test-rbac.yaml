@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-stack-test
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-stack-test
+rules:
+  - apiGroups: ["k8s.cni.cncf.io"]
+    resources: ["network-attachment-definitions"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-stack-test
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-stack-test
+roleRef:
+  kind: Role
+  name: {{ .Release.Name }}-stack-test
+  apiGroup: rbac.authorization.k8s.io

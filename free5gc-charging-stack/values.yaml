@@ -1,0 +1,169 @@
+labNodeSelector:
+  kubernetes.io/hostname: ebpf-bng-node-02
+
+free5gc:
+  global:
+    name: free5gc
+    projectName: free5gc
+    userPlaneArchitecture: single
+    uesubnet: 10.60.0.0/16
+    sbi:
+      scheme: http
+    amf:
+      multus:
+        enabled: true
+        n2if:
+          ipAddress: 10.201.10.10
+        n2network:
+          enabled: true
+          name: n2network
+          type: macvlan
+          masterIf: enp8s19
+          subnetIP: 10.201.10.0
+          cidr: 24
+          gatewayIP: 10.201.10.1
+          excludeIP: 10.201.10.1
+      service:
+        ngap:
+          enabled: false
+    smf:
+      multus:
+        enabled: true
+        n4if:
+          ipAddress: 10.201.40.10
+        n4network:
+          enabled: true
+          name: n4network
+          type: macvlan
+          masterIf: enp8s21
+          subnetIP: 10.201.40.0
+          cidr: 24
+          gatewayIP: 10.201.40.1
+          excludeIP: 10.201.40.1
+    upf:
+      multus:
+        enabled: true
+        upf:
+          n3if:
+            ipAddress: 10.201.30.10
+          n4if:
+            ipAddress: 10.201.40.20
+          n6if:
+            ipAddress: 10.201.60.10
+        n3network:
+          enabled: true
+          name: n3network
+          type: macvlan
+          masterIf: enp8s20
+          subnetIP: 10.201.30.0
+          cidr: 24
+          gatewayIP: 10.201.30.1
+          excludeIP: 10.201.30.1
+        n4network:
+          enabled: true
+          name: n4network
+          type: macvlan
+          masterIf: enp8s21
+          subnetIP: 10.201.40.0
+          cidr: 24
+          gatewayIP: 10.201.40.1
+          excludeIP: 10.201.40.1
+        n6network:
+          enabled: true
+          name: n6network
+          type: macvlan
+          masterIf: enp8s22
+          subnetIP: 10.201.60.0
+          cidr: 24
+          gatewayIP: 10.201.60.1
+          excludeIP: 10.201.60.1
+
+  deployMongoDb: true
+  deployAmf: true
+  deployAusf: true
+  deployChf: true
+  deployN3iwf: false
+  deployNef: false
+  deployNrf: true
+  deployNssf: true
+  deployPcf: true
+  deploySmf: true
+  deployUdm: true
+  deployUdr: true
+  deployUpf: true
+  deployWebui: true
+  deployDbPython: false
+
+  mongodb:
+    fullnameOverride: mongodb
+    auth:
+      enabled: false
+    persistence:
+      enabled: false
+    nodeSelector:
+      kubernetes.io/hostname: ebpf-bng-node-02
+
+  free5gc-amf:
+    amf:
+      nodeSelector:
+        kubernetes.io/hostname: ebpf-bng-node-02
+  free5gc-ausf:
+    ausf:
+      nodeSelector:
+        kubernetes.io/hostname: ebpf-bng-node-02
+  free5gc-chf:
+    chf:
+      nodeSelector:
+        kubernetes.io/hostname: ebpf-bng-node-02
+  free5gc-nrf:
+    nrf:
+      nodeSelector:
+        kubernetes.io/hostname: ebpf-bng-node-02
+  free5gc-nssf:
+    nssf:
+      nodeSelector:
+        kubernetes.io/hostname: ebpf-bng-node-02
+  free5gc-pcf:
+    pcf:
+      nodeSelector:
+        kubernetes.io/hostname: ebpf-bng-node-02
+  free5gc-smf:
+    smf:
+      nodeSelector:
+        kubernetes.io/hostname: ebpf-bng-node-02
+  free5gc-udm:
+    udm:
+      nodeSelector:
+        kubernetes.io/hostname: ebpf-bng-node-02
+  free5gc-udr:
+    udr:
+      nodeSelector:
+        kubernetes.io/hostname: ebpf-bng-node-02
+  free5gc-upf:
+    upf:
+      podSecurityContext:
+        sysctls: []
+      nodeSelector:
+        kubernetes.io/hostname: ebpf-bng-node-02
+  free5gc-webui:
+    webui:
+      nodeSelector:
+        kubernetes.io/hostname: ebpf-bng-node-02
+
+free5gc-charging-portal:
+  image:
+    repository: ghcr.io/infinitydon/free5gc-charging-portal
+    tag: "v0.1.0"
+  service:
+    type: NodePort
+    nodePort: 31380
+  nodeSelector:
+    kubernetes.io/hostname: ebpf-bng-node-02
+  config:
+    mongoUri: mongodb://mongodb:27017
+    mongoDb: free5gc
+    chfBaseUrl: http://free5gc-charging-stack-free5gc-chf-service:8000
+    chfNotifyEnabled: true
+    endUserSelfTopup: true
+  auth:
+    operatorPin: admin123

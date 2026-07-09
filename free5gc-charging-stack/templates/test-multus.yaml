@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-stack-smoke
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      serviceAccountName: {{ .Release.Name }}-stack-test
+      restartPolicy: Never
+      nodeSelector:
+        {{- toYaml .Values.labNodeSelector | nindent 8 }}
+      containers:
+        - name: curl
+          image: curlimages/curl:8.20.0
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          command:
+            - sh
+            - -ceu
+            - |
+              token="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+              ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              curl -fsS http://{{ .Release.Name }}-free5gc-charging-portal:{{ (index .Values "free5gc-charging-portal").service.port }}/healthz
+              api="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT_HTTPS}/apis/k8s.cni.cncf.io/v1/namespaces/${POD_NAMESPACE}/network-attachment-definitions"
+              curl -fsS --cacert "$ca" -H "Authorization: Bearer $token" "$api" >/tmp/nads.json
+              grep -q n2network /tmp/nads.json
+              grep -q n3network /tmp/nads.json
+              grep -q n4network /tmp/nads.json
+              grep -q n6network /tmp/nads.json
