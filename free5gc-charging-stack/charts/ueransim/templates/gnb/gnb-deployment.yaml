@@ -79,8 +79,13 @@ spec:
           capabilities:
             add: ["NET_ADMIN"]
 {{- if $.Values.global.gnb.multus.enabled }}
-        command: ["./nr-gnb"]
-        args: ["-c", "{{ .volume.mount }}/gnb-config.yaml"]
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            if [ -x /ueransim/nr-gnb ]; then
+              exec /ueransim/nr-gnb -c {{ .volume.mount }}/gnb-config.yaml
+            fi
+            exec /opt/UERANSIM/build/nr-gnb -c {{ .volume.mount }}/gnb-config.yaml
 {{- else }}
         command: ["/bin/sh", "-c"]
         args: ["cp /ueransim/config/wrapper.sh /tmp/wrapper.sh && chmod +x /tmp/wrapper.sh && /tmp/wrapper.sh"]

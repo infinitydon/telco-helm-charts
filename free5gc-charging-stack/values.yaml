@@ -167,8 +167,17 @@ free5gc:
         kubernetes.io/hostname: ebpf-bng-node-02
   free5gc-upf:
     upf:
+      configmap:
+        wrapperAdditionalCommands: |
+          echo 1 > /proc/sys/net/ipv4/ip_forward
+          echo "[wrapper] IPv4 forwarding: $(cat /proc/sys/net/ipv4/ip_forward)"
       podSecurityContext:
         sysctls: []
+      securityContext:
+        privileged: true
+        allowPrivilegeEscalation: true
+        capabilities:
+          add: ["NET_ADMIN"]
       nodeSelector:
         kubernetes.io/hostname: ebpf-bng-node-02
   free5gc-webui:
@@ -425,13 +434,13 @@ ueransim:
   initcontainers:
     sctp_test:
       enabled: false
-      image: free5gc/ueransim
-      tag: "v4.2.2"
+      image: ghcr.io/infinitydon/ueransim
+      tag: "v3.2.4-rls600s"
   gnb:
     enabled: true
     image:
-      name: free5gc/ueransim
-      tag: "v4.2.2"
+      name: ghcr.io/infinitydon/ueransim
+      tag: "v3.2.4-rls600s"
       pullPolicy: IfNotPresent
     n2if:
       ipAddress: 10.201.10.20
@@ -447,8 +456,8 @@ ueransim:
   ue:
     enabled: true
     image:
-      name: free5gc/ueransim
-      tag: "v4.2.2"
+      name: ghcr.io/infinitydon/ueransim
+      tag: "v3.2.4-rls600s"
       pullPolicy: IfNotPresent
     nodeSelector:
       kubernetes.io/hostname: ebpf-bng-node-02

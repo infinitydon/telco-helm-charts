@@ -34,7 +34,10 @@ data:
     mkdir /dev/net
     mknod /dev/net/tun c 10 200
 
-    {{ .command }} 
+    if [ -x /ueransim/nr-ue ]; then
+      exec /ueransim/nr-ue -c /ueransim/config/ue-config.yaml
+    fi
+    exec /opt/UERANSIM/build/nr-ue -c /ueransim/config/ue-config.yaml
 
     {{ .script | nindent 4 }}
 
