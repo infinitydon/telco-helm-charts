@@ -117,7 +117,7 @@ spec:
         - sh
         - -ceu
         - |
-          apk add --no-cache iproute2 iptables
+          apk add --no-cache curl iproute2 iptables
           while ! ip link show uesimtun0 >/dev/null 2>&1; do
             echo "waiting for uesimtun0"
             sleep 2
@@ -131,7 +131,22 @@ spec:
           iptables -t mangle -C POSTROUTING -o uesimtun0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || \
             iptables -t mangle -A POSTROUTING -o uesimtun0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
           echo "Chromium proxy traffic is routed through uesimtun0"
-          tail -f /dev/null
+          quota_url="{{ $.Values.ueBrowser.portalServiceUrl }}/api/me"
+          subscriber_header="{{ $.Values.ueBrowser.trustedSubscriberHeader }}: {{ $.Values.ueBrowser.subscriberSupi }}"
+          while true; do
+            remaining="$(curl -fsS -H "$subscriber_header" "$quota_url" | sed -n 's/.*"remainingBytes":\([0-9][0-9]*\).*/\1/p' || echo 0)"
+            remaining="${remaining:-0}"
+            if [ "$remaining" -le 0 ]; then
+              iptables -C OUTPUT -p tcp -m owner --uid-owner {{ $.Values.ueBrowser.internetProxy.uid }} -j REJECT --reject-with tcp-reset 2>/dev/null || \
+                iptables -I OUTPUT 1 -p tcp -m owner --uid-owner {{ $.Values.ueBrowser.internetProxy.uid }} -j REJECT --reject-with tcp-reset
+              echo "Quota exhausted: Chromium internet proxy traffic is blocked"
+            else
+              while iptables -C OUTPUT -p tcp -m owner --uid-owner {{ $.Values.ueBrowser.internetProxy.uid }} -j REJECT --reject-with tcp-reset 2>/dev/null; do
+                iptables -D OUTPUT -p tcp -m owner --uid-owner {{ $.Values.ueBrowser.internetProxy.uid }} -j REJECT --reject-with tcp-reset
+              done
+            fi
+            sleep {{ $.Values.ueBrowser.quotaGuard.intervalSeconds }}
+          done
 {{- end }}
 {{- if $.Values.ueBrowser.usageReporter.enabled }}
       - image: {{ $.Values.ueBrowser.usageReporter.image.repository }}:{{ $.Values.ueBrowser.usageReporter.image.tag }}

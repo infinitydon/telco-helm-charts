@@ -80,6 +80,8 @@ ueBrowser:
       pullPolicy: IfNotPresent
     mark: "0x5"
     table: "105"
+  quotaGuard:
+    intervalSeconds: 5
   usageReporter:
     enabled: false
     image:

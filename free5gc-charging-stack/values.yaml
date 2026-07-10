@@ -190,7 +190,7 @@ free5gc:
 free5gc-charging-portal:
   image:
     repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.3.10"
+    tag: "v0.3.12"
   service:
     type: NodePort
     nodePort: 31380
@@ -211,7 +211,7 @@ userPortal:
   enabled: true
   image:
     repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.3.10"
+    tag: "v0.3.12"
     pullPolicy: IfNotPresent
   imagePullSecrets: []
   replicaCount: 1
@@ -400,6 +400,8 @@ ueransim:
         pullPolicy: IfNotPresent
       mark: "0x5"
       table: "105"
+    quotaGuard:
+      intervalSeconds: 5
     usageReporter:
       enabled: true
       image:
