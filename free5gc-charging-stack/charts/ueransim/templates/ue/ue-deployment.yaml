@@ -131,6 +131,7 @@ spec:
           iptables -t mangle -C POSTROUTING -o uesimtun0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || \
             iptables -t mangle -A POSTROUTING -o uesimtun0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
           echo "Chromium proxy traffic is routed through uesimtun0"
+{{- if $.Values.ueBrowser.quotaGuard.enabled }}
           quota_url="{{ $.Values.ueBrowser.portalServiceUrl }}/api/me"
           subscriber_header="{{ $.Values.ueBrowser.trustedSubscriberHeader }}: {{ $.Values.ueBrowser.subscriberSupi }}"
           while true; do
@@ -147,6 +148,9 @@ spec:
             fi
             sleep {{ $.Values.ueBrowser.quotaGuard.intervalSeconds }}
           done
+{{- else }}
+          tail -f /dev/null
+{{- end }}
 {{- end }}
 {{- if $.Values.ueBrowser.usageReporter.enabled }}
       - image: {{ $.Values.ueBrowser.usageReporter.image.repository }}:{{ $.Values.ueBrowser.usageReporter.image.tag }}

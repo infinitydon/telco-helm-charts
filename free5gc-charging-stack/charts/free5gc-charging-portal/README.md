@@ -2,11 +2,12 @@
 
 This chart deploys the lab top-up portal for free5GC CHF charging data.
 
-The portal expects an existing free5GC deployment with MongoDB and, for live session refresh, CHF. It updates:
+The portal expects an existing free5GC deployment with MongoDB and CHF. free5GC
+CHF/ABMF uses MongoDB as its account-balance backing store, so the portal updates:
 
 `policyData.ues.chargingData`
 
-and can notify CHF with:
+and then notifies the live CHF session with:
 
 `PUT /nchf-convergedcharging/v3/recharging/{ueId}?ratingGroup={ratingGroup}`
 
@@ -17,7 +18,7 @@ helm upgrade --install free5gc-charging-portal ./free5gc-charging-portal \
   --namespace free5gc \
   --create-namespace \
   --set config.mongoUri=mongodb://mongodb:27017 \
-  --set config.chfBaseUrl=http://chf:8000 \
+  --set config.chfBaseUrl=http://chf:8080 \
   --set auth.operatorPin=change-me
 ```
 

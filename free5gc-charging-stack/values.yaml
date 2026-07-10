@@ -201,7 +201,7 @@ free5gc-charging-portal:
     portalMode: operator
     mongoUri: mongodb://mongodb:27017
     mongoDb: free5gc
-    chfBaseUrl: http://free5gc-charging-stack-free5gc-chf-service:8000
+    chfBaseUrl: http://free5gc-charging-stack-free5gc-chf-service:8080
     chfNotifyEnabled: true
     endUserSelfTopup: false
   auth:
@@ -235,7 +235,7 @@ userPortal:
     portalTitle: free5GC Data Top-Up
     mongoUri: mongodb://mongodb:27017
     mongoDb: free5gc
-    chfBaseUrl: http://free5gc-charging-stack-free5gc-chf-service:8000
+    chfBaseUrl: http://free5gc-charging-stack-free5gc-chf-service:8080
     chfNotifyEnabled: true
     endUserSelfTopup: true
     trustedSubscriberHeaderEnabled: true
@@ -356,6 +356,13 @@ subscriberProvisioning:
         quota: "104857600"
         unitCost: "1"
         snssai: "01010203"
+        dnn: ""
+        filter: ""
+        qosRef: 1
+      - chargingMethod: Online
+        quota: "104857600"
+        unitCost: "1"
+        snssai: "01010203"
         dnn: internet
         filter: any
         qosRef: 1
@@ -401,9 +408,10 @@ ueransim:
       mark: "0x5"
       table: "105"
     quotaGuard:
+      enabled: false
       intervalSeconds: 5
     usageReporter:
-      enabled: true
+      enabled: false
       image:
         repository: alpine
         tag: 3.22.1

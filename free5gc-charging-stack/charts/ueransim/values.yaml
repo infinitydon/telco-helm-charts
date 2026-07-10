@@ -81,6 +81,7 @@ ueBrowser:
     mark: "0x5"
     table: "105"
   quotaGuard:
+    enabled: false
     intervalSeconds: 5
   usageReporter:
     enabled: false

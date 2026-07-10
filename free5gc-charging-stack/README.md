@@ -12,8 +12,15 @@ lab. In this lab the image is imported into the selected worker's container
 runtime because GHCR package creation for that image path may require separate
 registry permissions.
 
-The portal writes to the free5GC MongoDB charging data collection and notifies
-CHF through `PUT /nchf-convergedcharging/v3/recharging/{ueId}`.
+The portal updates the free5GC ABMF account-balance backing data in
+`policyData.ues.chargingData` and notifies the live CHF session through
+`PUT /nchf-convergedcharging/v3/recharging/{ueId}`. The chart seeds both
+PDU-session-level and flow-level Online charging data so PCF can allocate
+rating groups during SM Policy creation.
+
+The UE browser usage reporter and browser-side quota guard are disabled by
+default. They are retained as lab troubleshooting switches, but native
+CHF/SMF/UPF charging is the intended enforcement path.
 
 ## Install
 
