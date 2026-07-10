@@ -38,4 +38,4 @@ http://<node-ip>:31380/
 - The image tag is pinned to `v0.3.3`; do not use bare `latest`.
 - `auth.existingSecret` can be used instead of putting PIN/token values in Helm values.
 - Set `config.portalMode=user` only for a separate trusted self-service deployment.
-- Self-service top-up is fictitious/demo behavior and can be disabled with `config.endUserSelfTopup=false`.
+- Self-service top-up is lab/demo behavior and can be disabled with `config.endUserSelfTopup=false`.

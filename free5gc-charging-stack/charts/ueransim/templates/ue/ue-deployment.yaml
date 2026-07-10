@@ -86,8 +86,18 @@ spec:
         - sh
         - -ceu
         - |
-          apk add --no-cache tinyproxy
-          exec tinyproxy -d -c /etc/tinyproxy/tinyproxy.conf
+          apk add --no-cache iproute2 tinyproxy
+          while ! ip link show uesimtun0 >/dev/null 2>&1; do
+            echo "waiting for uesimtun0"
+            sleep 2
+          done
+          ue_ip="$(ip -4 -o addr show uesimtun0 | awk '{ split($4, a, "/"); print a[1]; exit }')"
+          cp /etc/tinyproxy/tinyproxy.conf /tmp/tinyproxy.conf
+          if [ -n "$ue_ip" ]; then
+            printf '\nBind %s\n' "$ue_ip" >> /tmp/tinyproxy.conf
+            echo "Tinyproxy outbound traffic is bound to $ue_ip"
+          fi
+          exec tinyproxy -d -c /tmp/tinyproxy.conf
         ports:
         - name: web-proxy
           containerPort: {{ $.Values.ueBrowser.internetProxy.port }}
@@ -118,6 +128,8 @@ spec:
             iptables -t mangle -A OUTPUT -p tcp -m owner --uid-owner {{ $.Values.ueBrowser.internetProxy.uid }} -j MARK --set-mark {{ $.Values.ueBrowser.routeManager.mark }}
           iptables -t nat -C POSTROUTING -o uesimtun0 -j MASQUERADE 2>/dev/null || \
             iptables -t nat -A POSTROUTING -o uesimtun0 -j MASQUERADE
+          iptables -t mangle -C POSTROUTING -o uesimtun0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || \
+            iptables -t mangle -A POSTROUTING -o uesimtun0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
           echo "Chromium proxy traffic is routed through uesimtun0"
           tail -f /dev/null
 {{- end }}

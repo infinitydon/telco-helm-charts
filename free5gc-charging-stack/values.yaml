@@ -190,7 +190,7 @@ free5gc:
 free5gc-charging-portal:
   image:
     repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.3.7"
+    tag: "v0.3.10"
   service:
     type: NodePort
     nodePort: 31380
@@ -211,7 +211,7 @@ userPortal:
   enabled: true
   image:
     repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.3.7"
+    tag: "v0.3.10"
     pullPolicy: IfNotPresent
   imagePullSecrets: []
   replicaCount: 1
@@ -232,7 +232,7 @@ userPortal:
       drop:
         - ALL
   config:
-    portalTitle: free5GC User Fictitious Top-Up
+    portalTitle: free5GC Data Top-Up
     mongoUri: mongodb://mongodb:27017
     mongoDb: free5gc
     chfBaseUrl: http://free5gc-charging-stack-free5gc-chf-service:8000

@@ -45,7 +45,7 @@ The user portal inherits that pull secret by default. You can also set:
 | Portal | URL | Purpose |
 | --- | --- | --- |
 | Operator | `http://<node-ip>:31380/` | Operator PIN-protected top-up for any subscriber charging record. |
-| User | `http://<node-ip>:31381/` | Fictitious self top-up bound to the detected subscriber. |
+| User | `http://<node-ip>:31381/` | Subscriber data top-up page bound to the detected subscriber. |
 | UE Browser | `https://<node-ip>:31382/` | Kasm Chromium desktop embedded as sidecars in the UERANSIM UE pod. |
 
 The user portal does not trust a browser-supplied `ueId`. It resolves the
