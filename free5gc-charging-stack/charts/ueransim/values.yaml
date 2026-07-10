@@ -80,6 +80,15 @@ ueBrowser:
       pullPolicy: IfNotPresent
     mark: "0x5"
     table: "105"
+  usageReporter:
+    enabled: false
+    image:
+      repository: alpine
+      tag: 3.22.1
+      pullPolicy: IfNotPresent
+    portalUrl: http://free5gc-charging-stack-free5gc-charging-portal:8080
+    intervalSeconds: 5
+    interface: uesimtun0
   service:
     type: NodePort
     port: 6901

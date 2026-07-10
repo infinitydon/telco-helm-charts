@@ -150,6 +150,8 @@ free5gc:
       nodeSelector:
         kubernetes.io/hostname: ebpf-bng-node-02
       configuration:
+        logger:
+          reportCaller: true
         ueRoutingInfo: |-
           UE1:
             members:
@@ -188,7 +190,7 @@ free5gc:
 free5gc-charging-portal:
   image:
     repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.3.3"
+    tag: "v0.3.7"
   service:
     type: NodePort
     nodePort: 31380
@@ -209,7 +211,7 @@ userPortal:
   enabled: true
   image:
     repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.3.3"
+    tag: "v0.3.7"
     pullPolicy: IfNotPresent
   imagePullSecrets: []
   replicaCount: 1
@@ -335,7 +337,7 @@ subscriberProvisioning:
             internet:
               dnn: internet
     FlowRules:
-      - filter: 1.1.1.1/32
+      - filter: any
         precedence: 128
         snssai: "01010203"
         dnn: internet
@@ -350,18 +352,12 @@ subscriberProvisioning:
         gbrUL: 108 Mbps
         gbrDL: 108 Mbps
     ChargingDatas:
-      - chargingMethod: Offline
-        quota: "100000"
-        unitCost: "1"
-        snssai: "01010203"
-        dnn: ""
-        filter: ""
       - chargingMethod: Online
-        quota: "5000"
+        quota: "104857600"
         unitCost: "1"
         snssai: "01010203"
         dnn: internet
-        filter: 1.1.1.1/32
+        filter: any
         qosRef: 1
 
 ueransim:
@@ -404,6 +400,15 @@ ueransim:
         pullPolicy: IfNotPresent
       mark: "0x5"
       table: "105"
+    usageReporter:
+      enabled: true
+      image:
+        repository: alpine
+        tag: 3.22.1
+        pullPolicy: IfNotPresent
+      portalUrl: http://free5gc-charging-stack-free5gc-charging-portal:8080
+      intervalSeconds: 5
+      interface: uesimtun0
     service:
       type: NodePort
       port: 6901

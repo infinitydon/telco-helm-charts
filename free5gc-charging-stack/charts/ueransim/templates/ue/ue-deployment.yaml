@@ -121,6 +121,28 @@ spec:
           echo "Chromium proxy traffic is routed through uesimtun0"
           tail -f /dev/null
 {{- end }}
+{{- if $.Values.ueBrowser.usageReporter.enabled }}
+      - image: {{ $.Values.ueBrowser.usageReporter.image.repository }}:{{ $.Values.ueBrowser.usageReporter.image.tag }}
+        name: ue-usage-reporter
+        imagePullPolicy: {{ $.Values.ueBrowser.usageReporter.image.pullPolicy }}
+        command:
+        - sh
+        - -ceu
+        - |
+          apk add --no-cache curl
+          iface="{{ $.Values.ueBrowser.usageReporter.interface }}"
+          while ! ip link show "$iface" >/dev/null 2>&1; do
+            echo "waiting for $iface"
+            sleep 2
+          done
+          while true; do
+            rx="$(cat /sys/class/net/$iface/statistics/rx_bytes 2>/dev/null || echo 0)"
+            tx="$(cat /sys/class/net/$iface/statistics/tx_bytes 2>/dev/null || echo 0)"
+            payload="$(printf '{"ueId":"%s","rxBytes":%s,"txBytes":%s,"source":"%s"}' "{{ $.Values.ueBrowser.subscriberSupi }}" "$rx" "$tx" "$iface")"
+            curl -fsS -H 'Content-Type: application/json' -d "$payload" "{{ $.Values.ueBrowser.usageReporter.portalUrl }}/api/usage" || true
+            sleep {{ $.Values.ueBrowser.usageReporter.intervalSeconds }}
+          done
+{{- end }}
 {{- end }}
       dnsPolicy: ClusterFirst
       restartPolicy: Always
