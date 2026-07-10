@@ -69,9 +69,15 @@ data:
             sd: 010203
           dnnInfos: # DNN information list
             - dnn: internet # Data Network Name
-              dnaiList:
-                - mec
               dns: # the IP address of DNS
+                ipv4: 8.8.8.8
+                ipv6: 2001:4860:4860::8888
+        - sNssai:
+            sst: 1
+            sd: 112233
+          dnnInfos:
+            - dnn: internet
+              dns:
                 ipv4: 8.8.8.8
                 ipv6: 2001:4860:4860::8888
       plmnList: # the list of PLMN IDs that this SMF belongs to (optional, remove this key when unnecessary)
@@ -92,9 +98,14 @@ data:
                 dnnUpfInfoList:
                   - dnn: internet
                     pools:
-                      - cidr: {{ $.Values.global.uesubnet }}
-                    dnaiList:
-                      - mec
+                      - cidr: 10.60.0.0/17
+              - sNssai:
+                  sst: 1
+                  sd: 112233
+                dnnUpfInfoList:
+                  - dnn: internet
+                    pools:
+                      - cidr: 10.60.128.0/17
             interfaces:
               - interfaceType: N3
                 endpoints:

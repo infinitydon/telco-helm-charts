@@ -59,6 +59,10 @@ data:
 {{- if $.Values.global.upf.multus.enabled }}
     # Multus mode: Static IPs and dedicated interfaces are configured
     echo "[wrapper] Multus mode enabled - using dedicated interfaces"
+
+    # A crashed UPF can leave the gtp5g link behind in the pod namespace.
+    # Remove it so restart/upgrade loops do not fail with "open Gtp5g: file exists".
+    ip link delete upfgtp 2>/dev/null || true
     
     # Setup networking rules
     iptables -A FORWARD -j ACCEPT
@@ -83,6 +87,9 @@ data:
     # Get Pod IP dynamically
     POD_IP=$(hostname -i | awk '{print $1}')
     echo "[wrapper] UPF Pod IP detected: $POD_IP"
+
+    # A crashed UPF can leave the gtp5g link behind in the pod namespace.
+    ip link delete upfgtp 2>/dev/null || true
 
     # Copy config to writable location
     cp {{ .volume.mount }}/upfcfg.yaml /tmp/upfcfg.yaml

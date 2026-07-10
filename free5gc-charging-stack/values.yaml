@@ -131,6 +131,12 @@ free5gc:
         kubernetes.io/hostname: ebpf-bng-node-02
   free5gc-chf:
     chf:
+      image:
+        name: ghcr.io/infinitydon/free5gc-chf-prepaid
+        tag: "v1.2.5-prepaid.3"
+        pullPolicy: IfNotPresent
+      imagePullSecrets:
+        - name: ghcr-kaniko
       nodeSelector:
         kubernetes.io/hostname: ebpf-bng-node-02
   free5gc-nrf:
@@ -147,11 +153,21 @@ free5gc:
         kubernetes.io/hostname: ebpf-bng-node-02
   free5gc-smf:
     smf:
+      image:
+        name: ghcr.io/infinitydon/free5gc-smf-prepaid
+        tag: "v1.4.5-prepaid.2"
+        pullPolicy: IfNotPresent
+      imagePullSecrets:
+        - name: ghcr-kaniko
       nodeSelector:
         kubernetes.io/hostname: ebpf-bng-node-02
       configuration:
         logger:
           reportCaller: true
+        urrConfiguration: |-
+          urrPeriod: 10
+          urrThreshold: 1000
+          requestedUnit: 1048576
         ueRoutingInfo: |-
           UE1:
             members:
@@ -190,7 +206,9 @@ free5gc:
 free5gc-charging-portal:
   image:
     repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.3.12"
+    tag: "v0.3.13"
+  imagePullSecrets:
+    - name: ghcr-kaniko
   service:
     type: NodePort
     nodePort: 31380
@@ -211,9 +229,10 @@ userPortal:
   enabled: true
   image:
     repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.3.12"
+    tag: "v0.3.13"
     pullPolicy: IfNotPresent
-  imagePullSecrets: []
+  imagePullSecrets:
+    - name: ghcr-kaniko
   replicaCount: 1
   service:
     type: NodePort
@@ -292,11 +311,38 @@ subscriberProvisioning:
         defaultSingleNssais:
           - sst: 1
             sd: "010203"
-        singleNssais: []
+        singleNssais:
+          - sst: 1
+            sd: "112233"
     SessionManagementSubscriptionData:
       - singleNssai:
           sst: 1
           sd: "010203"
+        dnnConfigurations:
+          internet:
+            pduSessionTypes:
+              defaultSessionType: IPV4
+              allowedSessionTypes:
+                - IPV4
+            sscModes:
+              defaultSscMode: SSC_MODE_1
+              allowedSscModes:
+                - SSC_MODE_2
+                - SSC_MODE_3
+            5gQosProfile:
+              5qi: 9
+              arp:
+                priorityLevel: 8
+                preemptCap: ""
+                preemptVuln: ""
+              priorityLevel: 8
+            sessionAmbr:
+              uplink: 1000 Mbps
+              downlink: 1000 Mbps
+            staticIpAddress: []
+      - singleNssai:
+          sst: 1
+          sd: "112233"
         dnnConfigurations:
           internet:
             pduSessionTypes:
@@ -324,6 +370,9 @@ subscriberProvisioning:
         "01010203":
           dnnInfos:
             - dnn: internet
+        "01112233":
+          dnnInfos:
+            - dnn: internet
     AmPolicyData:
       subscCats:
         - free5gc
@@ -336,14 +385,34 @@ subscriberProvisioning:
           smPolicyDnnData:
             internet:
               dnn: internet
+        "01112233":
+          snssai:
+            sst: 1
+            sd: "112233"
+          smPolicyDnnData:
+            internet:
+              dnn: internet
     FlowRules:
       - filter: any
         precedence: 128
         snssai: "01010203"
         dnn: internet
         qosRef: 1
+      - filter: any
+        precedence: 128
+        snssai: "01112233"
+        dnn: internet
+        qosRef: 1
     QosFlows:
       - snssai: "01010203"
+        dnn: internet
+        qosRef: 1
+        5qi: 8
+        mbrUL: 208 Mbps
+        mbrDL: 208 Mbps
+        gbrUL: 108 Mbps
+        gbrDL: 108 Mbps
+      - snssai: "01112233"
         dnn: internet
         qosRef: 1
         5qi: 8
@@ -363,6 +432,20 @@ subscriberProvisioning:
         quota: "104857600"
         unitCost: "1"
         snssai: "01010203"
+        dnn: internet
+        filter: any
+        qosRef: 1
+      - chargingMethod: Online
+        quota: "104857600"
+        unitCost: "1"
+        snssai: "01112233"
+        dnn: ""
+        filter: ""
+        qosRef: 1
+      - chargingMethod: Online
+        quota: "104857600"
+        unitCost: "1"
+        snssai: "01112233"
         dnn: internet
         filter: any
         qosRef: 1
@@ -466,6 +549,18 @@ ueransim:
         ipAddress: 10.201.10.10
         serviceName: free5gc-amf-amf-n2
         port: 38412
+    configuration: |-
+      mcc: '208'
+      mnc: '93'
+      nci: '0x000000010'
+      idLength: 32
+      tac: 1
+      slices:
+        - sst: 0x1
+          sd: 0x010203
+        - sst: 0x1
+          sd: 0x112233
+      ignoreStreamIds: true
     nodeSelector:
       kubernetes.io/hostname: ebpf-bng-node-02
   ue:
@@ -474,6 +569,49 @@ ueransim:
       name: ghcr.io/infinitydon/ueransim
       tag: "v3.2.4-rls600s"
       pullPolicy: IfNotPresent
+    configuration: |-
+      supi: "imsi-208930000000001"
+      mcc: "208"
+      mnc: "93"
+      key: "8baf473f2f8fd09487cccbd7097c6862"
+      op: "8e27b6af0e692e750f32667a3b14605d"
+      opType: "OPC"
+      amf: "8000"
+      imei: "356938035643803"
+      imeiSv: "4370816125816151"
+      uacAic:
+        mps: false
+        mcs: false
+      uacAcc:
+        normalClass: 0
+        class11: false
+        class12: false
+        class13: false
+        class14: false
+        class15: false
+      sessions:
+        - type: "IPv4"
+          apn: "internet"
+          slice:
+            sst: 0x01
+            sd: 0x112233
+      configured-nssai:
+        - sst: 0x01
+          sd: 0x112233
+      default-nssai:
+        - sst: 1
+          sd: 0x112233
+      integrity:
+        IA1: true
+        IA2: true
+        IA3: true
+      ciphering:
+        EA1: true
+        EA2: true
+        EA3: true
+      integrityMaxRate:
+        uplink: "full"
+        downlink: "full"
     nodeSelector:
       kubernetes.io/hostname: ebpf-bng-node-02
     test:
