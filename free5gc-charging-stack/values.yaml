@@ -220,7 +220,7 @@ free5gc:
 free5gc-charging-portal:
   image:
     repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.3.16"
+    tag: "v0.3.18"
   imagePullSecrets:
     - name: ghcr-kaniko
   service:
@@ -243,7 +243,7 @@ userPortal:
   enabled: true
   image:
     repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.3.16"
+    tag: "v0.3.18"
     pullPolicy: IfNotPresent
   imagePullSecrets:
     - name: ghcr-kaniko
