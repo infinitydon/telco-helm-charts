@@ -159,6 +159,13 @@ free5gc:
         pullPolicy: IfNotPresent
       imagePullSecrets:
         - name: ghcr-kaniko
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 1Gi
       nodeSelector:
         kubernetes.io/hostname: ebpf-bng-node-02
       configuration:
@@ -196,6 +203,13 @@ free5gc:
         allowPrivilegeEscalation: true
         capabilities:
           add: ["NET_ADMIN"]
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2000m
+          memory: 2Gi
       nodeSelector:
         kubernetes.io/hostname: ebpf-bng-node-02
   free5gc-webui:
@@ -206,7 +220,7 @@ free5gc:
 free5gc-charging-portal:
   image:
     repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.3.13"
+    tag: "v0.3.14"
   imagePullSecrets:
     - name: ghcr-kaniko
   service:
@@ -229,7 +243,7 @@ userPortal:
   enabled: true
   image:
     repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.3.13"
+    tag: "v0.3.14"
     pullPolicy: IfNotPresent
   imagePullSecrets:
     - name: ghcr-kaniko
