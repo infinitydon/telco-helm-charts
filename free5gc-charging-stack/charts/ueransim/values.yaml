@@ -56,7 +56,7 @@ ueBrowser:
     env:
       VNC_PW: free5gc
       LAUNCH_URL: http://127.0.0.1:18080/
-      APP_ARGS: "--start-maximized --proxy-server=http://127.0.0.1:18888 --proxy-bypass-list=127.0.0.1;localhost;*.svc;*.svc.cluster.local;10.0.0.0/8;192.168.0.0/16"
+      APP_ARGS: "--start-maximized --no-first-run --no-default-browser-check --disable-background-networking --disable-sync --disable-component-update --disable-features=Translate,AutofillServerCommunication,OptimizationHints --proxy-server=http://127.0.0.1:18888 --proxy-bypass-list=127.0.0.1;localhost;*.svc;*.svc.cluster.local;10.0.0.0/8;192.168.0.0/16"
   proxy:
     image:
       repository: nginxinc/nginx-unprivileged

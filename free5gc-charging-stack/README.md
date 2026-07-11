@@ -34,7 +34,7 @@ helm upgrade --install free5gc-charging-stack ./free5gc-charging-stack \
   --create-namespace
 ```
 
-If `ghcr.io/infinitydon/free5gc-charging-portal:v0.3.3` is private, create a
+If `ghcr.io/infinitydon/free5gc-charging-portal:v0.3.13` is private, create a
 pull secret in the target namespace and add:
 
 ```bash
@@ -54,6 +54,15 @@ The user portal inherits that pull secret by default. You can also set:
 | Operator | `http://<node-ip>:31380/` | Operator PIN-protected top-up for any subscriber charging record. |
 | User | `http://<node-ip>:31381/` | Subscriber data top-up page bound to the detected subscriber. |
 | UE Browser | `https://<node-ip>:31382/` | Kasm Chromium desktop embedded as sidecars in the UERANSIM UE pod. |
+| free5GC WebUI | `http://<node-ip>:30500/` | Subscriber and core web console. |
+
+Default lab credentials:
+
+| Component | Username | Password/PIN |
+| --- | --- | --- |
+| Operator portal | PIN only | `admin123` |
+| UE Browser noVNC | `kasm_user` | `free5gc` |
+| free5GC WebUI | `admin` | `free5gc` |
 
 The user portal does not trust a browser-supplied `ueId`. It resolves the
 subscriber from a trusted header (`x-subscriber-supi`) or the configured UE
@@ -73,6 +82,25 @@ runs as a dedicated user and the UE pod installs policy routing so that proxy
 TCP traffic is marked and sent through `uesimtun0`. Local, Kubernetes service,
 and RFC1918 destinations bypass the proxy so noVNC and in-cluster portal access
 remain reachable. DNS lookup is still performed by the proxy using pod DNS.
+
+If the noVNC desktop opens but external pages keep spinning, restart the UE to
+force a fresh registration and PDU session:
+
+```bash
+kubectl -n <namespace> rollout restart deploy/free5gc-charging-stack-ueransim-ue
+kubectl -n <namespace> rollout status deploy/free5gc-charging-stack-ueransim-ue
+```
+
+Useful UE-side checks:
+
+```bash
+kubectl -n <namespace> exec deploy/free5gc-charging-stack-ueransim-ue \
+  -c ue-browser -- curl -fsS http://127.0.0.1:18080/api/me
+
+kubectl -n <namespace> exec deploy/free5gc-charging-stack-ueransim-ue \
+  -c ue-browser -- curl -x http://127.0.0.1:18888 \
+  -o /tmp/test.bin http://speed.cloudflare.com/__down?bytes=1024
+```
 
 ## Multus
 
