@@ -61,7 +61,7 @@ ueBrowser:
     enabled: false
     image:
       repository: ghcr.io/infinitydon/ueransim
-      tag: v3.2.4-binder.1
+      tag: v3.2.4-rls600s-binder.1
       pullPolicy: IfNotPresent
     interface: uesimtun0
     mountPath: /opt/ueransim-binder

@@ -6,11 +6,10 @@ and deploys separate operator and user charging portals beside it. It also
 vendors the free5GC UERANSIM chart for gNB/UE simulation over Multus N2/N3.
 
 The default UERANSIM image is pinned to
-`ghcr.io/infinitydon/ueransim:v3.2.4-rls600s`, built from upstream UERANSIM
-`v3.2.4` with the radio-link heartbeat timeout extended for this single-node
-lab. In this lab the image is imported into the selected worker's container
-runtime because GHCR package creation for that image path may require separate
-registry permissions.
+`ghcr.io/infinitydon/ueransim:v3.2.4-rls600s-binder.1`, built from upstream
+UERANSIM `v3.2.4` with the radio-link heartbeat timeout extended for this
+single-node lab and `nr-binder` included for browser traffic through the UE
+PDU-session tunnel.
 
 The portal updates the free5GC ABMF account-balance backing data in
 `policyData.ues.chargingData` and notifies the live CHF session through
