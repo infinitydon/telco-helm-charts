@@ -32,5 +32,6 @@ session and test again:
   kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ .Release.Name }}-ueransim-ue
 
 Inside the UE noVNC Chromium desktop, use http://127.0.0.1:{{ .Values.ueransim.ueBrowser.proxy.port }}/
-for subscriber-bound top-ups. External Chromium browsing is routed through the
-local proxy at 127.0.0.1:{{ .Values.ueransim.ueBrowser.internetProxy.port }} and then through the UE tunnel.
+for subscriber-bound top-ups. External Chromium browsing is launched through
+UERANSIM nr-binder and bound to the UE tunnel when
+ueransim.ueBrowser.binder.enabled=true.

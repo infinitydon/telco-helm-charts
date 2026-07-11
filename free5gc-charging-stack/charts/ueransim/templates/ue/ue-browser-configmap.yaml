@@ -11,6 +11,9 @@
 {{- if and .Values.ueBrowser.internetProxy.enabled (or (eq .Values.ueBrowser.routeManager.image.tag "latest") (regexMatch "(:latest$|^latest$)" .Values.ueBrowser.routeManager.image.tag)) }}
 {{- fail "ueBrowser.routeManager.image.tag must not use latest" }}
 {{- end }}
+{{- if and .Values.ueBrowser.binder.enabled (or (eq .Values.ueBrowser.binder.image.tag "latest") (regexMatch "(:latest$|^latest$)" .Values.ueBrowser.binder.image.tag)) }}
+{{- fail "ueBrowser.binder.image.tag must not use latest" }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -18,6 +21,28 @@ metadata:
   labels:
     {{- include "ueransim.labels" . | nindent 4 }}
 data:
+  chromium: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    if [ "${UERANSIM_BINDER_ENABLED:-false}" != "true" ]; then
+      exec /usr/bin/chromium "$@"
+    fi
+
+    iface="${UERANSIM_BINDER_INTERFACE:-uesimtun0}"
+    binder_dir="${UERANSIM_BINDER_DIR:-/opt/ueransim-binder}"
+    while ! ip link show "$iface" >/dev/null 2>&1; do
+      echo "waiting for $iface before launching Chromium through nr-binder"
+      sleep 2
+    done
+    ue_ip="$(ip -4 -o addr show "$iface" | awk '{ split($4, a, "/"); print a[1]; exit }')"
+    if [ -z "$ue_ip" ]; then
+      echo "could not determine UE IP on $iface" >&2
+      exit 1
+    fi
+    cd "$binder_dir"
+    exec ./nr-binder "$ue_ip" /usr/bin/chromium "$@"
+
   default.conf: |
     server {
       listen {{ .Values.ueBrowser.proxy.port }};

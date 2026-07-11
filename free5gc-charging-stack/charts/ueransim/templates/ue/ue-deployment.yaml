@@ -40,6 +40,22 @@ spec:
         {{- toYaml .imagePullSecrets | nindent 8 }}
       securityContext:
         {{- toYaml .podSecurityContext | nindent 8 }}
+{{- if and $.Values.ueBrowser.enabled $.Values.ueBrowser.binder.enabled }}
+      initContainers:
+      - image: {{ $.Values.ueBrowser.binder.image.repository }}:{{ $.Values.ueBrowser.binder.image.tag }}
+        name: ue-binder-tools
+        imagePullPolicy: {{ $.Values.ueBrowser.binder.image.pullPolicy }}
+        command:
+        - sh
+        - -ceu
+        - |
+          cp /ueransim/binder/nr-binder /binder/nr-binder
+          cp /ueransim/binder/libdevbnd.so /binder/libdevbnd.so
+          chmod 0755 /binder/nr-binder /binder/libdevbnd.so
+        volumeMounts:
+        - name: ue-binder-tools
+          mountPath: /binder
+{{- end }}
       containers:
       - image: {{ .image.name }}:{{ .image.tag | default $.Chart.AppVersion }}
         name: {{ .name }}
@@ -60,6 +76,14 @@ spec:
           containerPort: {{ $.Values.ueBrowser.browser.port }}
           protocol: TCP
         env:
+{{- if $.Values.ueBrowser.binder.enabled }}
+        - name: UERANSIM_BINDER_ENABLED
+          value: "true"
+        - name: UERANSIM_BINDER_INTERFACE
+          value: {{ $.Values.ueBrowser.binder.interface | quote }}
+        - name: UERANSIM_BINDER_DIR
+          value: {{ $.Values.ueBrowser.binder.mountPath | quote }}
+{{- end }}
         {{- range $name, $value := $.Values.ueBrowser.browser.env }}
         - name: {{ $name }}
           value: {{ $value | quote }}
@@ -67,6 +91,13 @@ spec:
         volumeMounts:
         - name: dshm
           mountPath: /dev/shm
+{{- if $.Values.ueBrowser.binder.enabled }}
+        - name: ue-browser-proxy
+          mountPath: /usr/local/bin/chromium
+          subPath: chromium
+        - name: ue-binder-tools
+          mountPath: {{ $.Values.ueBrowser.binder.mountPath }}
+{{- end }}
       - image: {{ $.Values.ueBrowser.proxy.image.repository }}:{{ $.Values.ueBrowser.proxy.image.tag }}
         name: ue-portal-proxy
         imagePullPolicy: {{ $.Values.ueBrowser.proxy.image.pullPolicy }}
@@ -198,6 +229,11 @@ spec:
       - name: ue-browser-proxy
         configMap:
           name: {{ include "ueransim.fullname" $ }}-ue-browser-proxy
+          defaultMode: 0755
+{{- if $.Values.ueBrowser.binder.enabled }}
+      - name: ue-binder-tools
+        emptyDir: {}
+{{- end }}
       - name: dshm
         emptyDir:
           medium: Memory
