@@ -36,11 +36,11 @@ data:
     Group {{ .Values.ueBrowser.internetProxy.group }}
     Port {{ .Values.ueBrowser.internetProxy.port }}
     Listen 127.0.0.1
-    Timeout 600
+    Timeout {{ .Values.ueBrowser.internetProxy.timeoutSeconds }}
     DefaultErrorFile "/usr/share/tinyproxy/default.html"
     StatFile "/usr/share/tinyproxy/stats.html"
     LogLevel Info
-    MaxClients 100
+    MaxClients {{ .Values.ueBrowser.internetProxy.maxClients }}
     Allow 127.0.0.1
     ConnectPort 443
     ConnectPort 563

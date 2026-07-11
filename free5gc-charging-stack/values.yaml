@@ -497,6 +497,8 @@ ueransim:
       user: nobody
       group: nobody
       uid: 65534
+      timeoutSeconds: 120
+      maxClients: 500
     routeManager:
       image:
         repository: alpine
