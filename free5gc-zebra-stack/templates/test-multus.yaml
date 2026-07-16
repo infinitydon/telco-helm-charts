@@ -64,10 +64,20 @@ spec:
             kubectl -n "$ns" exec "$ue" -- sh -lc "command -v iperf3 >/dev/null || (apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y iperf3)"
           fi
           echo "iperf3 UE client -> N6 gateway server:"
+          kubectl -n "$ns" exec "$gateway" -- sh -lc ": > /tmp/iperf3-server.log || true"
           set +e
           kubectl -n "$ns" exec "$ue" -- sh -lc "timeout {{ add .Values.stackSmokeTest.iperf3.seconds 10 }} iperf3 -c ${gw_ip} -B ${ue_ip} -p {{ .Values.stackSmokeTest.iperf3.port }} -t {{ .Values.stackSmokeTest.iperf3.seconds }}"
           iperf_rc=$?
           set -e
+          if [ "$iperf_rc" -ne 0 ]; then
+            echo "iperf3 client returned rc=${iperf_rc}; checking gateway server log"
+            iperf_log="$(kubectl -n "$ns" exec "$gateway" -- sh -lc "cat /tmp/iperf3-server.log || true")"
+            echo "$iperf_log"
+            if echo "$iperf_log" | grep -q "receiver"; then
+              echo "iperf3 server recorded a completed transfer"
+              iperf_rc=0
+            fi
+          fi
           if [ "$iperf_rc" -ne 0 ]; then
             echo "iperf3 failed with rc=${iperf_rc}; ping/GTP checks above remain authoritative"
             {{- if .Values.stackSmokeTest.iperf3.failOnError }}

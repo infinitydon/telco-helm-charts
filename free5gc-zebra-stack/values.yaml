@@ -60,19 +60,20 @@ zebra:
       networkName: ""
       ip: 10.201.40.20
       cidr: 24
-    n6ul:
-      name: n6ul
+    n6:
+      name: n6
       networkName: ""
       masterIf: enp8s22
       device: enp8s24
+    n6ul:
+      name: n6ul
+      networkName: ""
       ip: 10.201.60.10
       cidr: 24
       vrf: 2
     n6dl:
       name: n6dl
       networkName: ""
-      masterIf: enp8s22
-      device: enp8s25
       ip: 10.201.60.11
       cidr: 24
       vrf: 1

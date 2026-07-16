@@ -6,6 +6,7 @@
 {{- $n3Name := default (printf "n3network-%s-ueransim" .Release.Name) .Values.zebra.interfaces.n3.networkName }}
 {{- $n4Name := default (printf "n4network-%s-free5gc-smf" .Release.Name) .Values.zebra.interfaces.n4.networkName }}
 {{- $n3HostName := printf "%s-zebra-n3-hostdev" .Release.Name }}
+{{- $n6Name := default (printf "%s-zebra-n6" .Release.Name) .Values.zebra.interfaces.n6.networkName }}
 {{- $n6ulName := default (printf "%s-zebra-n6ul" .Release.Name) .Values.zebra.interfaces.n6ul.networkName }}
 {{- $n6dlName := default (printf "%s-zebra-n6dl" .Release.Name) .Values.zebra.interfaces.n6dl.networkName }}
 {{- if eq $mode "hostDevice" }}
@@ -43,7 +44,7 @@ spec:
 apiVersion: k8s.cni.cncf.io/v1
 kind: NetworkAttachmentDefinition
 metadata:
-  name: {{ $n6ulName }}
+  name: {{ $n6Name }}
   labels:
     app.kubernetes.io/name: zebra
     app.kubernetes.io/instance: {{ .Release.Name }}
@@ -54,42 +55,7 @@ spec:
       "plugins": [
         {
           "type": "host-device",
-          "device": {{ .Values.zebra.interfaces.n6ul.device | quote }},
-          "ipam": {
-            "type": "static",
-            "addresses": [
-              { "address": "{{ .Values.zebra.interfaces.n6ul.ip }}/{{ .Values.zebra.interfaces.n6ul.cidr }}" }
-            ]
-          }
-        },
-        {
-          "type": "tuning",
-          "mtu": 1500
-        }
-      ]
-    }
----
-apiVersion: k8s.cni.cncf.io/v1
-kind: NetworkAttachmentDefinition
-metadata:
-  name: {{ $n6dlName }}
-  labels:
-    app.kubernetes.io/name: zebra
-    app.kubernetes.io/instance: {{ .Release.Name }}
-spec:
-  config: |
-    {
-      "cniVersion": "0.3.1",
-      "plugins": [
-        {
-          "type": "host-device",
-          "device": {{ .Values.zebra.interfaces.n6dl.device | quote }},
-          "ipam": {
-            "type": "static",
-            "addresses": [
-              { "address": "{{ .Values.zebra.interfaces.n6dl.ip }}/{{ .Values.zebra.interfaces.n6dl.cidr }}" }
-            ]
-          }
+          "device": {{ .Values.zebra.interfaces.n6.device | quote }}
         },
         {
           "type": "tuning",
@@ -113,7 +79,7 @@ spec:
       "plugins": [
         {
           "type": "macvlan",
-          "master": {{ .Values.zebra.interfaces.n6ul.masterIf | quote }},
+          "master": {{ .Values.zebra.interfaces.n6.masterIf | quote }},
           "mode": "bridge",
           "ipam": {
             "type": "static",
@@ -143,7 +109,7 @@ spec:
       "plugins": [
         {
           "type": "macvlan",
-          "master": {{ .Values.zebra.interfaces.n6dl.masterIf | quote }},
+          "master": {{ .Values.zebra.interfaces.n6.masterIf | quote }},
           "mode": "bridge",
           "ipam": {
             "type": "static",
@@ -264,8 +230,12 @@ spec:
             {"name":{{ $n3Name | quote }},"interface":{{ .Values.zebra.interfaces.n3.name | quote }},"ips":["{{ .Values.zebra.interfaces.n3.ip }}/{{ .Values.zebra.interfaces.n3.cidr }}"]},
             {{- end }}
             {"name":{{ $n4Name | quote }},"interface":{{ .Values.zebra.interfaces.n4.name | quote }},"ips":["{{ .Values.zebra.interfaces.n4.ip }}/{{ .Values.zebra.interfaces.n4.cidr }}"]},
+            {{- if eq $mode "hostDevice" }}
+            {"name":{{ $n6Name | quote }},"interface":{{ .Values.zebra.interfaces.n6.name | quote }}}
+            {{- else }}
             {"name":{{ $n6ulName | quote }},"interface":{{ .Values.zebra.interfaces.n6ul.name | quote }}},
             {"name":{{ $n6dlName | quote }},"interface":{{ .Values.zebra.interfaces.n6dl.name | quote }}}
+            {{- end }}
           ]
     spec:
       nodeSelector:
@@ -273,6 +243,29 @@ spec:
       {{- with .Values.zebra.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if eq $mode "hostDevice" }}
+      initContainers:
+        - name: setup-n6-logical-interfaces
+          image: "{{ .Values.zebra.image.repository }}:{{ .Values.zebra.image.tag }}"
+          imagePullPolicy: {{ .Values.zebra.image.pullPolicy }}
+          command: ["sh"]
+          args:
+            - -ceu
+            - |
+              ip link set {{ .Values.zebra.interfaces.n6.name }} up
+              ip link show {{ .Values.zebra.interfaces.n6ul.name }} >/dev/null 2>&1 || ip link add link {{ .Values.zebra.interfaces.n6.name }} name {{ .Values.zebra.interfaces.n6ul.name }} type macvlan mode bridge
+              ip link show {{ .Values.zebra.interfaces.n6dl.name }} >/dev/null 2>&1 || ip link add link {{ .Values.zebra.interfaces.n6.name }} name {{ .Values.zebra.interfaces.n6dl.name }} type macvlan mode bridge
+              ip addr replace {{ .Values.zebra.interfaces.n6ul.ip }}/{{ .Values.zebra.interfaces.n6ul.cidr }} dev {{ .Values.zebra.interfaces.n6ul.name }}
+              ip addr replace {{ .Values.zebra.interfaces.n6dl.ip }}/{{ .Values.zebra.interfaces.n6dl.cidr }} dev {{ .Values.zebra.interfaces.n6dl.name }}
+              ip link set {{ .Values.zebra.interfaces.n6ul.name }} up
+              ip link set {{ .Values.zebra.interfaces.n6dl.name }} up
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            runAsGroup: 0
+            capabilities:
+              add: ["NET_ADMIN", "NET_RAW"]
       {{- end }}
       containers:
         - name: cradle

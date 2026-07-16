@@ -23,7 +23,7 @@ The chart supports two zebra/cradle attachment modes:
 | Mode | Value | Multus type | Expected XDP mode |
 | --- | --- | --- | --- |
 | Generic XDP | `zebra.dataplane.mode=macvlan` | `macvlan` | Generic XDP fallback |
-| Native XDP | `zebra.dataplane.mode=hostDevice` | `host-device` | Native XDP |
+| Host-device | `zebra.dataplane.mode=hostDevice` | `host-device` | N3 native XDP; single-N6 logical children fall back to generic XDP |
 
 The N6 gateway can also be selected independently:
 
@@ -41,11 +41,13 @@ zebra:
   interfaces:
     n3:
       device: enp8s23
-    n6ul:
+    n6:
       device: enp8s24
-    n6dl:
-      device: enp8s25
 ```
+
+N6 is configured as one external network/device. The chart creates the
+`n6ul` and `n6dl` logical interfaces inside the zebra pod because cradle's MUP
+datapath config uses separate uplink and downlink VRFs.
 
 ## Lab Defaults
 
@@ -56,7 +58,7 @@ The default lab values pin workloads to `ebpf-bng-node-02` and use:
 | N2 | `enp8s19` | `10.201.10.0/24` |
 | N3 | `enp8s20` or host-device `enp8s23` | `10.201.30.0/24` |
 | N4 | `enp8s21` | `10.201.40.0/24` |
-| N6 | `enp8s22` or host-device `enp8s24`/`enp8s25` | `10.201.60.0/24` |
+| N6 | `enp8s22` or host-device `enp8s24` | `10.201.60.0/24` |
 
 Key lab addresses:
 
@@ -105,8 +107,7 @@ helm upgrade --install free5gc-zebra ./free5gc-zebra-stack \
   --set stackSmokeTest.iperf3.failOnError=true \
   --set zebra.dataplane.mode=hostDevice \
   --set zebra.interfaces.n3.device=enp8s23 \
-  --set zebra.interfaces.n6ul.device=enp8s24 \
-  --set zebra.interfaces.n6dl.device=enp8s25 \
+  --set zebra.interfaces.n6.device=enp8s24 \
   --set n6Gateway.mode=macvlan \
   --no-hooks \
   --timeout 10m \
@@ -235,8 +236,20 @@ kubectl exec -n free5gc-zebra-test "$UE_POD" -- \
 
 ## Observed Lab Results
 
-Known-good host-device/native result with
+Current single-N6 host-device result with
 `ghcr.io/infinitydon/zebra-sh:26.7.4-nightly20260714`:
+
+```text
+UE -> 10.201.60.1: 3/3 received, 0% loss
+UE -> 8.8.8.8: 3/3 received, 0% loss
+gtp_encap: increased
+gtp_decap: increased
+iperf3: TCP test did not complete
+```
+
+The earlier two-N6-host-device lab shape reached native-style throughput, but
+that is not exposed by this chart because N6 is modeled as one external
+network/device:
 
 ```text
 UE -> 10.201.60.1: 3/3 received, 0% loss
