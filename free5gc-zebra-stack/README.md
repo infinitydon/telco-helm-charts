@@ -45,9 +45,12 @@ zebra:
       device: enp8s24
 ```
 
-N6 is configured as one external network/device. The chart creates the
-`n6ul` and `n6dl` logical interfaces inside the zebra pod because cradle's MUP
-datapath config uses separate uplink and downlink VRFs.
+N6 is configured as one external network/device. The chart creates `n6ul` and
+`n6dl` as logical interfaces inside the zebra pod because the current
+zebra/cradle MUP datapath binds one VRF to one direction. Do not dedicate two
+physical N6 NICs just for this split; if native XDP is required on N6, the
+better long-term fix is for the datapath to support the usual operator model:
+N3 in one VRF and N6 in another VRF.
 
 ## Lab Defaults
 
@@ -247,9 +250,9 @@ gtp_decap: increased
 iperf3: TCP test did not complete
 ```
 
-The earlier two-N6-host-device lab shape reached native-style throughput, but
-that is not exposed by this chart because N6 is modeled as one external
-network/device:
+An earlier internal lab shape used two separate host-device-backed N6 legs and
+reached native-style throughput, but that is not the recommended chart model
+because it wastes physical interfaces for what should be one N6 network:
 
 ```text
 UE -> 10.201.60.1: 3/3 received, 0% loss
