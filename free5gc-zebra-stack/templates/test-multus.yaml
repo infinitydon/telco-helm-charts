@@ -1,0 +1,78 @@
+{{- if .Values.stackSmokeTest.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Release.Name }}-datapath-smoke
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  activeDeadlineSeconds: 300
+  serviceAccountName: {{ .Release.Name }}-stack-test
+  restartPolicy: Never
+  nodeSelector:
+    {{- toYaml .Values.labNodeSelector | nindent 4 }}
+  containers:
+    - name: kubectl
+      image: {{ .Values.stackSmokeTest.image | quote }}
+      command:
+        - sh
+        - -ceu
+        - |
+          ns={{ .Release.Namespace | quote }}
+          release={{ .Release.Name | quote }}
+          ue_if={{ .Values.stackSmokeTest.ueInterface | quote }}
+          gw_ip={{ .Values.n6Gateway.gatewayIp | quote }}
+          inet_ip={{ .Values.stackSmokeTest.pingTarget | quote }}
+          ue_ip=""
+
+          pod_by_label() {
+            kubectl -n "$ns" get pod -l "$1" -o jsonpath='{.items[0].metadata.name}'
+          }
+
+          ue="$(pod_by_label 'component=ue')"
+          gnb="$(pod_by_label 'component=gnb')"
+          zebra="$(pod_by_label "app.kubernetes.io/name=zebra,app.kubernetes.io/instance=${release}")"
+          gateway="$(pod_by_label "app.kubernetes.io/name=n6-gateway,app.kubernetes.io/instance=${release}")"
+
+          echo "UE pod: ${ue}"
+          echo "gNB pod: ${gnb}"
+          echo "zebra pod: ${zebra}"
+          echo "gateway pod: ${gateway}"
+
+          for i in $(seq 1 90); do
+            if kubectl -n "$ns" exec "$ue" -- sh -lc "ip addr show ${ue_if} >/dev/null 2>&1"; then
+              ue_ip="$(kubectl -n "$ns" exec "$ue" -- sh -lc "ip -4 -o addr show ${ue_if} | awk '{print \$4}' | cut -d/ -f1")"
+              [ -n "$ue_ip" ] && break
+            fi
+            sleep 2
+          done
+          test -n "$ue_ip"
+          echo "UE tunnel ${ue_if}: ${ue_ip}"
+
+          kubectl -n "$ns" exec "$ue" -- sh -lc "ip route replace ${gw_ip} dev ${ue_if} scope link"
+          kubectl -n "$ns" exec "$ue" -- sh -lc "ping -I ${ue_if} -c 3 -W 2 ${gw_ip}"
+          kubectl -n "$ns" exec "$ue" -- sh -lc "ping -I ${ue_if} -c 3 -W 2 ${inet_ip}"
+
+          echo "cradle stats:"
+          kubectl -n "$ns" exec "$zebra" -c zebra -- sh -lc "cradle stats --grpc unix:cradle/grpc | grep gtp"
+          echo "cradle VRF2:"
+          kubectl -n "$ns" exec "$zebra" -c zebra -- sh -lc "cradle dump ipv4 --grpc unix:cradle/grpc --vrf 2"
+
+          {{- if .Values.stackSmokeTest.iperf3.enabled }}
+          if {{ .Values.stackSmokeTest.installIperf3 }}; then
+            kubectl -n "$ns" exec "$ue" -- sh -lc "command -v iperf3 >/dev/null || (apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y iperf3)"
+          fi
+          echo "iperf3 UE client -> N6 gateway server:"
+          set +e
+          kubectl -n "$ns" exec "$ue" -- sh -lc "timeout {{ add .Values.stackSmokeTest.iperf3.seconds 10 }} iperf3 -c ${gw_ip} -B ${ue_ip} -p {{ .Values.stackSmokeTest.iperf3.port }} -t {{ .Values.stackSmokeTest.iperf3.seconds }}"
+          iperf_rc=$?
+          set -e
+          if [ "$iperf_rc" -ne 0 ]; then
+            echo "iperf3 failed with rc=${iperf_rc}; ping/GTP checks above remain authoritative"
+            {{- if .Values.stackSmokeTest.iperf3.failOnError }}
+            exit "$iperf_rc"
+            {{- end }}
+          fi
+          {{- end }}
+{{- end }}

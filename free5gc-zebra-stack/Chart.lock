@@ -1,0 +1,9 @@
+dependencies:
+- name: free5gc
+  repository: file://charts/free5gc
+  version: 1.1.7
+- name: ueransim
+  repository: file://charts/ueransim
+  version: 2.0.17
+digest: sha256:aa248a3d91cb0df7f97fd3bbb5c9972687eae76276c8677a07c2bb76107291d4
+generated: "2026-07-16T10:09:17.7474111-04:00"

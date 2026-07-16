@@ -1,0 +1,16 @@
+free5GC stack has been deployed.
+
+Access points:
+
+  free5GC WebUI:
+    URL: http://<node-ip>:30500/
+    Username: {{ .Values.subscriberProvisioning.username }}
+    Password: {{ .Values.subscriberProvisioning.password }}
+
+Default subscriber:
+  SUPI: {{ .Values.subscriberProvisioning.subscriber.ueId }}
+
+Quick checks:
+  kubectl -n {{ .Release.Namespace }} get pods,svc
+  kubectl -n {{ .Release.Namespace }} logs deploy/{{ .Release.Name }}-zebra -c cradle
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}

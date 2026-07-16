@@ -1,8 +1,0 @@
-apiVersion: v2
-name: free5gc-charging-portal
-description: Lab top-up portal for free5GC CHF charging data
-type: application
-version: 0.1.0
-appVersion: "0.1.0"
-maintainers:
-  - name: infinitydon

@@ -3,21 +3,98 @@ labNodeSelector:
 
 stackSmokeTest:
   enabled: false
+  image: dtzar/helm-kubectl:3.19.0
+  pingTarget: 8.8.8.8
+  ueInterface: uesimtun0
+  installIperf3: true
+  iperf3:
+    enabled: true
+    seconds: 5
+    port: 5201
+    failOnError: false
 
 n6Gateway:
   enabled: true
+  mode: macvlan
   image:
     repository: alpine
     tag: "3.22.1"
     pullPolicy: IfNotPresent
   nodeSelector:
     kubernetes.io/hostname: ebpf-bng-node-02
+  interfaceName: n6gw
   masterIf: enp8s22
+  networkName: ""
   gatewayIf: free5gc-n6-gw
   gatewayIp: 10.201.60.1
   cidr: 24
-  subnet: 10.201.60.0/24
+  n6Subnet: 10.201.60.0/24
+  ueSubnet: 10.60.128.0/17
+  zebraDownlinkIp: 10.201.60.11
   uplinkIf: eth0
+  iperf3:
+    enabled: true
+    port: 5201
+
+zebra:
+  enabled: true
+  image:
+    repository: ghcr.io/infinitydon/zebra-sh
+    tag: "26.7.4-nightly20260714"
+    pullPolicy: IfNotPresent
+  imagePullSecrets: []
+  nodeSelector:
+    kubernetes.io/hostname: ebpf-bng-node-02
+  dataplane:
+    mode: macvlan
+  interfaces:
+    n3:
+      name: n3
+      networkName: ""
+      masterIf: enp8s20
+      device: enp8s23
+      ip: 10.201.30.10
+      cidr: 24
+    n4:
+      name: n4
+      networkName: ""
+      ip: 10.201.40.20
+      cidr: 24
+    n6ul:
+      name: n6ul
+      networkName: ""
+      masterIf: enp8s22
+      device: enp8s24
+      ip: 10.201.60.10
+      cidr: 24
+      vrf: 2
+    n6dl:
+      name: n6dl
+      networkName: ""
+      masterIf: enp8s22
+      device: enp8s25
+      ip: 10.201.60.11
+      cidr: 24
+      vrf: 1
+  gatewayIp: 10.201.60.1
+  uePool: 10.60.128.0/17
+  bgp:
+    as: 65001
+    routerId: 1.1.1.1
+  mup:
+    controllerAddress: 2001:db8::1
+    networkInstance: internet
+    pfcp:
+      listenAddress: 10.201.40.20
+      port: 8805
+    vrfs:
+      downlink:
+        name: mobile-dl
+        rd: "65000:101"
+      uplink:
+        name: mobile-ul
+        rd: "65000:100"
+  resources: {}
 
 free5gc:
   global:
@@ -99,7 +176,7 @@ free5gc:
   deployMongoDb: true
   deployAmf: true
   deployAusf: true
-  deployChf: true
+  deployChf: false
   deployN3iwf: false
   deployNef: false
   deployNrf: true
@@ -108,7 +185,7 @@ free5gc:
   deploySmf: true
   deployUdm: true
   deployUdr: true
-  deployUpf: true
+  deployUpf: false
   deployWebui: true
   deployDbPython: false
 
@@ -129,16 +206,6 @@ free5gc:
     ausf:
       nodeSelector:
         kubernetes.io/hostname: ebpf-bng-node-02
-  free5gc-chf:
-    chf:
-      image:
-        name: ghcr.io/infinitydon/free5gc-chf-prepaid
-        tag: "v1.2.5-prepaid.3"
-        pullPolicy: IfNotPresent
-      imagePullSecrets:
-        - name: ghcr-kaniko
-      nodeSelector:
-        kubernetes.io/hostname: ebpf-bng-node-02
   free5gc-nrf:
     nrf:
       nodeSelector:
@@ -154,11 +221,10 @@ free5gc:
   free5gc-smf:
     smf:
       image:
-        name: ghcr.io/infinitydon/free5gc-smf-prepaid
-        tag: "v1.4.5-prepaid.2"
+        name: free5gc/smf
+        tag: "v4.2.2"
         pullPolicy: IfNotPresent
-      imagePullSecrets:
-        - name: ghcr-kaniko
+      imagePullSecrets: []
       resources:
         requests:
           cpu: 250m
@@ -216,74 +282,6 @@ free5gc:
     webui:
       nodeSelector:
         kubernetes.io/hostname: ebpf-bng-node-02
-
-free5gc-charging-portal:
-  image:
-    repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.3.18"
-  imagePullSecrets:
-    - name: ghcr-kaniko
-  service:
-    type: NodePort
-    nodePort: 31380
-  nodeSelector:
-    kubernetes.io/hostname: ebpf-bng-node-02
-  config:
-    portalTitle: free5GC Operator Charging Portal
-    portalMode: operator
-    mongoUri: mongodb://mongodb:27017
-    mongoDb: free5gc
-    chfBaseUrl: http://free5gc-charging-stack-free5gc-chf-service:8080
-    chfNotifyEnabled: true
-    endUserSelfTopup: false
-  auth:
-    operatorPin: admin123
-
-userPortal:
-  enabled: true
-  image:
-    repository: ghcr.io/infinitydon/free5gc-charging-portal
-    tag: "v0.3.18"
-    pullPolicy: IfNotPresent
-  imagePullSecrets:
-    - name: ghcr-kaniko
-  replicaCount: 1
-  service:
-    type: NodePort
-    port: 8080
-    nodePort: 31381
-  nodeSelector:
-    kubernetes.io/hostname: ebpf-bng-node-02
-  podSecurityContext:
-    runAsNonRoot: true
-    runAsUser: 65532
-    runAsGroup: 65532
-    fsGroup: 65532
-  securityContext:
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-        - ALL
-  config:
-    portalTitle: free5GC Data Top-Up
-    mongoUri: mongodb://mongodb:27017
-    mongoDb: free5gc
-    chfBaseUrl: http://free5gc-charging-stack-free5gc-chf-service:8080
-    chfNotifyEnabled: true
-    endUserSelfTopup: true
-    trustedSubscriberHeaderEnabled: true
-    trustedSubscriberHeader: x-subscriber-supi
-    subscriberBindingsJson: '{"10.60.0.0/16":"imsi-208930000000001"}'
-    defaultSubscriberSupi: ""
-  livenessProbe:
-    httpGet:
-      path: /healthz
-      port: http
-  readinessProbe:
-    httpGet:
-      path: /healthz
-      port: http
-  resources: {}
 
 subscriberProvisioning:
   enabled: true
@@ -434,104 +432,9 @@ subscriberProvisioning:
         mbrDL: 208 Mbps
         gbrUL: 108 Mbps
         gbrDL: 108 Mbps
-    ChargingDatas:
-      - chargingMethod: Online
-        quota: "104857600"
-        unitCost: "1"
-        snssai: "01010203"
-        dnn: ""
-        filter: ""
-        qosRef: 1
-      - chargingMethod: Online
-        quota: "104857600"
-        unitCost: "1"
-        snssai: "01010203"
-        dnn: internet
-        filter: any
-        qosRef: 1
-      - chargingMethod: Online
-        quota: "104857600"
-        unitCost: "1"
-        snssai: "01112233"
-        dnn: ""
-        filter: ""
-        qosRef: 1
-      - chargingMethod: Online
-        quota: "104857600"
-        unitCost: "1"
-        snssai: "01112233"
-        dnn: internet
-        filter: any
-        qosRef: 1
-
 ueransim:
-  ueBrowser:
-    enabled: true
-    subscriberSupi: imsi-208930000000001
-    portalServiceUrl: http://free5gc-charging-stack-user-charging-portal:8080
-    trustedSubscriberHeader: x-subscriber-supi
-    browser:
-      image:
-        repository: kasmweb/chromium
-        tag: 1.17.0
-        pullPolicy: IfNotPresent
-      port: 6901
-      shmSize: 1Gi
-      env:
-        VNC_PW: free5gc
-        LAUNCH_URL: http://127.0.0.1:18080/
-        APP_ARGS: "--start-maximized --no-first-run --no-default-browser-check --disable-background-networking --disable-sync --disable-component-update --disable-features=Translate,AutofillServerCommunication,OptimizationHints"
-    binder:
-      enabled: true
-      image:
-        repository: ghcr.io/infinitydon/ueransim
-        tag: v3.2.4-rls600s-binder.1
-        pullPolicy: IfNotPresent
-      interface: uesimtun0
-      mountPath: /opt/ueransim-binder
-    proxy:
-      image:
-        repository: nginxinc/nginx-unprivileged
-        tag: 1.29.3-alpine
-      pullPolicy: IfNotPresent
-      port: 18080
-    internetProxy:
-      enabled: false
-      image:
-        repository: alpine
-        tag: 3.22.1
-        pullPolicy: IfNotPresent
-      port: 18888
-      user: nobody
-      group: nobody
-      uid: 65534
-      timeoutSeconds: 120
-      maxClients: 500
-    routeManager:
-      image:
-        repository: alpine
-        tag: 3.22.1
-        pullPolicy: IfNotPresent
-      mark: "0x5"
-      table: "105"
-    quotaGuard:
-      enabled: false
-      intervalSeconds: 5
-    usageReporter:
-      enabled: false
-      image:
-        repository: alpine
-        tag: 3.22.1
-        pullPolicy: IfNotPresent
-      portalUrl: http://free5gc-charging-stack-free5gc-charging-portal:8080
-      intervalSeconds: 5
-      interface: uesimtun0
-    service:
-      type: NodePort
-      port: 6901
-      nodePort: 31382
   global:
-    free5gcReleaseName: free5gc-charging-stack
+    free5gcReleaseName: free5gc-zebra
     gnb:
       multus:
         enabled: true

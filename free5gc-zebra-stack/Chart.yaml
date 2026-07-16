@@ -1,16 +1,13 @@
 apiVersion: v2
-name: free5gc-charging-stack
-description: free5GC v4.2.2 with Multus networking and the charging top-up portal
+name: free5gc-zebra-stack
+description: free5GC v4.2.2 with Multus networking and zebra-rs/cradle UPF datapath
 type: application
-version: 0.1.0
+version: 0.1.2
 appVersion: "v4.2.2"
 dependencies:
   - name: free5gc
     version: 1.1.7
     repository: file://charts/free5gc
-  - name: free5gc-charging-portal
-    version: 0.1.0
-    repository: file://charts/free5gc-charging-portal
   - name: ueransim
     version: 2.0.17
     repository: file://charts/ueransim
