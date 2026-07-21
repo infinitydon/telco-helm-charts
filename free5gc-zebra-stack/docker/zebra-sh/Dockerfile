@@ -62,6 +62,7 @@ COPY --from=zebra-builder /src/target/release/zebra-rs /usr/bin/zebra-rs
 COPY --from=zebra-builder /src/target/release/vtyctl /usr/bin/vtyctl
 COPY --from=zebra-builder /src/target/release/vtyhelper /usr/bin/vtyhelper
 COPY --from=zebra-builder /src/zebra-rs/yang/*.yang /etc/zebra-rs/yang/
+COPY --from=zebra-builder /src/zebra-rs/yang/*.yang /usr/share/zebra-rs/yang/
 COPY --from=cradle-builder /src/target/release/cradle /usr/bin/cradle
 
 RUN setcap 'cap_net_bind_service,cap_net_admin,cap_net_broadcast,cap_net_raw=ep' /usr/bin/zebra-rs \

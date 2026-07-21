@@ -7,14 +7,12 @@ this lab.
 The zebra/cradle image is pinned by default to:
 
 ```text
-ghcr.io/infinitydon/zebra-sh:26.7.4-nightly20260714
+ghcr.io/infinitydon/zebra-sh:26.7.7-nightly20260720
 ```
 
-Do not use floating `latest` tags for this chart. The released
-`ghcr.io/infinitydon/zebra-sh:v26.7.5` image was built and tested, but did not
-pass this lab datapath test. It accepted PFCP/session setup but did not program
-or use the GTP datapath (`gtp_encap=0`, `gtp_decap=0`) in either macvlan or
-host-device mode.
+Do not use floating `latest` tags for this chart. The default image was built
+from the zebra-rs and cradle-rs `nightly` refs published after zebra-rs issue
+`#1947`, which added the single-N6 UPF model.
 
 ## Datapath Modes
 
@@ -23,7 +21,14 @@ The chart supports two zebra/cradle attachment modes:
 | Mode | Value | Multus type | Expected XDP mode |
 | --- | --- | --- | --- |
 | Generic XDP | `zebra.dataplane.mode=macvlan` | `macvlan` | Generic XDP fallback |
-| Host-device | `zebra.dataplane.mode=hostDevice` | `host-device` | N3 native XDP; single-N6 logical children fall back to generic XDP |
+| Host-device | `zebra.dataplane.mode=hostDevice` | `host-device` | N3 native XDP |
+
+N6 attachment is selected separately with `zebra.interfaces.n6.mode`:
+
+| Mode | Value | Notes |
+| --- | --- | --- |
+| Host-device | `hostDevice` | Full lab smoke test, including iperf3, passed |
+| Macvlan | `macvlan` | ICMP/GTP passed in this lab, but iperf3 did not complete |
 
 The N6 gateway can also be selected independently:
 
@@ -45,12 +50,9 @@ zebra:
       device: enp8s24
 ```
 
-N6 is configured as one external network/device. The chart creates `n6ul` and
-`n6dl` as logical interfaces inside the zebra pod because the current
-zebra/cradle MUP datapath binds one VRF to one direction. Do not dedicate two
-physical N6 NICs just for this split; if native XDP is required on N6, the
-better long-term fix is for the datapath to support the usual operator model:
-N3 in one VRF and N6 in another VRF.
+N6 is configured as one external network/device and one service VRF. The MUP
+config binds both `route st1` and `route st2` to that same VRF, matching the
+normal telco model: N3 on the access/GTP side and one N6 network-facing side.
 
 ## Lab Defaults
 
@@ -72,8 +74,7 @@ Key lab addresses:
 | SMF N4 | `10.201.40.10` |
 | zebra N4 | `10.201.40.20` |
 | zebra N3 | `10.201.30.10` |
-| zebra N6 UL | `10.201.60.10` |
-| zebra N6 DL | `10.201.60.11` |
+| zebra N6 | `10.201.60.10` |
 | N6 gateway | `10.201.60.1` |
 | UE pool | `10.60.128.0/17` |
 
@@ -110,6 +111,7 @@ helm upgrade --install free5gc-zebra ./free5gc-zebra-stack \
   --set stackSmokeTest.iperf3.failOnError=true \
   --set zebra.dataplane.mode=hostDevice \
   --set zebra.interfaces.n3.device=enp8s23 \
+  --set zebra.interfaces.n6.mode=hostDevice \
   --set zebra.interfaces.n6.device=enp8s24 \
   --set n6Gateway.mode=macvlan \
   --no-hooks \
@@ -204,9 +206,6 @@ Check cradle routes:
 ```bash
 kubectl exec -n free5gc-zebra-test "$ZEBRA_POD" -c zebra -- \
   cradle dump ipv4 --grpc unix:cradle/grpc --vrf 1
-
-kubectl exec -n free5gc-zebra-test "$ZEBRA_POD" -c zebra -- \
-  cradle dump ipv4 --grpc unix:cradle/grpc --vrf 2
 ```
 
 Check UE tunnel and datapath manually:
@@ -240,7 +239,19 @@ kubectl exec -n free5gc-zebra-test "$UE_POD" -- \
 ## Observed Lab Results
 
 Current single-N6 host-device result with
-`ghcr.io/infinitydon/zebra-sh:26.7.4-nightly20260714`:
+`ghcr.io/infinitydon/zebra-sh:26.7.7-nightly20260720`:
+
+```text
+UE -> 10.201.60.1: 3/3 received, 0% loss
+UE -> 8.8.8.8: 3/3 received, 0% loss
+iperf3 sender:   285 MBytes, 479 Mbits/sec
+iperf3 receiver: 283 MBytes, 475 Mbits/sec
+gtp_encap: 73228
+gtp_decap: 221270
+```
+
+N3 host-device with N6 macvlan also programmed the single-N6 datapath and
+passed gateway/internet ping, but iperf3 did not complete in this lab:
 
 ```text
 UE -> 10.201.60.1: 3/3 received, 0% loss
@@ -248,19 +259,6 @@ UE -> 8.8.8.8: 3/3 received, 0% loss
 gtp_encap: increased
 gtp_decap: increased
 iperf3: TCP test did not complete
-```
-
-An earlier internal lab shape used two separate host-device-backed N6 legs and
-reached native-style throughput, but that is not the recommended chart model
-because it wastes physical interfaces for what should be one N6 network:
-
-```text
-UE -> 10.201.60.1: 3/3 received, 0% loss
-UE -> 8.8.8.8: 3/3 received, 0% loss
-iperf3 sender:   249 MBytes, 418 Mbits/sec
-iperf3 receiver: 246 MBytes, 412 Mbits/sec
-gtp_encap: 64514
-gtp_decap: 191878
 ```
 
 `ghcr.io/infinitydon/zebra-sh:v26.7.5` did not pass in this lab:
@@ -279,16 +277,16 @@ Build a specific zebra-rs/cradle combination:
 
 ```bash
 buildah bud \
-  --build-arg ZEBRA_REF=v26.7.5 \
-  --build-arg CRADLE_REF=a02afad54a22bcfa8339df2faad8e06d15d437c6 \
-  -t ghcr.io/infinitydon/zebra-sh:v26.7.5 \
+  --build-arg ZEBRA_REF=nightly \
+  --build-arg CRADLE_REF=nightly \
+  -t ghcr.io/infinitydon/zebra-sh:26.7.7-nightly20260720 \
   -f docker/zebra-sh/Dockerfile .
 ```
 
 Push it:
 
 ```bash
-buildah push ghcr.io/infinitydon/zebra-sh:v26.7.5
+buildah push ghcr.io/infinitydon/zebra-sh:26.7.7-nightly20260720
 ```
 
 Then test the image without changing chart defaults:
@@ -297,8 +295,9 @@ Then test the image without changing chart defaults:
 helm upgrade --install free5gc-zebra ./free5gc-zebra-stack \
   --namespace free5gc-zebra-test \
   --create-namespace \
-  --set zebra.image.tag=v26.7.5 \
+  --set zebra.image.tag=26.7.7-nightly20260720 \
   --set zebra.dataplane.mode=hostDevice \
+  --set zebra.interfaces.n6.mode=hostDevice \
   --set stackSmokeTest.enabled=true \
   --no-hooks \
   --timeout 10m \

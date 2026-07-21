@@ -30,7 +30,7 @@ n6Gateway:
   cidr: 24
   n6Subnet: 10.201.60.0/24
   ueSubnet: 10.60.128.0/17
-  zebraDownlinkIp: 10.201.60.11
+  zebraDownlinkIp: 10.201.60.10
   uplinkIf: eth0
   iperf3:
     enabled: true
@@ -40,7 +40,7 @@ zebra:
   enabled: true
   image:
     repository: ghcr.io/infinitydon/zebra-sh
-    tag: "26.7.4-nightly20260714"
+    tag: "26.7.7-nightly20260720"
     pullPolicy: IfNotPresent
   imagePullSecrets: []
   nodeSelector:
@@ -63,18 +63,10 @@ zebra:
     n6:
       name: n6
       networkName: ""
+      mode: hostDevice
       masterIf: enp8s22
       device: enp8s24
-    n6ul:
-      name: n6ul
-      networkName: ""
       ip: 10.201.60.10
-      cidr: 24
-      vrf: 2
-    n6dl:
-      name: n6dl
-      networkName: ""
-      ip: 10.201.60.11
       cidr: 24
       vrf: 1
   gatewayIp: 10.201.60.1
@@ -88,13 +80,9 @@ zebra:
     pfcp:
       listenAddress: 10.201.40.20
       port: 8805
-    vrfs:
-      downlink:
-        name: mobile-dl
-        rd: "65000:101"
-      uplink:
-        name: mobile-ul
-        rd: "65000:100"
+    vrf:
+      name: mobile
+      rd: "65000:1"
   resources: {}
 
 free5gc:
