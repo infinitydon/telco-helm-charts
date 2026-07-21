@@ -2,29 +2,21 @@
 {{- if or (eq .Values.subscriberProvisioning.image.tag "latest") (regexMatch "(:latest$|^latest$)" .Values.subscriberProvisioning.image.tag) -}}
 {{- fail "subscriberProvisioning.image.tag must not use latest" -}}
 {{- end -}}
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ .Release.Name }}-subscriber-provisioning
-  annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "5"
-    "helm.sh/hook-delete-policy": before-hook-creation
-data:
-  subscriber.json: |
-    {{- .Values.subscriberProvisioning.subscriber | toPrettyJson | nindent 4 }}
----
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ .Release.Name }}-subscriber-provisioning
-  annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "6"
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  name: {{ .Release.Name }}-subscriber-provisioning-{{ .Release.Revision }}
+  labels:
+    app.kubernetes.io/name: subscriber-provisioning
+    app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   backoffLimit: 3
+  ttlSecondsAfterFinished: 600
   template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: subscriber-provisioning
+        app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
       restartPolicy: Never
       nodeSelector:
@@ -44,6 +36,8 @@ spec:
               value: {{ .Values.subscriberProvisioning.subscriber.ueId | quote }}
             - name: PLMN_ID
               value: {{ .Values.subscriberProvisioning.subscriber.plmnID | quote }}
+            - name: SUBSCRIBER_JSON
+              value: {{ .Values.subscriberProvisioning.subscriber | toJson | quote }}
           command:
             - sh
             - -ceu
@@ -61,16 +55,8 @@ spec:
               url="$WEBUI_BASE_URL/api/subscriber/$UE_ID/$PLMN_ID"
               code="$(curl -sS -o /tmp/subscriber-get.json -w '%{http_code}' -H "Token: $token" "$url" || true)"
               if [ "$code" = "200" ]; then
-                curl -fsS -X PUT -H 'Content-Type: application/json' -H "Token: $token" --data-binary @/config/subscriber.json "$url"
+                curl -fsS -X PUT -H 'Content-Type: application/json' -H "Token: $token" --data "$SUBSCRIBER_JSON" "$url"
               else
-                curl -fsS -X POST -H 'Content-Type: application/json' -H "Token: $token" --data-binary @/config/subscriber.json "$url"
+                curl -fsS -X POST -H 'Content-Type: application/json' -H "Token: $token" --data "$SUBSCRIBER_JSON" "$url"
               fi
-          volumeMounts:
-            - name: payload
-              mountPath: /config
-              readOnly: true
-      volumes:
-        - name: payload
-          configMap:
-            name: {{ .Release.Name }}-subscriber-provisioning
 {{- end }}

@@ -56,8 +56,8 @@ spec:
 
           echo "cradle stats:"
           kubectl -n "$ns" exec "$zebra" -c zebra -- sh -lc "cradle stats --grpc unix:cradle/grpc | grep gtp"
-          echo "cradle VRF2:"
-          kubectl -n "$ns" exec "$zebra" -c zebra -- sh -lc "cradle dump ipv4 --grpc unix:cradle/grpc --vrf 2"
+          echo "cradle VRF{{ .Values.zebra.interfaces.n6.vrf }}:"
+          kubectl -n "$ns" exec "$zebra" -c zebra -- sh -lc "cradle dump ipv4 --grpc unix:cradle/grpc --vrf {{ .Values.zebra.interfaces.n6.vrf }}"
 
           {{- if .Values.stackSmokeTest.iperf3.enabled }}
           if {{ .Values.stackSmokeTest.installIperf3 }}; then

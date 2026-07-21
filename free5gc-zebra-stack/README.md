@@ -91,28 +91,18 @@ Native XDP / host-device zebra datapath:
 helm upgrade --install free5gc-zebra ./free5gc-zebra-stack \
   --namespace free5gc-zebra-test \
   --create-namespace \
-  --set stackSmokeTest.enabled=true \
-  --set stackSmokeTest.iperf3.failOnError=true \
   --set zebra.interfaces.n3.device=enp8s23 \
   --set zebra.interfaces.n6.device=enp8s24 \
   --set n6Gateway.mode=macvlan \
-  --no-hooks \
   --timeout 10m \
+  --wait-for-jobs \
   --wait
 ```
 
-Provision the default subscriber after the core is up:
-
-```bash
-helm template free5gc-zebra ./free5gc-zebra-stack \
-  --namespace free5gc-zebra-test \
-  --show-only templates/subscriber-provisioning.yaml \
-  | kubectl apply -n free5gc-zebra-test -f -
-
-kubectl wait -n free5gc-zebra-test \
-  --for=condition=complete job/free5gc-zebra-subscriber-provisioning \
-  --timeout=180s
-```
+The default subscriber is provisioned by a chart-managed Job during
+install/upgrade. `--wait-for-jobs` makes Helm wait for that provisioning Job to
+complete before the command returns. Set `subscriberProvisioning.enabled=false`
+only when you want to manage subscribers outside this chart.
 
 Wait for the workloads to be ready before running the smoke test:
 
@@ -124,7 +114,24 @@ kubectl rollout status -n free5gc-zebra-test deploy/free5gc-zebra-ueransim-ue
 
 ## Test
 
-Run the smoke test:
+The datapath smoke test is optional. Enable its resources during install or
+upgrade when you want Helm to render the test pod/RBAC:
+
+```bash
+helm upgrade --install free5gc-zebra ./free5gc-zebra-stack \
+  --namespace free5gc-zebra-test \
+  --create-namespace \
+  --set stackSmokeTest.enabled=true \
+  --set stackSmokeTest.iperf3.failOnError=true \
+  --set zebra.interfaces.n3.device=enp8s23 \
+  --set zebra.interfaces.n6.device=enp8s24 \
+  --set n6Gateway.mode=macvlan \
+  --timeout 10m \
+  --wait-for-jobs \
+  --wait
+```
+
+Then run:
 
 ```bash
 helm test free5gc-zebra -n free5gc-zebra-test --timeout 8m
@@ -141,6 +148,11 @@ The smoke test checks:
 The N6 gateway pod starts an `iperf3` server when `n6Gateway.iperf3.enabled`
 is true. The UE side installs `iperf3` during the smoke test when
 `stackSmokeTest.installIperf3` is true.
+
+`stackSmokeTest.enabled=true` does not run the test during install. It only
+renders the `helm test` pod/RBAC so you can run `helm test` afterward.
+`stackSmokeTest.iperf3.failOnError=true` makes the smoke test fail when the TCP
+iperf3 check fails instead of treating ping/GTP checks as sufficient.
 
 ## Status Checks
 
@@ -275,8 +287,8 @@ helm upgrade --install free5gc-zebra ./free5gc-zebra-stack \
   --create-namespace \
   --set zebra.image.tag=26.7.7-nightly20260720 \
   --set stackSmokeTest.enabled=true \
-  --no-hooks \
   --timeout 10m \
+  --wait-for-jobs \
   --wait
 ```
 
