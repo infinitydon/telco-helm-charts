@@ -114,14 +114,9 @@ kubectl wait -n free5gc-zebra-test \
   --timeout=180s
 ```
 
-Restart SMF/gNB/UE after provisioning to avoid the early UERANSIM attach race:
+Wait for the workloads to be ready before running the smoke test:
 
 ```bash
-kubectl rollout restart -n free5gc-zebra-test \
-  deploy/free5gc-zebra-free5gc-smf-smf \
-  deploy/free5gc-zebra-ueransim-gnb \
-  deploy/free5gc-zebra-ueransim-ue
-
 kubectl rollout status -n free5gc-zebra-test deploy/free5gc-zebra-free5gc-smf-smf
 kubectl rollout status -n free5gc-zebra-test deploy/free5gc-zebra-ueransim-gnb
 kubectl rollout status -n free5gc-zebra-test deploy/free5gc-zebra-ueransim-ue
