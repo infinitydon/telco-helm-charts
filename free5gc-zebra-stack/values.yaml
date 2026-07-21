@@ -45,13 +45,9 @@ zebra:
   imagePullSecrets: []
   nodeSelector:
     kubernetes.io/hostname: ebpf-bng-node-02
-  dataplane:
-    mode: macvlan
   interfaces:
     n3:
       name: n3
-      networkName: ""
-      masterIf: enp8s20
       device: enp8s23
       ip: 10.201.30.10
       cidr: 24
@@ -63,8 +59,6 @@ zebra:
     n6:
       name: n6
       networkName: ""
-      mode: hostDevice
-      masterIf: enp8s22
       device: enp8s24
       ip: 10.201.60.10
       cidr: 24

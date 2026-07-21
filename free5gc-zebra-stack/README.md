@@ -14,21 +14,19 @@ Do not use floating `latest` tags for this chart. The default image was built
 from the zebra-rs and cradle-rs `nightly` refs published after zebra-rs issue
 `#1947`, which added the single-N6 UPF model.
 
-## Datapath Modes
+## Datapath Mode
 
-The chart supports two zebra/cradle attachment modes:
+The chart uses Multus `host-device` for the zebra/cradle datapath:
 
-| Mode | Value | Multus type | Expected XDP mode |
-| --- | --- | --- | --- |
-| Generic XDP | `zebra.dataplane.mode=macvlan` | `macvlan` | Generic XDP fallback |
-| Host-device | `zebra.dataplane.mode=hostDevice` | `host-device` | N3 native XDP |
-
-N6 attachment is selected separately with `zebra.interfaces.n6.mode`:
-
-| Mode | Value | Notes |
+| Interface | Multus type | Expected XDP mode |
 | --- | --- | --- |
-| Host-device | `hostDevice` | Full lab smoke test, including iperf3, passed |
-| Macvlan | `macvlan` | ICMP/GTP passed in this lab, but iperf3 did not complete |
+| N3 | `host-device` | Native XDP |
+| N6 | `host-device` | Native driver path; single N6 service VRF |
+
+Macvlan support was removed from the zebra datapath values after lab testing:
+N3 host-device plus N6 macvlan passed ICMP and moved GTP counters, but the TCP
+iperf3 smoke test did not complete. The maintained deployment path is therefore
+one host-device for N3 and one host-device for the single N6 interface.
 
 The N6 gateway can also be selected independently:
 
@@ -41,8 +39,6 @@ For host-device mode, set the free worker-node interfaces explicitly:
 
 ```yaml
 zebra:
-  dataplane:
-    mode: hostDevice
   interfaces:
     n3:
       device: enp8s23
@@ -60,10 +56,12 @@ The default lab values pin workloads to `ebpf-bng-node-02` and use:
 
 | Network | Interface | Subnet |
 | --- | --- | --- |
-| N2 | `enp8s19` | `10.201.10.0/24` |
-| N3 | `enp8s20` or host-device `enp8s23` | `10.201.30.0/24` |
-| N4 | `enp8s21` | `10.201.40.0/24` |
-| N6 | `enp8s22` or host-device `enp8s24` | `10.201.60.0/24` |
+| N2 macvlan parent | `enp8s19` | `10.201.10.0/24` |
+| gNB N3 macvlan parent | `enp8s20` | `10.201.30.0/24` |
+| N4 macvlan parent | `enp8s21` | `10.201.40.0/24` |
+| zebra N3 host-device | `enp8s23` | `10.201.30.0/24` |
+| zebra N6 host-device | `enp8s24` | `10.201.60.0/24` |
+| N6 gateway macvlan parent | `enp8s22` | `10.201.60.0/24` |
 
 Key lab addresses:
 
@@ -87,21 +85,7 @@ free5gc:
 
 ## Install
 
-Generic XDP / macvlan:
-
-```bash
-helm upgrade --install free5gc-zebra ./free5gc-zebra-stack \
-  --namespace free5gc-zebra-test \
-  --create-namespace \
-  --set stackSmokeTest.enabled=true \
-  --set zebra.dataplane.mode=macvlan \
-  --set n6Gateway.mode=macvlan \
-  --no-hooks \
-  --timeout 10m \
-  --wait
-```
-
-Native XDP / host-device:
+Native XDP / host-device zebra datapath:
 
 ```bash
 helm upgrade --install free5gc-zebra ./free5gc-zebra-stack \
@@ -109,9 +93,7 @@ helm upgrade --install free5gc-zebra ./free5gc-zebra-stack \
   --create-namespace \
   --set stackSmokeTest.enabled=true \
   --set stackSmokeTest.iperf3.failOnError=true \
-  --set zebra.dataplane.mode=hostDevice \
   --set zebra.interfaces.n3.device=enp8s23 \
-  --set zebra.interfaces.n6.mode=hostDevice \
   --set zebra.interfaces.n6.device=enp8s24 \
   --set n6Gateway.mode=macvlan \
   --no-hooks \
@@ -250,8 +232,9 @@ gtp_encap: 73228
 gtp_decap: 221270
 ```
 
-N3 host-device with N6 macvlan also programmed the single-N6 datapath and
-passed gateway/internet ping, but iperf3 did not complete in this lab:
+Decision note: N3 host-device with N6 macvlan also programmed the single-N6
+datapath and passed gateway/internet ping, but iperf3 did not complete in this
+lab. The chart no longer exposes that zebra datapath mode.
 
 ```text
 UE -> 10.201.60.1: 3/3 received, 0% loss
@@ -296,8 +279,6 @@ helm upgrade --install free5gc-zebra ./free5gc-zebra-stack \
   --namespace free5gc-zebra-test \
   --create-namespace \
   --set zebra.image.tag=26.7.7-nightly20260720 \
-  --set zebra.dataplane.mode=hostDevice \
-  --set zebra.interfaces.n6.mode=hostDevice \
   --set stackSmokeTest.enabled=true \
   --no-hooks \
   --timeout 10m \
