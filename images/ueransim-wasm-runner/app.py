@@ -15,11 +15,15 @@ from urllib.parse import parse_qs
 import requests
 import socks
 import wasmtime
+import yaml
 
 
 HOST = os.getenv("LISTEN_HOST", "127.0.0.1")
 PORT = int(os.getenv("LISTEN_PORT", "8090"))
-UE_INTERFACE = os.getenv("UE_INTERFACE", "uesimtun0")
+UE_INTERFACE_PATTERN = os.getenv("UE_INTERFACE_PATTERN", "uesimtun*")
+UE_CONFIG_PATH = pathlib.Path(
+    os.getenv("UE_CONFIG_PATH", "/etc/ueransim/ue.yaml")
+)
 SOCKS_PROXY = os.getenv("SOCKS_PROXY", "socks5h://127.0.0.1:1080")
 SCENARIO_DIR = pathlib.Path(os.getenv("SCENARIO_DIR", "/scenarios"))
 DEFAULT_TARGET = os.getenv("DEFAULT_TARGET", "https://example.com")
@@ -27,16 +31,6 @@ PING_TARGET = os.getenv("PING_TARGET", "10.54.0.100")
 IPERF3_TARGET = os.getenv("IPERF3_TARGET", "10.54.0.101:5201")
 REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "20"))
 WASM_FUEL = int(os.getenv("WASM_FUEL", "1000000"))
-UE_IMSI = os.getenv("UE_IMSI", "")
-UE_GATEWAY = os.getenv("UE_GATEWAY", "")
-GNB_NAME = os.getenv("GNB_NAME", "")
-GNB_N2_ADDRESS = os.getenv("GNB_N2_ADDRESS", "")
-PLMN = os.getenv("PLMN", "")
-TAC = os.getenv("TAC", "")
-NR_CELL_ID = os.getenv("NR_CELL_ID", "")
-SLICE_SST = os.getenv("SLICE_SST", "")
-SLICE_SD = os.getenv("SLICE_SD", "")
-DNN = os.getenv("DNN", "")
 RUNNER_STARTED = time.time()
 
 BUILTIN_FUNCTIONS = {
@@ -73,14 +67,29 @@ traffic_lock = threading.Lock()
 traffic_sample = {"checked": 0.0, "rx": 0, "tx": 0}
 
 
+def ue_interface():
+    candidates = sorted(
+        path.name for path in pathlib.Path("/sys/class/net").glob(
+            UE_INTERFACE_PATTERN
+        )
+    )
+    for name in candidates:
+        if live_interface_address(name):
+            return name
+    return candidates[0] if candidates else ""
+
+
 def interface_ready():
-    return pathlib.Path(f"/sys/class/net/{UE_INTERFACE}").exists()
+    return bool(ue_interface())
 
 
-def live_interface_address():
+def live_interface_address(interface=None):
+    interface = interface or ue_interface()
+    if not interface:
+        return ""
     try:
         completed = subprocess.run(
-            ["ip", "-json", "address", "show", "dev", UE_INTERFACE],
+            ["ip", "-json", "address", "show", "dev", interface],
             capture_output=True,
             text=True,
             timeout=2,
@@ -104,13 +113,13 @@ def format_bitrate(bits_per_second):
         value /= 1000
 
 
-def tunnel_throughput():
+def tunnel_throughput(interface):
     try:
         rx = int(pathlib.Path(
-            f"/sys/class/net/{UE_INTERFACE}/statistics/rx_bytes"
+            f"/sys/class/net/{interface}/statistics/rx_bytes"
         ).read_text().strip())
         tx = int(pathlib.Path(
-            f"/sys/class/net/{UE_INTERFACE}/statistics/tx_bytes"
+            f"/sys/class/net/{interface}/statistics/tx_bytes"
         ).read_text().strip())
     except (OSError, ValueError):
         return {"rxBps": 0, "txBps": 0, "rxRate": "0 bps", "txRate": "0 bps"}
@@ -132,16 +141,43 @@ def tunnel_throughput():
     }
 
 
-def masked_imsi():
-    if len(UE_IMSI) < 9:
-        return UE_IMSI
-    return f"{UE_IMSI[:5]}••••••{UE_IMSI[-4:]}"
+def ue_config():
+    try:
+        parsed = yaml.safe_load(UE_CONFIG_PATH.read_text()) or {}
+    except (OSError, yaml.YAMLError):
+        return {}
+    session = (parsed.get("sessions") or [{}])[0] or {}
+    network_slice = session.get("slice") or {}
+    slice_sd = network_slice.get("sd", "")
+    if isinstance(slice_sd, int):
+        slice_sd = f"0x{slice_sd:06x}"
+    supi = str(parsed.get("supi", ""))
+    imsi = supi.removeprefix("imsi-")
+    gnb_list = parsed.get("gnbSearchList") or []
+    return {
+        "imsi": imsi,
+        "plmn": f'{parsed.get("mcc", "")}-{parsed.get("mnc", "")}'.strip("-"),
+        "servingGnb": str(gnb_list[0]) if gnb_list else "",
+        "slice": (
+            f'SST {network_slice.get("sst", "")} / '
+            f"SD {slice_sd}"
+        ),
+        "dnn": str(session.get("apn", session.get("dnn", ""))),
+    }
+
+
+def masked_imsi(imsi):
+    if len(imsi) < 9:
+        return imsi
+    return f"{imsi[:5]}••••••{imsi[-4:]}"
 
 
 def ue_status():
-    tunnel_ip = live_interface_address()
+    interface = ue_interface()
+    tunnel_ip = live_interface_address(interface)
     active = bool(tunnel_ip)
-    throughput = tunnel_throughput() if active else {
+    config = ue_config()
+    throughput = tunnel_throughput(interface) if active else {
         "rxBps": 0, "txBps": 0, "rxRate": "0 bps", "txRate": "0 bps"
     }
     with state_lock:
@@ -163,19 +199,16 @@ def ue_status():
         "updatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "registration": "Registered" if active else "Not registered",
         "pduSession": "Active" if active else "Inactive",
-        "tunnelInterface": UE_INTERFACE,
+        "tunnelInterface": interface or "Pending",
         "tunnelIp": tunnel_ip or "Pending",
-        "ueGateway": UE_GATEWAY,
         **throughput,
-        "servingGnb": GNB_NAME,
-        "gnbN2Address": GNB_N2_ADDRESS,
+        "servingGnb": config.get("servingGnb", ""),
         "gnbState": "Connected" if active else "Searching",
-        "plmn": PLMN,
-        "tac": TAC,
-        "nrCellId": NR_CELL_ID,
-        "slice": f"SST {SLICE_SST} / SD {SLICE_SD}",
-        "dnn": DNN,
-        "imsi": masked_imsi(),
+        "plmn": config.get("plmn", ""),
+        "slice": config.get("slice", ""),
+        "dnn": config.get("dnn", ""),
+        "imsi": masked_imsi(config.get("imsi", "")),
+        "configSource": str(UE_CONFIG_PATH),
         "uptimeSeconds": int(time.time() - RUNNER_STARTED),
         "testRunning": running,
         "lastTest": last_test,
@@ -199,17 +232,20 @@ def load_scenario(name):
 
 
 def run_scenario(name, target):
+    interface = ue_interface()
     started = time.time()
     result = {
         "scenario": name,
         "target": target,
-        "interface": UE_INTERFACE,
+        "interface": interface,
         "proxy": SOCKS_PROXY,
         "startedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started)),
         "logs": [],
     }
-    if not interface_ready():
-        raise RuntimeError(f"{UE_INTERFACE} is not present; refusing fallback routing")
+    if not interface:
+        raise RuntimeError(
+            f"no interface matches {UE_INTERFACE_PATTERN}; refusing fallback routing"
+        )
 
     config = wasmtime.Config()
     config.consume_fuel = True
@@ -251,12 +287,12 @@ def run_scenario(name, target):
 
     def interface_address():
         output = run_command(
-            ["ip", "-json", "address", "show", "dev", UE_INTERFACE]
+            ["ip", "-json", "address", "show", "dev", interface]
         )
         for address in json.loads(output)[0].get("addr_info", []):
             if address.get("family") == "inet":
                 return address["local"]
-        raise RuntimeError(f"{UE_INTERFACE} has no IPv4 address")
+        raise RuntimeError(f"{interface} has no IPv4 address")
 
     def proxy_socket(host, port):
         parsed = requests.utils.urlparse(SOCKS_PROXY)
@@ -367,7 +403,7 @@ def run_scenario(name, target):
     def ping_test():
         host, _ = target_host()
         output = run_command(
-            ["ping", "-n", "-I", UE_INTERFACE, "-c", "4", "-W", "2", host],
+            ["ping", "-n", "-I", interface, "-c", "4", "-W", "2", host],
             timeout=15,
         )
         loss = re.search(r"([\d.]+)% packet loss", output)
@@ -378,7 +414,7 @@ def run_scenario(name, target):
             {
                 "test": "ping",
                 "host": host,
-                "interface": UE_INTERFACE,
+                "interface": interface,
                 "packetLossPercent": float(loss.group(1)) if loss else None,
                 "minMs": float(timing.group(1)) if timing else None,
                 "avgMs": float(timing.group(2)) if timing else None,
@@ -396,7 +432,7 @@ def run_scenario(name, target):
                 "traceroute",
                 "-n",
                 "-i",
-                UE_INTERFACE,
+                interface,
                 "-m",
                 "12",
                 "-w",
@@ -418,7 +454,7 @@ def run_scenario(name, target):
                 "test": "traceroute",
                 "host": host,
                 "destinationIp": destination,
-                "interface": UE_INTERFACE,
+                "interface": interface,
                 "hopCount": len(hops),
                 "timedOutHops": sum(hop.endswith("*") for hop in hops),
                 "completed": True,
@@ -619,7 +655,7 @@ class Handler(BaseHTTPRequestHandler):
                 200 if self.path == "/api/status" or ready else 503,
                 {
                     "ready": ready,
-                    "interface": UE_INTERFACE,
+                    "interface": ue_interface(),
                     "proxy": SOCKS_PROXY,
                     "runtime": f"wasmtime-py {importlib.metadata.version('wasmtime')}",
                     "scenarios": scenario_names(),
@@ -668,7 +704,7 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     print(
         f"WASM runner listening on http://{HOST}:{PORT}; "
-        f"egress proxy={SOCKS_PROXY}, interface={UE_INTERFACE}",
+        f"egress proxy={SOCKS_PROXY}, interface-pattern={UE_INTERFACE_PATTERN}",
         flush=True,
     )
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()

@@ -87,12 +87,12 @@ simulated 5G connection state without requiring a separate UI image.
 
 On desktop-sized screens, the shell also shows a live UE telemetry rail. It
 refreshes every three seconds and reports registration and PDU state,
-`uesimtun0` address, UE gateway, live downlink/uplink rate, serving gNB, N2
-address, PLMN, TAC, NR Cell ID, slice, DNN, masked IMSI, session uptime, and
-the latest WASM test result. Rates are calculated from the tunnel interface
-byte counters and automatically displayed as bps, Kbps, Mbps, or Gbps. The
-HTTPS phone server proxies this telemetry internally from the runner; no
-additional public service is required.
+active `uesimtun*` interface and address, live downlink/uplink rate, configured
+gNB endpoint, PLMN, slice, DNN, masked IMSI, session uptime, and the latest
+WASM test result. Rates are calculated from the tunnel interface byte counters
+and automatically displayed as bps, Kbps, Mbps, or Gbps. The HTTPS phone
+server proxies this telemetry internally from the runner; no additional public
+service is required.
 
 The proxy image is private by default. Create an image pull secret and set:
 
@@ -106,8 +106,13 @@ Set `phoneUi.enabled=false` to deploy the original command-line-only UE.
 ## UE WebAssembly scenarios
 
 The optional `wasm-runner` sidecar executes fuel-limited WebAssembly modules
-without replacing the UE, browser, or fail-closed proxy. It has its own web UI
-on NodePort `30083`:
+without replacing the UE, browser, or fail-closed proxy. It mounts the same
+UERANSIM `ue.yaml` as the UE container and derives the IMSI, PLMN, gNB search
+endpoint, DNN, and requested slice directly from that file. It discovers the
+active interface matching `phoneUi.tunnelPattern` and obtains its address,
+gateway, and counters from the live network namespace. This avoids duplicating
+UE configuration in runner environment variables. It has its own web UI on
+NodePort `30083`:
 
 ```text
 http://<worker-node-ip>:30083

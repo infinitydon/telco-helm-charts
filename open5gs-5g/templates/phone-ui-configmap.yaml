@@ -80,7 +80,6 @@ data:
                 <div><dt>PDU session</dt><dd id="status-pdu">Checking</dd></div>
                 <div><dt>Tunnel</dt><dd id="status-tunnel">—</dd></div>
                 <div><dt>UE address</dt><dd id="status-ip">—</dd></div>
-                <div><dt>Gateway</dt><dd id="status-gateway">—</dd></div>
                 <div><dt>Downlink</dt><dd id="status-rx">—</dd></div>
                 <div><dt>Uplink</dt><dd id="status-tx">—</dd></div>
               </dl>
@@ -89,9 +88,7 @@ data:
               <h3>Serving network</h3>
               <dl>
                 <div><dt>gNB</dt><dd id="status-gnb">—</dd></div>
-                <div><dt>gNB N2</dt><dd id="status-gnb-ip">—</dd></div>
-                <div><dt>PLMN / TAC</dt><dd id="status-plmn">—</dd></div>
-                <div><dt>NR Cell ID</dt><dd id="status-cell">—</dd></div>
+                <div><dt>PLMN</dt><dd id="status-plmn">—</dd></div>
                 <div><dt>Slice</dt><dd id="status-slice">—</dd></div>
                 <div><dt>DNN</dt><dd id="status-dnn">—</dd></div>
                 <div><dt>IMSI</dt><dd id="status-imsi">—</dd></div>
@@ -135,13 +132,10 @@ data:
               statusText("status-pdu", data.pduSession);
               statusText("status-tunnel", data.tunnelInterface);
               statusText("status-ip", data.tunnelIp);
-              statusText("status-gateway", data.ueGateway);
               statusText("status-rx", data.rxRate);
               statusText("status-tx", data.txRate);
               statusText("status-gnb", `${data.servingGnb} · ${data.gnbState}`);
-              statusText("status-gnb-ip", data.gnbN2Address);
-              statusText("status-plmn", `${data.plmn} / ${data.tac}`);
-              statusText("status-cell", data.nrCellId);
+              statusText("status-plmn", data.plmn);
               statusText("status-slice", data.slice);
               statusText("status-dnn", data.dnn);
               statusText("status-imsi", data.imsi);
