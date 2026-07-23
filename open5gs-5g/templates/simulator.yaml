@@ -417,7 +417,7 @@ spec:
           args:
             - >-
               apk add --no-cache iperf3;
-              ip route add {{ .Values.ueSubnet }} via {{ .Values.addresses.upfN6 }} dev n6;
+              ip route add {{ .Values.ueSubnet }} via {{ .Values.addresses.upfN6 }} dev n6 onlink;
               exec iperf3 -s -p {{ .Values.iperf3Server.port }}
           ports:
             - name: iperf3
