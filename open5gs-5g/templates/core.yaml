@@ -85,6 +85,8 @@ spec:
               sysctl -w net.ipv4.conf.all.rp_filter=0;
               sysctl -w net.ipv4.conf.n3.rp_filter=0;
               sysctl -w net.ipv4.conf.n6.rp_filter=0;
+              ip rule add priority 100 from {{ $root.Values.ueSubnet }} table 65;
+              ip route add default via {{ $root.Values.addresses.dataN6 }} dev n6 table 65;
         {{- end }}
       {{- end }}
       containers:

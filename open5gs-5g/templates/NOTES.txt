@@ -11,6 +11,16 @@ Open the WebUI:
 {{- end }}
 {{- end }}
 
+{{- if .Values.phoneUi.enabled }}
+Open the UE phone browser:
+{{- if eq .Values.phoneUi.service.type "NodePort" }}
+  Browse to http://<worker-node-ip>:{{ .Values.phoneUi.service.nodePort }}
+{{- else }}
+  kubectl port-forward service/{{ include "open5gs-5g.fullname" . }}-phone 5800:{{ .Values.phoneUi.service.port }}
+  Browse to http://localhost:5800
+{{- end }}
+{{- end }}
+
 Multus networks:
   N2: {{ include "open5gs-5g.fullname" . }}-n2
   N3: {{ include "open5gs-5g.fullname" . }}-n3
@@ -22,3 +32,6 @@ Check registration and the PDU session:
 
 Ping the N6 test endpoint through the UE tunnel:
   kubectl exec deploy/{{ include "open5gs-5g.fullname" . }}-ue -- ping -I uesimtun0 {{ .Values.addresses.dataN6 }}
+
+Verify phone traffic exits through the UE tunnel:
+  kubectl exec deploy/{{ include "open5gs-5g.fullname" . }}-ue -c phone-proxy -- verify-ue-path

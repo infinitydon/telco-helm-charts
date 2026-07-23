@@ -64,3 +64,34 @@ webui:
     type: NodePort
     port: 9999
     nodePort: 30081
+
+phoneUi:
+  enabled: true
+  proxyImage: ghcr.io/infinitydon/ueransim-phone:v0.2.1
+  browserImage: lscr.io/linuxserver/chromium:bf9e0b4f-ls46
+  tunnelPattern: "uesimtun*"
+  homeUrl: https://example.com
+  display:
+    width: 390
+    height: 844
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 30082
+  resources:
+    proxy:
+      requests:
+        cpu: 10m
+        memory: 16Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+    browser:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+
+imagePullSecrets: []

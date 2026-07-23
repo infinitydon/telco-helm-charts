@@ -87,6 +87,10 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       nodeSelector:
         {{- toYaml .Values.nodeSelector | nindent 8 }}
       initContainers:
@@ -127,10 +131,90 @@ spec:
             - name: config
               mountPath: /etc/ueransim/ue.yaml
               subPath: ue.yaml
+        {{- if .Values.phoneUi.enabled }}
+        - name: phone-proxy
+          image: {{ .Values.phoneUi.proxyImage }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: UE_TUN_PATTERN
+              value: {{ .Values.phoneUi.tunnelPattern | quote }}
+          resources:
+            {{- toYaml .Values.phoneUi.resources.proxy | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [SETGID, SETUID]
+        - name: phone
+          image: {{ .Values.phoneUi.browserImage }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: TITLE
+              value: UERANSIM Phone
+            - name: CHROME_CLI
+              value: {{ printf "--kiosk --proxy-server=socks5://127.0.0.1:1080 %s" .Values.phoneUi.homeUrl | quote }}
+            - name: SELKIES_MANUAL_WIDTH
+              value: {{ .Values.phoneUi.display.width | quote }}
+            - name: SELKIES_MANUAL_HEIGHT
+              value: {{ .Values.phoneUi.display.height | quote }}
+            - name: MAX_RES
+              value: {{ printf "%vx%v" .Values.phoneUi.display.width .Values.phoneUi.display.height | quote }}
+            - name: NO_DECOR
+              value: "true"
+            - name: HARDEN_DESKTOP
+              value: "true"
+            - name: HARDEN_OPENBOX
+              value: "true"
+            - name: DISABLE_IPV6
+              value: "true"
+            - name: SELKIES_UI_TITLE
+              value: UERANSIM Phone
+            - name: SELKIES_UI_SHOW_LOGO
+              value: "false|locked"
+            - name: SELKIES_UI_SIDEBAR_SHOW_FILES
+              value: "false|locked"
+            - name: SELKIES_UI_SIDEBAR_SHOW_APPS
+              value: "false|locked"
+          ports:
+            - name: phone-http
+              containerPort: 3000
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /
+              port: phone-http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.phoneUi.resources.browser | nindent 12 }}
+        {{- end }}
       volumes:
         - name: config
           configMap:
             name: {{ include "open5gs-5g.fullname" . }}-configs
+{{- if .Values.phoneUi.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-phone
+  labels:
+    {{- include "open5gs-5g.labels" . | nindent 4 }}
+    app.kubernetes.io/component: phone
+spec:
+  type: {{ .Values.phoneUi.service.type }}
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: ue
+  ports:
+    - name: http
+      port: {{ .Values.phoneUi.service.port }}
+      targetPort: phone-http
+      protocol: TCP
+      {{- if and (eq .Values.phoneUi.service.type "NodePort") .Values.phoneUi.service.nodePort }}
+      nodePort: {{ .Values.phoneUi.service.nodePort }}
+      {{- end }}
+{{- end }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -162,9 +246,14 @@ spec:
         - name: data
           image: {{ .Values.image.toolbox }}
           securityContext:
+            privileged: true
             capabilities: { add: [NET_ADMIN] }
           command: ["/bin/sh", "-ec"]
           args:
             - >-
+              apk add --no-cache iptables;
+              sysctl -w net.ipv4.ip_forward=1;
+              sysctl -w net.ipv4.conf.all.rp_filter=0;
               ip route add {{ .Values.ueSubnet }} via {{ .Values.addresses.upfN6 }} dev n6;
+              iptables -t nat -A POSTROUTING -s {{ .Values.ueSubnet }} -o eth0 -j MASQUERADE;
               sleep infinity

@@ -61,12 +61,36 @@ Set `webui.enabled=false` to disable the WebUI. Override
 `webui.service.type` or `webui.service.nodePort` when NodePort is unsuitable
 or port `30081` is already allocated.
 
+## UE phone browser
+
+The UERANSIM UE pod includes a mobile-sized Chromium UI and a fail-closed
+SOCKS5 proxy. The proxy waits for `uesimtun*` and binds its outbound sockets to
+that interface, so browser traffic cannot silently use the pod's Kubernetes
+interface.
+
+The phone UI defaults to NodePort `30082`:
+
+```text
+http://<worker-node-ip>:30082
+```
+
+The proxy image is private by default. Create an image pull secret and set:
+
+```yaml
+imagePullSecrets:
+  - name: ghcr-ueransim-phone
+```
+
+Set `phoneUi.enabled=false` to deploy the original command-line-only UE.
+
 ## Verify
 
 ```powershell
 kubectl logs -n open5gs-5g deploy/open5gs-5g-open5gs-5g-ue
 kubectl exec -n open5gs-5g deploy/open5gs-5g-open5gs-5g-ue -- `
   ping -I uesimtun0 -c 5 10.54.0.100
+kubectl exec -n open5gs-5g deploy/open5gs-5g-open5gs-5g-ue `
+  -c phone-proxy -- verify-ue-path
 ```
 
 Expected results include successful registration, a PDU session with

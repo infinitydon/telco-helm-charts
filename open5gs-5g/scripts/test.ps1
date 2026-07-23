@@ -2,6 +2,7 @@ param(
     [string]$Namespace = "open5gs-5g",
     [string]$Release = "open5gs-5g",
     [string]$Kubeconfig = "",
+    [string]$DataEndpoint = "10.54.0.100",
     [int]$TimeoutSeconds = 180
 )
 
@@ -13,6 +14,7 @@ if ($Kubeconfig) {
 $deployment = "$Release-open5gs-5g-ue"
 $dataDeployment = "$Release-open5gs-5g-data"
 $webuiService = "$Release-open5gs-5g-webui"
+$phoneService = "$Release-open5gs-5g-phone"
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 
 kubectl @kubectlArgs wait --namespace $Namespace --for=condition=Available `
@@ -42,9 +44,22 @@ if (-not $logs.Contains("PDU Session establishment is successful")) {
 }
 
 kubectl @kubectlArgs exec --namespace $Namespace "deployment/$deployment" --container ue -- `
-    ping -I uesimtun0 -c 5 -W 2 10.54.0.100
+    ping -I uesimtun0 -c 5 -W 2 $DataEndpoint
 if ($LASTEXITCODE -ne 0) {
     throw "5G UE could not reach the N6 test endpoint."
 }
+
+kubectl @kubectlArgs exec --namespace $Namespace "deployment/$deployment" `
+    --container phone-proxy -- verify-ue-path
+if ($LASTEXITCODE -ne 0) {
+    throw "Phone browser proxy could not reach the Internet through uesimtun."
+}
+
+$phoneNodePort = kubectl @kubectlArgs get service --namespace $Namespace `
+    $phoneService -o jsonpath='{.spec.ports[0].nodePort}'
+if (-not $phoneNodePort) {
+    throw "Phone UI does not have a NodePort."
+}
+Write-Host "Phone UI NodePort is $phoneNodePort."
 
 Write-Host "5G end-to-end test passed."
