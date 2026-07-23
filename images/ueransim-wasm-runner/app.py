@@ -27,6 +27,17 @@ PING_TARGET = os.getenv("PING_TARGET", "10.54.0.100")
 IPERF3_TARGET = os.getenv("IPERF3_TARGET", "10.54.0.101:5201")
 REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "20"))
 WASM_FUEL = int(os.getenv("WASM_FUEL", "1000000"))
+UE_IMSI = os.getenv("UE_IMSI", "")
+UE_GATEWAY = os.getenv("UE_GATEWAY", "")
+GNB_NAME = os.getenv("GNB_NAME", "")
+GNB_N2_ADDRESS = os.getenv("GNB_N2_ADDRESS", "")
+PLMN = os.getenv("PLMN", "")
+TAC = os.getenv("TAC", "")
+NR_CELL_ID = os.getenv("NR_CELL_ID", "")
+SLICE_SST = os.getenv("SLICE_SST", "")
+SLICE_SD = os.getenv("SLICE_SD", "")
+DNN = os.getenv("DNN", "")
+RUNNER_STARTED = time.time()
 
 BUILTIN_FUNCTIONS = {
     "builtin-http": "http_get",
@@ -59,10 +70,92 @@ state = {
     "running": False,
     "last_run": None,
 }
+egress_cache = {"value": "", "checked": 0.0}
 
 
 def interface_ready():
     return pathlib.Path(f"/sys/class/net/{UE_INTERFACE}").exists()
+
+
+def live_interface_address():
+    try:
+        completed = subprocess.run(
+            ["ip", "-json", "address", "show", "dev", UE_INTERFACE],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=True,
+        )
+        for address in json.loads(completed.stdout)[0].get("addr_info", []):
+            if address.get("family") == "inet":
+                return address["local"]
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError, KeyError):
+        pass
+    return ""
+
+
+def public_egress_ip():
+    now = time.time()
+    if egress_cache["value"] and now - egress_cache["checked"] < 60:
+        return egress_cache["value"]
+    try:
+        response = requests.get(
+            "https://api.ipify.org",
+            proxies={"http": SOCKS_PROXY, "https": SOCKS_PROXY},
+            timeout=5,
+        )
+        response.raise_for_status()
+        egress_cache.update(value=response.text.strip(), checked=now)
+    except requests.RequestException:
+        return egress_cache["value"]
+    return egress_cache["value"]
+
+
+def masked_imsi():
+    if len(UE_IMSI) < 9:
+        return UE_IMSI
+    return f"{UE_IMSI[:5]}••••••{UE_IMSI[-4:]}"
+
+
+def ue_status():
+    tunnel_ip = live_interface_address()
+    active = bool(tunnel_ip)
+    with state_lock:
+        last_run = state["last_run"]
+        running = state["running"]
+    last_test = None
+    if last_run:
+        last_test = {
+            "scenario": last_run.get("scenario"),
+            "ok": last_run.get("ok"),
+            "durationMs": last_run.get("durationMs"),
+            "target": last_run.get("target"),
+        }
+        request = last_run.get("request") or {}
+        for key in ("avgMs", "receivedMbps", "status", "publicIp"):
+            if key in request:
+                last_test[key] = request[key]
+    return {
+        "updatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "registration": "Registered" if active else "Not registered",
+        "pduSession": "Active" if active else "Inactive",
+        "tunnelInterface": UE_INTERFACE,
+        "tunnelIp": tunnel_ip or "Pending",
+        "ueGateway": UE_GATEWAY,
+        "publicEgressIp": public_egress_ip() if active else "",
+        "servingGnb": GNB_NAME,
+        "gnbN2Address": GNB_N2_ADDRESS,
+        "gnbState": "Connected" if active else "Searching",
+        "plmn": PLMN,
+        "tac": TAC,
+        "nrCellId": NR_CELL_ID,
+        "slice": f"SST {SLICE_SST} / SD {SLICE_SD}",
+        "dnn": DNN,
+        "imsi": masked_imsi(),
+        "uptimeSeconds": int(time.time() - RUNNER_STARTED),
+        "testRunning": running,
+        "lastTest": last_test,
+    }
 
 
 def scenario_names():
@@ -513,6 +606,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        elif self.path == "/api/ue-status":
+            self.send_json(200, ue_status())
         elif self.path in ("/healthz", "/api/status"):
             ready = interface_ready()
             self.send_json(

@@ -160,7 +160,7 @@ data:
   gnb.yaml: |
     mcc: {{ .Values.plmn.mcc | quote }}
     mnc: {{ .Values.plmn.mnc | quote }}
-    nci: "0x000000010"
+    nci: {{ .Values.gnb.nci | quote }}
     idLength: 32
     tac: {{ printf "%06d" (.Values.plmn.tac | int) | quote }}
     linkIp: 0.0.0.0

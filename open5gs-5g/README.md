@@ -85,6 +85,13 @@ mobile layouts. Its web traffic is forced through the UE tunnel. A chart-managed
 responsive phone shell frames the embedded Selkies client and displays the
 simulated 5G connection state without requiring a separate UI image.
 
+On desktop-sized screens, the shell also shows a live UE telemetry rail. It
+refreshes every three seconds and reports registration and PDU state,
+`uesimtun0` address, UE gateway, public egress, serving gNB, N2 address, PLMN,
+TAC, NR Cell ID, slice, DNN, masked IMSI, session uptime, and the latest WASM
+test result. The HTTPS phone server proxies this telemetry internally from the
+runner; no additional public service is required.
+
 The proxy image is private by default. Create an image pull secret and set:
 
 ```yaml

@@ -245,6 +245,26 @@ spec:
               value: {{ .Values.addresses.dataN6 | quote }}
             - name: IPERF3_TARGET
               value: {{ printf "%s:%v" .Values.addresses.iperfN6 .Values.iperf3Server.port | quote }}
+            - name: UE_IMSI
+              value: {{ .Values.subscriber.imsi | quote }}
+            - name: UE_GATEWAY
+              value: {{ .Values.ueGateway | quote }}
+            - name: GNB_NAME
+              value: {{ printf "%s-gnb" (include "open5gs-5g.fullname" .) | quote }}
+            - name: GNB_N2_ADDRESS
+              value: {{ .Values.addresses.gnbN2 | quote }}
+            - name: PLMN
+              value: {{ printf "%s-%s" .Values.plmn.mcc .Values.plmn.mnc | quote }}
+            - name: TAC
+              value: {{ .Values.plmn.tac | quote }}
+            - name: NR_CELL_ID
+              value: {{ .Values.gnb.nci | quote }}
+            - name: SLICE_SST
+              value: {{ .Values.subscriber.sst | quote }}
+            - name: SLICE_SD
+              value: {{ .Values.subscriber.sd | quote }}
+            - name: DNN
+              value: {{ .Values.subscriber.dnn | quote }}
             - name: REQUEST_TIMEOUT_SECONDS
               value: {{ .Values.wasmRunner.requestTimeoutSeconds | quote }}
             - name: WASM_FUEL
