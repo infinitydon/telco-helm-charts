@@ -95,14 +95,20 @@ Set `phoneUi.enabled=false` to deploy the original command-line-only UE.
 ## UE WebAssembly scenarios
 
 The optional `wasm-runner` sidecar executes fuel-limited WebAssembly modules
-without replacing the UE, browser, or fail-closed proxy. Open
-`http://127.0.0.1:8090` inside the simulated phone's Chromium browser to run
-the built-in HTTP scenario. Requests are sent to the existing SOCKS5 proxy,
-whose outbound sockets are bound to `uesimtun0`.
+without replacing the UE, browser, or fail-closed proxy. It has its own web UI
+on NodePort `30083`:
 
-The runner refuses to execute when `uesimtun0` is missing. Its API listens
-only on the pod loopback interface and is not published as another NodePort.
-The phone UI remains available through NodePort `30082`.
+```text
+http://<worker-node-ip>:30083
+```
+
+Run the built-in HTTP scenario there independently of the phone UI. Requests
+are sent to the existing SOCKS5 proxy, whose outbound sockets are bound to
+`uesimtun0`.
+
+The runner refuses to execute when `uesimtun0` is missing. The phone UI remains
+available separately through NodePort `30082`. Override
+`wasmRunner.service.type` or `wasmRunner.service.nodePort` when needed.
 
 To add custom modules, create a ConfigMap containing files named `*.wasm` and
 set `wasmRunner.existingScenarioConfigMap`. Modules must export `run`, export

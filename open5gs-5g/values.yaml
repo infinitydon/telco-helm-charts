@@ -97,8 +97,13 @@ phoneUi:
 wasmRunner:
   enabled: true
   image: ghcr.io/infinitydon/ueransim-wasm-runner:v0.1.0
+  listenHost: 0.0.0.0
   listenPort: 8090
   defaultTarget: https://example.com
+  service:
+    type: NodePort
+    port: 8090
+    nodePort: 30083
   # Optional ConfigMap containing one or more files named *.wasm.
   existingScenarioConfigMap: ""
   requestTimeoutSeconds: 20

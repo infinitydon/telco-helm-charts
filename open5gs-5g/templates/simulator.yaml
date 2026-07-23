@@ -228,7 +228,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - name: LISTEN_HOST
-              value: "127.0.0.1"
+              value: {{ .Values.wasmRunner.listenHost | quote }}
             - name: LISTEN_PORT
               value: {{ .Values.wasmRunner.listenPort | quote }}
             - name: UE_INTERFACE
@@ -241,6 +241,10 @@ spec:
               value: {{ .Values.wasmRunner.requestTimeoutSeconds | quote }}
             - name: WASM_FUEL
               value: {{ .Values.wasmRunner.fuel | int | quote }}
+          ports:
+            - name: wasm-http
+              containerPort: {{ .Values.wasmRunner.listenPort }}
+              protocol: TCP
           readinessProbe:
             exec:
               command:
@@ -300,6 +304,29 @@ spec:
       protocol: TCP
       {{- if and (eq .Values.phoneUi.service.type "NodePort") .Values.phoneUi.service.nodePort }}
       nodePort: {{ .Values.phoneUi.service.nodePort }}
+      {{- end }}
+{{- end }}
+{{- if .Values.wasmRunner.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-wasm
+  labels:
+    {{- include "open5gs-5g.labels" . | nindent 4 }}
+    app.kubernetes.io/component: wasm-runner
+spec:
+  type: {{ .Values.wasmRunner.service.type }}
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: ue
+  ports:
+    - name: http
+      port: {{ .Values.wasmRunner.service.port }}
+      targetPort: wasm-http
+      protocol: TCP
+      {{- if and (eq .Values.wasmRunner.service.type "NodePort") .Values.wasmRunner.service.nodePort }}
+      nodePort: {{ .Values.wasmRunner.service.nodePort }}
       {{- end }}
 {{- end }}
 ---
