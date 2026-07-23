@@ -78,7 +78,9 @@ The browser container generates a self-signed certificate by default. Accept
 the browser warning for the lab address, or provide a certificate trusted by
 your clients. Chromium starts maximized in the portrait session with its URL
 and navigation controls visible. Its web traffic is forced through the UE
-tunnel.
+tunnel. A chart-managed responsive phone shell frames the embedded Selkies
+client and displays the simulated 5G connection state without requiring a
+separate UI image.
 
 The proxy image is private by default. Create an image pull secret and set:
 

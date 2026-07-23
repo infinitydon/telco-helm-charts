@@ -86,6 +86,9 @@ spec:
         app.kubernetes.io/component: ue
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
+        {{- if .Values.phoneUi.enabled }}
+        checksum/phone-ui: {{ include (print $.Template.BasePath "/phone-ui-configmap.yaml") . | sha256sum }}
+        {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -195,11 +198,25 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.phoneUi.resources.browser | nindent 12 }}
+          volumeMounts:
+            - name: phone-ui
+              mountPath: /usr/share/selkies/web/index.html
+              subPath: index.html
+              readOnly: true
+            - name: phone-ui
+              mountPath: /usr/share/selkies/web/phone.css
+              subPath: phone.css
+              readOnly: true
         {{- end }}
       volumes:
         - name: config
           configMap:
             name: {{ include "open5gs-5g.fullname" . }}-configs
+        {{- if .Values.phoneUi.enabled }}
+        - name: phone-ui
+          configMap:
+            name: {{ include "open5gs-5g.fullname" . }}-phone-ui
+        {{- end }}
 {{- if .Values.phoneUi.enabled }}
 ---
 apiVersion: v1
