@@ -71,8 +71,12 @@ interface.
 The phone UI defaults to NodePort `30082`:
 
 ```text
-http://<worker-node-ip>:30082
+https://<worker-node-ip>:30082
 ```
+
+The browser container generates a self-signed certificate by default. Accept
+the browser warning for the lab address, or provide a certificate trusted by
+your clients.
 
 The proxy image is private by default. Create an image pull secret and set:
 

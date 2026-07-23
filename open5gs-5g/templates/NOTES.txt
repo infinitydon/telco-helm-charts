@@ -14,7 +14,7 @@ Open the WebUI:
 {{- if .Values.phoneUi.enabled }}
 Open the UE phone browser:
 {{- if eq .Values.phoneUi.service.type "NodePort" }}
-  Browse to http://<worker-node-ip>:{{ .Values.phoneUi.service.nodePort }}
+  Browse to https://<worker-node-ip>:{{ .Values.phoneUi.service.nodePort }}
 {{- else }}
   kubectl port-forward service/{{ include "open5gs-5g.fullname" . }}-phone 5800:{{ .Values.phoneUi.service.port }}
   Browse to http://localhost:5800

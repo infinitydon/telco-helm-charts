@@ -179,10 +179,14 @@ spec:
             - name: phone-http
               containerPort: 3000
               protocol: TCP
+            - name: phone-https
+              containerPort: 3001
+              protocol: TCP
           readinessProbe:
             httpGet:
               path: /
-              port: phone-http
+              port: phone-https
+              scheme: HTTPS
             initialDelaySeconds: 15
             periodSeconds: 10
           resources:
@@ -209,7 +213,7 @@ spec:
   ports:
     - name: http
       port: {{ .Values.phoneUi.service.port }}
-      targetPort: phone-http
+      targetPort: phone-https
       protocol: TCP
       {{- if and (eq .Values.phoneUi.service.type "NodePort") .Values.phoneUi.service.nodePort }}
       nodePort: {{ .Values.phoneUi.service.nodePort }}

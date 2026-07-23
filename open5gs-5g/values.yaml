@@ -76,7 +76,7 @@ phoneUi:
     height: 844
   service:
     type: NodePort
-    port: 80
+    port: 443
     nodePort: 30082
   resources:
     proxy:
