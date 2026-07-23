@@ -127,14 +127,16 @@ Built-in WASM scenarios include:
 - `builtin-http`: HTTP status, redirect, response size, and server
 - `builtin-tcp`: SOCKS-routed TCP connection time
 - `builtin-tls`: TLS handshake time, protocol, cipher, and certificate subject
-- `builtin-download`: downloaded bytes and calculated throughput
+- `builtin-download`: selectable 10 MB, 100 MB, or 1 GB test file with
+  downloaded bytes and calculated throughput
 - `builtin-ping`: four ICMP probes bound directly to `uesimtun0`
 - `builtin-traceroute`: up to 12 hops bound directly to `uesimtun0`
 - `builtin-iperf3`: a three-second TCP throughput test to the dedicated N6 server
 
 Each selection supplies an operational default target: Cloudflare trace for
-HTTP, Cloudflare HTTPS for TCP and TLS, Cloudflare's 1 MB speed endpoint for
-download. The target remains editable.
+HTTP, Cloudflare HTTPS for TCP and TLS, and Tele2's public speed-test files for
+downloads. Tele2 provides sparse HTTP test files at the selectable 10 MB,
+100 MB, and 1 GB sizes. The target remains editable.
 Ping and traceroute default to `10.54.0.100`; iperf3 defaults to the dedicated
 chart-managed server at `10.54.0.101:5201`.
 

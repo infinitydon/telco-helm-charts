@@ -101,7 +101,7 @@ phoneUi:
 
 wasmRunner:
   enabled: true
-  image: ghcr.io/infinitydon/ueransim-wasm-runner:v0.5.0
+  image: ghcr.io/infinitydon/ueransim-wasm-runner:v0.5.1
   listenHost: 0.0.0.0
   listenPort: 8090
   defaultTarget: https://www.cloudflare.com/cdn-cgi/trace

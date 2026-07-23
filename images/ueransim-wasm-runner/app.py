@@ -570,6 +570,14 @@ PAGE = """<!doctype html>
   <p id="health">Checking UE path…</p>
   <form id="runner">
     <label for="scenario">Scenario</label><select id="scenario"></select>
+    <div id="download-size-field" hidden>
+      <label for="download-size">Download size</label>
+      <select id="download-size">
+        <option value="http://speedtest.tele2.net/10MB.zip">10 MB</option>
+        <option value="http://speedtest.tele2.net/100MB.zip">100 MB</option>
+        <option value="http://speedtest.tele2.net/1GB.zip">1 GB</option>
+      </select>
+    </div>
     <label for="target">Target URL, host, or IP</label><input id="target" value="__DEFAULT_TARGET__" required>
     <button id="run" type="submit">Run through 5G UE</button>
   </form>
@@ -580,11 +588,14 @@ const health = document.querySelector('#health');
 const scenario = document.querySelector('#scenario');
 const result = document.querySelector('#result');
 const button = document.querySelector('#run');
+const target = document.querySelector('#target');
+const downloadSize = document.querySelector('#download-size');
+const downloadSizeField = document.querySelector('#download-size-field');
 const targets = {
   'builtin-http': 'https://www.cloudflare.com/cdn-cgi/trace',
   'builtin-tcp': 'https://www.cloudflare.com',
   'builtin-tls': 'https://www.cloudflare.com',
-  'builtin-download': 'https://speed.cloudflare.com/__down?bytes=1000000',
+  'builtin-download': 'http://speedtest.tele2.net/10MB.zip',
   'builtin-ping': '__PING_TARGET__',
   'builtin-traceroute': '__PING_TARGET__',
   'builtin-iperf3': '__IPERF3_TARGET__'
@@ -593,11 +604,19 @@ async function refresh() {
   const r = await fetch('/api/status'); const s = await r.json();
   health.className = s.ready ? 'ready' : 'down';
   health.textContent = s.ready ? `Ready — ${s.interface} and SOCKS proxy configured` : `Not ready — ${s.interface} missing`;
+  const selected = scenario.value;
   scenario.replaceChildren(...s.scenarios.map(n => Object.assign(document.createElement('option'), {value:n,textContent:n})));
+  if (s.scenarios.includes(selected)) scenario.value = selected;
+  updateScenarioControls(false);
 }
-scenario.addEventListener('change', () => {
-  if (targets[scenario.value]) document.querySelector('#target').value = targets[scenario.value];
-});
+function updateScenarioControls(resetTarget = true) {
+  const isDownload = scenario.value === 'builtin-download';
+  downloadSizeField.hidden = !isDownload;
+  if (resetTarget && targets[scenario.value]) target.value = targets[scenario.value];
+  if (isDownload && resetTarget) downloadSize.value = target.value;
+}
+scenario.addEventListener('change', () => updateScenarioControls());
+downloadSize.addEventListener('change', () => { target.value = downloadSize.value; });
 document.querySelector('#runner').addEventListener('submit', async e => {
   e.preventDefault();
   button.disabled = true;
@@ -609,7 +628,7 @@ document.querySelector('#runner').addEventListener('submit', async e => {
       'Ping normally takes about 3s; iperf3 about 3s; traceroute can take up to 35s.';
   }, 250);
   try {
-    const body = new URLSearchParams({scenario:scenario.value,target:document.querySelector('#target').value});
+    const body = new URLSearchParams({scenario:scenario.value,target:target.value});
     const r = await fetch('/api/run', {method:'POST',body});
     clearInterval(timer);
     result.textContent = JSON.stringify(await r.json(), null, 2);
