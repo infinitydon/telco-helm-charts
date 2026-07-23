@@ -99,10 +99,10 @@ phoneUi:
 
 wasmRunner:
   enabled: true
-  image: ghcr.io/infinitydon/ueransim-wasm-runner:v0.2.0
+  image: ghcr.io/infinitydon/ueransim-wasm-runner:v0.2.1
   listenHost: 0.0.0.0
   listenPort: 8090
-  defaultTarget: https://example.com
+  defaultTarget: https://www.cloudflare.com/cdn-cgi/trace
   service:
     type: NodePort
     port: 8090

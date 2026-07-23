@@ -140,7 +140,7 @@ data:
     .signal-bars i:nth-child(4) { height: 12px; }
     .device {
       position: relative;
-      width: min(390px, calc((100vh - 126px) * .462085), calc(100vw - 40px));
+      width: min(430px, calc((100vh - 126px) * .462085), calc(100vw - 40px));
       aspect-ratio: 390 / 844;
       min-height: 0;
       overflow: hidden;
@@ -235,7 +235,7 @@ data:
         display: none;
       }
       .device {
-        width: min(390px, calc((100vh - 16px) * .462085), calc(100vw - 16px));
+        width: min(430px, calc((100vh - 16px) * .462085), calc(100vw - 16px));
       }
     }
 {{- end }}

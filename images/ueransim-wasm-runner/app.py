@@ -299,9 +299,9 @@ const scenario = document.querySelector('#scenario');
 const result = document.querySelector('#result');
 const button = document.querySelector('#run');
 const targets = {
-  'builtin-http': 'https://example.com',
-  'builtin-tcp': 'https://example.com',
-  'builtin-tls': 'https://example.com',
+  'builtin-http': 'https://www.cloudflare.com/cdn-cgi/trace',
+  'builtin-tcp': 'https://www.cloudflare.com',
+  'builtin-tls': 'https://www.cloudflare.com',
   'builtin-download': 'https://speed.cloudflare.com/__down?bytes=1000000',
   'builtin-egress': 'https://api.ipify.org'
 };

@@ -115,6 +115,10 @@ Built-in WASM scenarios include:
 - `builtin-download`: downloaded bytes and calculated throughput
 - `builtin-egress`: public IP observed through the UE data path
 
+Each selection supplies an operational default target: Cloudflare trace for
+HTTP, Cloudflare HTTPS for TCP and TLS, Cloudflare's 1 MB speed endpoint for
+download, and ipify for public egress. The target remains editable.
+
 The runner refuses to execute when `uesimtun0` is missing. The phone UI remains
 available separately through NodePort `30082`. Override
 `wasmRunner.service.type` or `wasmRunner.service.nodePort` when needed.
