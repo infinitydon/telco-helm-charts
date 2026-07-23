@@ -10,6 +10,7 @@ MongoDB, the Open5GS 5G core, UERANSIM, and an N6 test endpoint.
 - UERANSIM gNB and UE
 - A subscriber created before the UE starts; WebUI does not replace it
 - A data pod at `10.54.0.100` for the end-to-end ping
+- An optional WebAssembly scenario runner sharing the UE network namespace
 
 ## Multus interfaces
 
@@ -91,6 +92,30 @@ imagePullSecrets:
 
 Set `phoneUi.enabled=false` to deploy the original command-line-only UE.
 
+## UE WebAssembly scenarios
+
+The optional `wasm-runner` sidecar executes fuel-limited WebAssembly modules
+without replacing the UE, browser, or fail-closed proxy. Open
+`http://127.0.0.1:8090` inside the simulated phone's Chromium browser to run
+the built-in HTTP scenario. Requests are sent to the existing SOCKS5 proxy,
+whose outbound sockets are bound to `uesimtun0`.
+
+The runner refuses to execute when `uesimtun0` is missing. Its API listens
+only on the pod loopback interface and is not published as another NodePort.
+The phone UI remains available through NodePort `30082`.
+
+To add custom modules, create a ConfigMap containing files named `*.wasm` and
+set `wasmRunner.existingScenarioConfigMap`. Modules must export `run`, export
+their memory as `memory`, and may import:
+
+```wat
+(import "ue" "log" (func $log (param i32 i32)))
+(import "ue" "http_get" (func $http_get (result i32)))
+```
+
+The HTTP target is selected in the runner page. Set
+`wasmRunner.enabled=false` to omit only this sidecar.
+
 ## Verify
 
 ```powershell
@@ -99,6 +124,8 @@ kubectl exec -n open5gs-5g deploy/open5gs-5g-open5gs-5g-ue -- `
   ping -I uesimtun0 -c 5 10.54.0.100
 kubectl exec -n open5gs-5g deploy/open5gs-5g-open5gs-5g-ue `
   -c phone-proxy -- verify-ue-path
+kubectl exec -n open5gs-5g deploy/open5gs-5g-open5gs-5g-ue `
+  -c wasm-runner -- python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8090/api/status').read().decode())"
 ```
 
 Expected results include successful registration, a PDU session with

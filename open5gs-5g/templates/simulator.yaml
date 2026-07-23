@@ -222,6 +222,47 @@ spec:
               mountPath: /usr/share/selkies/phone-dashboard
               readOnly: true
         {{- end }}
+        {{- if .Values.wasmRunner.enabled }}
+        - name: wasm-runner
+          image: {{ .Values.wasmRunner.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: LISTEN_HOST
+              value: "127.0.0.1"
+            - name: LISTEN_PORT
+              value: {{ .Values.wasmRunner.listenPort | quote }}
+            - name: UE_INTERFACE
+              value: "uesimtun0"
+            - name: SOCKS_PROXY
+              value: "socks5h://127.0.0.1:1080"
+            - name: DEFAULT_TARGET
+              value: {{ .Values.wasmRunner.defaultTarget | quote }}
+            - name: REQUEST_TIMEOUT_SECONDS
+              value: {{ .Values.wasmRunner.requestTimeoutSeconds | quote }}
+            - name: WASM_FUEL
+              value: {{ .Values.wasmRunner.fuel | int | quote }}
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - import urllib.request; urllib.request.urlopen("http://127.0.0.1:{{ .Values.wasmRunner.listenPort }}/healthz", timeout=2)
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            {{- toYaml .Values.wasmRunner.resources | nindent 12 }}
+          {{- if .Values.wasmRunner.existingScenarioConfigMap }}
+          volumeMounts:
+            - name: wasm-scenarios
+              mountPath: /scenarios
+              readOnly: true
+          {{- end }}
+        {{- end }}
       volumes:
         - name: config
           configMap:
@@ -232,6 +273,11 @@ spec:
             name: {{ include "open5gs-5g.fullname" . }}-phone-ui
         - name: phone-dashboard
           emptyDir: {}
+        {{- end }}
+        {{- if and .Values.wasmRunner.enabled .Values.wasmRunner.existingScenarioConfigMap }}
+        - name: wasm-scenarios
+          configMap:
+            name: {{ .Values.wasmRunner.existingScenarioConfigMap }}
         {{- end }}
 {{- if .Values.phoneUi.enabled }}
 ---

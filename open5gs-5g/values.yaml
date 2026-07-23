@@ -94,4 +94,21 @@ phoneUi:
         cpu: "1"
         memory: 1Gi
 
+wasmRunner:
+  enabled: true
+  image: ghcr.io/infinitydon/ueransim-wasm-runner:v0.1.0
+  listenPort: 8090
+  defaultTarget: https://example.com
+  # Optional ConfigMap containing one or more files named *.wasm.
+  existingScenarioConfigMap: ""
+  requestTimeoutSeconds: 20
+  fuel: 1000000
+  resources:
+    requests:
+      cpu: 25m
+      memory: 48Mi
+    limits:
+      cpu: 250m
+      memory: 192Mi
+
 imagePullSecrets: []
