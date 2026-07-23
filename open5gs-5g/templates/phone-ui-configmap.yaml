@@ -88,6 +88,7 @@ data:
               <h3>Serving network</h3>
               <dl>
                 <div><dt>gNB</dt><dd id="status-gnb">—</dd></div>
+                <div><dt>Status</dt><dd id="status-gnb-state">—</dd></div>
                 <div><dt>PLMN</dt><dd id="status-plmn">—</dd></div>
                 <div><dt>Slice</dt><dd id="status-slice">—</dd></div>
                 <div><dt>DNN</dt><dd id="status-dnn">—</dd></div>
@@ -134,7 +135,8 @@ data:
               statusText("status-ip", data.tunnelIp);
               statusText("status-rx", data.rxRate);
               statusText("status-tx", data.txRate);
-              statusText("status-gnb", `${data.servingGnb} · ${data.gnbState}`);
+              statusText("status-gnb", data.servingGnb);
+              statusText("status-gnb-state", data.gnbState);
               statusText("status-plmn", data.plmn);
               statusText("status-slice", data.slice);
               statusText("status-dnn", data.dnn);

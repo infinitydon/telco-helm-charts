@@ -62,6 +62,7 @@ state_lock = threading.Lock()
 state = {
     "running": False,
     "last_run": None,
+    "progress": None,
 }
 traffic_lock = threading.Lock()
 traffic_sample = {"checked": 0.0, "rx": 0, "tx": 0}
@@ -183,6 +184,7 @@ def ue_status():
     with state_lock:
         last_run = state["last_run"]
         running = state["running"]
+        progress = dict(state["progress"]) if state["progress"] else None
     last_test = None
     if last_run:
         last_test = {
@@ -211,6 +213,7 @@ def ue_status():
         "configSource": str(UE_CONFIG_PATH),
         "uptimeSeconds": int(time.time() - RUNNER_STARTED),
         "testRunning": running,
+        "testProgress": progress,
         "lastTest": last_test,
     }
 
@@ -386,7 +389,22 @@ def run_scenario(name, target):
             headers={"User-Agent": "UERANSIM-WASM-Runner/0.2.0"},
         )
         response.raise_for_status()
-        total = sum(len(chunk) for chunk in response.iter_content(65536) if chunk)
+        expected = int(response.headers.get("content-length", "0") or 0)
+        total = 0
+        for chunk in response.iter_content(65536):
+            if not chunk:
+                continue
+            total += len(chunk)
+            elapsed = max(time.perf_counter() - began, 0.001)
+            with state_lock:
+                state["progress"] = {
+                    "scenario": "builtin-download",
+                    "receivedBytes": total,
+                    "totalBytes": expected,
+                    "percent": round(total * 100 / expected, 1) if expected else None,
+                    "elapsedSeconds": round(elapsed, 1),
+                    "averageMbps": round(total * 8 / elapsed / 1_000_000, 3),
+                }
         seconds = max(time.perf_counter() - began, 0.001)
         request_result.update(
             {
@@ -600,6 +618,12 @@ const targets = {
   'builtin-traceroute': '__PING_TARGET__',
   'builtin-iperf3': '__IPERF3_TARGET__'
 };
+function formatBytes(bytes) {
+  if (!bytes) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / Math.pow(1024, index)).toFixed(index ? 1 : 0)} ${units[index]}`;
+}
 async function refresh() {
   const r = await fetch('/api/status'); const s = await r.json();
   health.className = s.ready ? 'ready' : 'down';
@@ -622,16 +646,51 @@ document.querySelector('#runner').addEventListener('submit', async e => {
   button.disabled = true;
   const selected = scenario.value;
   const started = Date.now();
-  const timer = setInterval(() => {
+  const updateRunningResult = async () => {
     const seconds = Math.floor((Date.now() - started) / 1000);
-    result.textContent = `Running ${selected} through the UE… ${seconds}s elapsed.\n` +
-      'Ping normally takes about 3s; iperf3 about 3s; traceroute can take up to 35s.';
-  }, 250);
+    if (selected === 'builtin-download') {
+      try {
+        const status = await fetch('/api/ue-status', {cache:'no-store'}).then(r => r.json());
+        const progress = status.testProgress;
+        if (progress) {
+          const total = progress.totalBytes ? formatBytes(progress.totalBytes) : 'unknown';
+          result.textContent =
+            `Downloading through ${status.tunnelInterface}\n` +
+            `Received: ${formatBytes(progress.receivedBytes)} / ${total}` +
+            `${progress.percent == null ? '' : ` (${progress.percent}%)`}\n` +
+            `Elapsed: ${progress.elapsedSeconds}s\n` +
+            `Average throughput: ${progress.averageMbps} Mbps`;
+          return;
+        }
+      } catch (_) {}
+      result.textContent = `Starting download through the UE… ${seconds}s elapsed.`;
+      return;
+    }
+    const guidance = {
+      'builtin-ping': 'Ping normally takes about 3 seconds.',
+      'builtin-iperf3': 'iperf3 normally takes about 3 seconds.',
+      'builtin-traceroute': 'Traceroute can take up to 35 seconds.'
+    };
+    result.textContent = `Running ${selected} through the UE… ${seconds}s elapsed.\n${guidance[selected] || ''}`;
+  };
+  updateRunningResult();
+  const timer = setInterval(updateRunningResult, 1000);
   try {
     const body = new URLSearchParams({scenario:scenario.value,target:target.value});
     const r = await fetch('/api/run', {method:'POST',body});
     clearInterval(timer);
-    result.textContent = JSON.stringify(await r.json(), null, 2);
+    const output = await r.json();
+    if (selected === 'builtin-download' && output.request) {
+      result.textContent =
+        `Download ${output.ok ? 'completed' : 'failed'}\n` +
+        `Interface: ${output.interface}\n` +
+        `Received: ${formatBytes(output.request.bytes)}\n` +
+        `Duration: ${(output.request.durationMs / 1000).toFixed(1)}s\n` +
+        `Average throughput: ${output.request.megabitsPerSecond} Mbps\n` +
+        `HTTP status: ${output.request.status}`;
+    } else {
+      result.textContent = JSON.stringify(output, null, 2);
+    }
   } catch (e) {
     clearInterval(timer);
     result.textContent = String(e);
@@ -701,6 +760,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(409, {"error": "a scenario is already running"})
                 return
             state["running"] = True
+            state["progress"] = None
         try:
             output = run_scenario(name, target)
             code = 200 if output["ok"] else 502
@@ -715,6 +775,7 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             with state_lock:
                 state["running"] = False
+                state["progress"] = None
 
     def log_message(self, fmt, *args):
         print(f"{self.client_address[0]} - {fmt % args}", flush=True)

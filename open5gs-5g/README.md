@@ -128,7 +128,7 @@ Built-in WASM scenarios include:
 - `builtin-tcp`: SOCKS-routed TCP connection time
 - `builtin-tls`: TLS handshake time, protocol, cipher, and certificate subject
 - `builtin-download`: selectable 10 MB, 100 MB, or 1 GB test file with
-  downloaded bytes and calculated throughput
+  live bytes, completion percentage, elapsed time, and calculated throughput
 - `builtin-ping`: four ICMP probes bound directly to `uesimtun0`
 - `builtin-traceroute`: up to 12 hops bound directly to `uesimtun0`
 - `builtin-iperf3`: a three-second TCP throughput test to the dedicated N6 server
