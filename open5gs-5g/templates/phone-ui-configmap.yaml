@@ -6,6 +6,24 @@ metadata:
   labels:
     {{- include "open5gs-5g.labels" . | nindent 4 }}
 data:
+  browser-init.sh: |
+    #!/bin/sh
+    cat > /config/.config/labwc/autostart <<'PHONE_AUTOSTART'
+    #!/bin/bash
+    wrapped-chromium \
+      --enable-features=UseOzonePlatform,OverlayScrollbar \
+      --ozone-platform=wayland \
+      --start-maximized \
+      --no-first-run \
+      --no-default-browser-check \
+      --disable-session-crashed-bubble \
+      --force-device-scale-factor=0.9 \
+      --touch-events=enabled \
+      --user-agent='{{ .Values.phoneUi.mobileUserAgent }}' \
+      --proxy-server=socks5://127.0.0.1:1080 \
+      '{{ .Values.phoneUi.homeUrl }}'
+    PHONE_AUTOSTART
+    chmod 0555 /config/.config/labwc/autostart
   index.html: |
     <!doctype html>
     <html lang="en">

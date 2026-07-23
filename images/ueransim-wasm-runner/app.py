@@ -455,12 +455,24 @@ scenario.addEventListener('change', () => {
   if (targets[scenario.value]) document.querySelector('#target').value = targets[scenario.value];
 });
 document.querySelector('#runner').addEventListener('submit', async e => {
-  e.preventDefault(); button.disabled = true; result.textContent = 'Running…';
+  e.preventDefault();
+  button.disabled = true;
+  const selected = scenario.value;
+  const started = Date.now();
+  const timer = setInterval(() => {
+    const seconds = Math.floor((Date.now() - started) / 1000);
+    result.textContent = `Running ${selected} through the UE… ${seconds}s elapsed.\n` +
+      'Ping normally takes about 3s; iperf3 about 3s; traceroute can take up to 35s.';
+  }, 250);
   try {
     const body = new URLSearchParams({scenario:scenario.value,target:document.querySelector('#target').value});
     const r = await fetch('/api/run', {method:'POST',body});
+    clearInterval(timer);
     result.textContent = JSON.stringify(await r.json(), null, 2);
-  } catch (e) { result.textContent = String(e); }
+  } catch (e) {
+    clearInterval(timer);
+    result.textContent = String(e);
+  }
   button.disabled = false; refresh();
 });
 refresh().catch(e => { health.className='down'; health.textContent=String(e); });

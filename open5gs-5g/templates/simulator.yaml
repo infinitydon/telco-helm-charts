@@ -174,7 +174,7 @@ spec:
             - name: DASHBOARD
               value: phone-dashboard
             - name: CHROME_CLI
-              value: {{ printf "--start-maximized --no-first-run --no-default-browser-check --disable-session-crashed-bubble --force-device-scale-factor=1 --touch-events=enabled --enable-features=OverlayScrollbar --user-agent=%s --proxy-server=socks5://127.0.0.1:1080 %s" .Values.phoneUi.mobileUserAgent .Values.phoneUi.homeUrl | quote }}
+              value: ""
             - name: SELKIES_MANUAL_WIDTH
               value: {{ .Values.phoneUi.display.width | quote }}
             - name: SELKIES_MANUAL_HEIGHT
@@ -220,6 +220,10 @@ spec:
           volumeMounts:
             - name: phone-dashboard
               mountPath: /usr/share/selkies/phone-dashboard
+              readOnly: true
+            - name: phone-ui
+              mountPath: /custom-cont-init.d/99-ueransim-phone-browser
+              subPath: browser-init.sh
               readOnly: true
         {{- end }}
         {{- if .Values.wasmRunner.enabled }}
@@ -282,6 +286,7 @@ spec:
         - name: phone-ui
           configMap:
             name: {{ include "open5gs-5g.fullname" . }}-phone-ui
+            defaultMode: 0755
         - name: phone-dashboard
           emptyDir: {}
         {{- end }}

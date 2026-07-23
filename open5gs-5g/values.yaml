@@ -72,9 +72,7 @@ phoneUi:
   browserImage: lscr.io/linuxserver/chromium:bf9e0b4f-ls46
   tunnelPattern: "uesimtun*"
   homeUrl: https://example.com
-  # The LinuxServer wrapper word-splits CHROME_CLI, so this value must not
-  # contain spaces. Android and Mobile tokens still trigger responsive sites.
-  mobileUserAgent: "Mozilla/5.0(Android14;Pixel8)AppleWebKit/537.36(KHTML,likeGecko)Chrome/126.0.0.0MobileSafari/537.36"
+  mobileUserAgent: "Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP2A.240705.005) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36"
   display:
     width: 430
     height: 930
@@ -100,7 +98,7 @@ phoneUi:
 
 wasmRunner:
   enabled: true
-  image: ghcr.io/infinitydon/ueransim-wasm-runner:v0.3.1
+  image: ghcr.io/infinitydon/ueransim-wasm-runner:v0.3.2
   listenHost: 0.0.0.0
   listenPort: 8090
   defaultTarget: https://www.cloudflare.com/cdn-cgi/trace
