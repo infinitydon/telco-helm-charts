@@ -15,6 +15,9 @@ data:
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="theme-color" content="#07111f">
+        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+        <meta http-equiv="Pragma" content="no-cache">
+        <meta http-equiv="Expires" content="0">
         <title>UERANSIM Phone</title>
         <link rel="apple-touch-icon" href="icon.png">
         <link rel="manifest" href="manifest.json" crossorigin="use-credentials">

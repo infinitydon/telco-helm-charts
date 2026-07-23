@@ -122,6 +122,23 @@ spec:
             - >-
               until nc -zu -w 1 {{ include "open5gs-5g.fullname" . }}-gnb 4997
               >/dev/null 2>&1; do sleep 2; done
+        {{- if .Values.phoneUi.enabled }}
+        - name: prepare-phone-ui
+          image: {{ .Values.phoneUi.browserImage }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              cp -a /usr/share/selkies/selkies-dashboard/. /phone-dashboard/;
+              cp /phone-config/index.html /phone-dashboard/index.html;
+              cp /phone-config/phone.css /phone-dashboard/phone.css
+          volumeMounts:
+            - name: phone-dashboard
+              mountPath: /phone-dashboard
+            - name: phone-ui
+              mountPath: /phone-config
+              readOnly: true
+        {{- end }}
       containers:
         - name: ue
           image: {{ .Values.image.ueransim }}
@@ -154,6 +171,8 @@ spec:
           env:
             - name: TITLE
               value: UERANSIM Phone
+            - name: DASHBOARD
+              value: phone-dashboard
             - name: CHROME_CLI
               value: {{ printf "--start-maximized --force-device-scale-factor=1 --proxy-server=socks5://127.0.0.1:1080 %s" .Values.phoneUi.homeUrl | quote }}
             - name: SELKIES_MANUAL_WIDTH
@@ -199,13 +218,8 @@ spec:
           resources:
             {{- toYaml .Values.phoneUi.resources.browser | nindent 12 }}
           volumeMounts:
-            - name: phone-ui
-              mountPath: /usr/share/selkies/web/index.html
-              subPath: index.html
-              readOnly: true
-            - name: phone-ui
-              mountPath: /usr/share/selkies/web/phone.css
-              subPath: phone.css
+            - name: phone-dashboard
+              mountPath: /usr/share/selkies/phone-dashboard
               readOnly: true
         {{- end }}
       volumes:
@@ -216,6 +230,8 @@ spec:
         - name: phone-ui
           configMap:
             name: {{ include "open5gs-5g.fullname" . }}-phone-ui
+        - name: phone-dashboard
+          emptyDir: {}
         {{- end }}
 {{- if .Values.phoneUi.enabled }}
 ---
