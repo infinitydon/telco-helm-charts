@@ -152,15 +152,17 @@ spec:
             - name: TITLE
               value: UERANSIM Phone
             - name: CHROME_CLI
-              value: {{ printf "--kiosk --proxy-server=socks5://127.0.0.1:1080 %s" .Values.phoneUi.homeUrl | quote }}
+              value: {{ printf "--start-maximized --force-device-scale-factor=1 --proxy-server=socks5://127.0.0.1:1080 %s" .Values.phoneUi.homeUrl | quote }}
             - name: SELKIES_MANUAL_WIDTH
               value: {{ .Values.phoneUi.display.width | quote }}
             - name: SELKIES_MANUAL_HEIGHT
               value: {{ .Values.phoneUi.display.height | quote }}
+            - name: SELKIES_SCALING_DPI
+              value: "96"
+            - name: SELKIES_USE_CSS_SCALING
+              value: "true|locked"
             - name: MAX_RES
               value: {{ printf "%vx%v" .Values.phoneUi.display.width .Values.phoneUi.display.height | quote }}
-            - name: NO_DECOR
-              value: "true"
             - name: HARDEN_DESKTOP
               value: "true"
             - name: HARDEN_OPENBOX
@@ -170,6 +172,8 @@ spec:
             - name: SELKIES_UI_TITLE
               value: UERANSIM Phone
             - name: SELKIES_UI_SHOW_LOGO
+              value: "false|locked"
+            - name: SELKIES_UI_SHOW_SIDEBAR
               value: "false|locked"
             - name: SELKIES_UI_SIDEBAR_SHOW_FILES
               value: "false|locked"
