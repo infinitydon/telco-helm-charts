@@ -81,7 +81,8 @@ data:
                 <div><dt>Tunnel</dt><dd id="status-tunnel">—</dd></div>
                 <div><dt>UE address</dt><dd id="status-ip">—</dd></div>
                 <div><dt>Gateway</dt><dd id="status-gateway">—</dd></div>
-                <div><dt>Public IP</dt><dd id="status-public-ip">—</dd></div>
+                <div><dt>Downlink</dt><dd id="status-rx">—</dd></div>
+                <div><dt>Uplink</dt><dd id="status-tx">—</dd></div>
               </dl>
             </section>
             <section class="status-card">
@@ -135,7 +136,8 @@ data:
               statusText("status-tunnel", data.tunnelInterface);
               statusText("status-ip", data.tunnelIp);
               statusText("status-gateway", data.ueGateway);
-              statusText("status-public-ip", data.publicEgressIp);
+              statusText("status-rx", data.rxRate);
+              statusText("status-tx", data.txRate);
               statusText("status-gnb", `${data.servingGnb} · ${data.gnbState}`);
               statusText("status-gnb-ip", data.gnbN2Address);
               statusText("status-plmn", `${data.plmn} / ${data.tac}`);
@@ -277,6 +279,11 @@ data:
       text-align: right;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    #status-gnb {
+      overflow-wrap: anywhere;
+      text-overflow: clip;
+      white-space: normal;
     }
     .last-test p, .status-updated {
       margin: 0;

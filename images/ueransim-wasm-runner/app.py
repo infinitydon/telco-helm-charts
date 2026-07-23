@@ -44,7 +44,6 @@ BUILTIN_FUNCTIONS = {
     "builtin-tcp": "tcp_connect",
     "builtin-tls": "tls_handshake",
     "builtin-download": "download_test",
-    "builtin-egress": "egress_ip",
     "builtin-ping": "ping_test",
     "builtin-traceroute": "traceroute_test",
     "builtin-iperf3": "iperf3_test",
@@ -70,7 +69,8 @@ state = {
     "running": False,
     "last_run": None,
 }
-egress_cache = {"value": "", "checked": 0.0}
+traffic_lock = threading.Lock()
+traffic_sample = {"checked": 0.0, "rx": 0, "tx": 0}
 
 
 def interface_ready():
@@ -94,21 +94,42 @@ def live_interface_address():
     return ""
 
 
-def public_egress_ip():
-    now = time.time()
-    if egress_cache["value"] and now - egress_cache["checked"] < 60:
-        return egress_cache["value"]
+def format_bitrate(bits_per_second):
+    units = ("bps", "Kbps", "Mbps", "Gbps", "Tbps")
+    value = max(float(bits_per_second), 0.0)
+    for unit in units:
+        if value < 1000 or unit == units[-1]:
+            precision = 0 if value >= 100 else 1 if value >= 10 else 2
+            return f"{value:.{precision}f} {unit}"
+        value /= 1000
+
+
+def tunnel_throughput():
     try:
-        response = requests.get(
-            "https://api.ipify.org",
-            proxies={"http": SOCKS_PROXY, "https": SOCKS_PROXY},
-            timeout=5,
-        )
-        response.raise_for_status()
-        egress_cache.update(value=response.text.strip(), checked=now)
-    except requests.RequestException:
-        return egress_cache["value"]
-    return egress_cache["value"]
+        rx = int(pathlib.Path(
+            f"/sys/class/net/{UE_INTERFACE}/statistics/rx_bytes"
+        ).read_text().strip())
+        tx = int(pathlib.Path(
+            f"/sys/class/net/{UE_INTERFACE}/statistics/tx_bytes"
+        ).read_text().strip())
+    except (OSError, ValueError):
+        return {"rxBps": 0, "txBps": 0, "rxRate": "0 bps", "txRate": "0 bps"}
+
+    now = time.monotonic()
+    with traffic_lock:
+        elapsed = now - traffic_sample["checked"]
+        if traffic_sample["checked"] and elapsed > 0:
+            rx_bps = max(0, (rx - traffic_sample["rx"]) * 8 / elapsed)
+            tx_bps = max(0, (tx - traffic_sample["tx"]) * 8 / elapsed)
+        else:
+            rx_bps = tx_bps = 0
+        traffic_sample.update(checked=now, rx=rx, tx=tx)
+    return {
+        "rxBps": round(rx_bps),
+        "txBps": round(tx_bps),
+        "rxRate": format_bitrate(rx_bps),
+        "txRate": format_bitrate(tx_bps),
+    }
 
 
 def masked_imsi():
@@ -120,6 +141,9 @@ def masked_imsi():
 def ue_status():
     tunnel_ip = live_interface_address()
     active = bool(tunnel_ip)
+    throughput = tunnel_throughput() if active else {
+        "rxBps": 0, "txBps": 0, "rxRate": "0 bps", "txRate": "0 bps"
+    }
     with state_lock:
         last_run = state["last_run"]
         running = state["running"]
@@ -132,7 +156,7 @@ def ue_status():
             "target": last_run.get("target"),
         }
         request = last_run.get("request") or {}
-        for key in ("avgMs", "receivedMbps", "status", "publicIp"):
+        for key in ("avgMs", "receivedMbps", "status"):
             if key in request:
                 last_test[key] = request[key]
     return {
@@ -142,7 +166,7 @@ def ue_status():
         "tunnelInterface": UE_INTERFACE,
         "tunnelIp": tunnel_ip or "Pending",
         "ueGateway": UE_GATEWAY,
-        "publicEgressIp": public_egress_ip() if active else "",
+        **throughput,
         "servingGnb": GNB_NAME,
         "gnbN2Address": GNB_N2_ADDRESS,
         "gnbState": "Connected" if active else "Searching",
@@ -340,23 +364,6 @@ def run_scenario(name, target):
         )
         return 0
 
-    def egress_ip():
-        response = requests.get(
-            "https://api.ipify.org",
-            proxies={"http": SOCKS_PROXY, "https": SOCKS_PROXY},
-            timeout=REQUEST_TIMEOUT,
-            headers={"User-Agent": "UERANSIM-WASM-Runner/0.2.0"},
-        )
-        response.raise_for_status()
-        request_result.update(
-            {
-                "test": "egress",
-                "publicIp": response.text.strip(),
-                "ok": True,
-            }
-        )
-        return 0
-
     def ping_test():
         host, _ = target_host()
         output = run_command(
@@ -478,7 +485,6 @@ def run_scenario(name, target):
         ("tcp_connect", tcp_connect),
         ("tls_handshake", tls_handshake),
         ("download_test", download_test),
-        ("egress_ip", egress_ip),
         ("ping_test", ping_test),
         ("traceroute_test", traceroute_test),
         ("iperf3_test", iperf3_test),
@@ -543,7 +549,6 @@ const targets = {
   'builtin-tcp': 'https://www.cloudflare.com',
   'builtin-tls': 'https://www.cloudflare.com',
   'builtin-download': 'https://speed.cloudflare.com/__down?bytes=1000000',
-  'builtin-egress': 'https://api.ipify.org',
   'builtin-ping': '__PING_TARGET__',
   'builtin-traceroute': '__PING_TARGET__',
   'builtin-iperf3': '__IPERF3_TARGET__'
@@ -632,7 +637,7 @@ class Handler(BaseHTTPRequestHandler):
         fields = parse_qs(self.rfile.read(length).decode())
         name = fields.get("scenario", ["builtin-http"])[0]
         target = fields.get("target", [DEFAULT_TARGET])[0]
-        url_scenarios = {"builtin-http", "builtin-download", "builtin-egress"}
+        url_scenarios = {"builtin-http", "builtin-download"}
         if name in url_scenarios and not target.startswith(("http://", "https://")):
             self.send_json(400, {"error": "this scenario target must use http or https"})
             return

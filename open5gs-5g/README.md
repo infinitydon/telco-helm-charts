@@ -87,10 +87,12 @@ simulated 5G connection state without requiring a separate UI image.
 
 On desktop-sized screens, the shell also shows a live UE telemetry rail. It
 refreshes every three seconds and reports registration and PDU state,
-`uesimtun0` address, UE gateway, public egress, serving gNB, N2 address, PLMN,
-TAC, NR Cell ID, slice, DNN, masked IMSI, session uptime, and the latest WASM
-test result. The HTTPS phone server proxies this telemetry internally from the
-runner; no additional public service is required.
+`uesimtun0` address, UE gateway, live downlink/uplink rate, serving gNB, N2
+address, PLMN, TAC, NR Cell ID, slice, DNN, masked IMSI, session uptime, and
+the latest WASM test result. Rates are calculated from the tunnel interface
+byte counters and automatically displayed as bps, Kbps, Mbps, or Gbps. The
+HTTPS phone server proxies this telemetry internally from the runner; no
+additional public service is required.
 
 The proxy image is private by default. Create an image pull secret and set:
 
@@ -121,14 +123,13 @@ Built-in WASM scenarios include:
 - `builtin-tcp`: SOCKS-routed TCP connection time
 - `builtin-tls`: TLS handshake time, protocol, cipher, and certificate subject
 - `builtin-download`: downloaded bytes and calculated throughput
-- `builtin-egress`: public IP observed through the UE data path
 - `builtin-ping`: four ICMP probes bound directly to `uesimtun0`
 - `builtin-traceroute`: up to 12 hops bound directly to `uesimtun0`
 - `builtin-iperf3`: a three-second TCP throughput test to the dedicated N6 server
 
 Each selection supplies an operational default target: Cloudflare trace for
 HTTP, Cloudflare HTTPS for TCP and TLS, Cloudflare's 1 MB speed endpoint for
-download, and ipify for public egress. The target remains editable.
+download. The target remains editable.
 Ping and traceroute default to `10.54.0.100`; iperf3 defaults to the dedicated
 chart-managed server at `10.54.0.101:5201`.
 
@@ -146,7 +147,6 @@ their memory as `memory`, and may import:
 (import "ue" "tcp_connect" (func $tcp_connect (result i32)))
 (import "ue" "tls_handshake" (func $tls_handshake (result i32)))
 (import "ue" "download_test" (func $download_test (result i32)))
-(import "ue" "egress_ip" (func $egress_ip (result i32)))
 (import "ue" "ping_test" (func $ping_test (result i32)))
 (import "ue" "traceroute_test" (func $traceroute_test (result i32)))
 (import "ue" "iperf3_test" (func $iperf3_test (result i32)))
