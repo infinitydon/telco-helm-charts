@@ -3,12 +3,14 @@ import importlib.metadata
 import json
 import os
 import pathlib
+import ssl
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
 
 import requests
+import socks
 import wasmtime
 
 
@@ -21,18 +23,28 @@ DEFAULT_TARGET = os.getenv("DEFAULT_TARGET", "https://example.com")
 REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "20"))
 WASM_FUEL = int(os.getenv("WASM_FUEL", "1000000"))
 
-BUILTIN_WAT = r"""
-(module
-  (import "ue" "log" (func $log (param i32 i32)))
-  (import "ue" "http_get" (func $http_get (result i32)))
-  (memory (export "memory") 1)
-  (data (i32.const 0) "WASM scenario started")
-  (func (export "run") (result i32)
-    i32.const 0
-    i32.const 21
-    call $log
-    call $http_get))
-"""
+BUILTIN_FUNCTIONS = {
+    "builtin-http": "http_get",
+    "builtin-tcp": "tcp_connect",
+    "builtin-tls": "tls_handshake",
+    "builtin-download": "download_test",
+    "builtin-egress": "egress_ip",
+}
+
+
+def builtin_wat(function_name):
+    return f"""
+    (module
+      (import "ue" "log" (func $log (param i32 i32)))
+      (import "ue" "{function_name}" (func $test (result i32)))
+      (memory (export "memory") 1)
+      (data (i32.const 0) "WASM scenario started")
+      (func (export "run") (result i32)
+        i32.const 0
+        i32.const 21
+        call $log
+        call $test))
+    """
 
 state_lock = threading.Lock()
 state = {
@@ -46,15 +58,15 @@ def interface_ready():
 
 
 def scenario_names():
-    names = ["builtin-http"]
+    names = list(BUILTIN_FUNCTIONS)
     if SCENARIO_DIR.exists():
         names.extend(sorted(path.stem for path in SCENARIO_DIR.glob("*.wasm")))
     return names
 
 
 def load_scenario(name):
-    if name == "builtin-http":
-        return wasmtime.wat2wasm(BUILTIN_WAT)
+    if name in BUILTIN_FUNCTIONS:
+        return wasmtime.wat2wasm(builtin_wat(BUILTIN_FUNCTIONS[name]))
     candidate = (SCENARIO_DIR / f"{name}.wasm").resolve()
     if candidate.parent != SCENARIO_DIR.resolve() or not candidate.is_file():
         raise ValueError(f"unknown scenario: {name}")
@@ -83,6 +95,25 @@ def run_scenario(name, target):
     linker = wasmtime.Linker(engine)
     request_result = {}
 
+    def target_endpoint(default_port):
+        parsed = requests.utils.urlparse(target)
+        if not parsed.hostname:
+            raise ValueError("target URL must contain a hostname")
+        return parsed.hostname, parsed.port or default_port
+
+    def proxy_socket(host, port):
+        parsed = requests.utils.urlparse(SOCKS_PROXY)
+        connection = socks.socksocket()
+        connection.set_proxy(
+            socks.SOCKS5,
+            parsed.hostname,
+            parsed.port or 1080,
+            rdns=True,
+        )
+        connection.settimeout(REQUEST_TIMEOUT)
+        connection.connect((host, port))
+        return connection
+
     def guest_log(caller, pointer, length):
         memory = caller.get("memory")
         if memory is None:
@@ -98,10 +129,11 @@ def run_scenario(name, target):
             proxies={"http": SOCKS_PROXY, "https": SOCKS_PROXY},
             timeout=REQUEST_TIMEOUT,
             allow_redirects=True,
-            headers={"User-Agent": "UERANSIM-WASM-Runner/0.1.0"},
+            headers={"User-Agent": "UERANSIM-WASM-Runner/0.2.0"},
         )
         request_result.update(
             {
+                "test": "http",
                 "status": response.status_code,
                 "finalUrl": response.url,
                 "bytes": len(response.content),
@@ -109,6 +141,88 @@ def run_scenario(name, target):
             }
         )
         return response.status_code
+
+    def tcp_connect():
+        host, port = target_endpoint(443)
+        began = time.perf_counter()
+        with proxy_socket(host, port):
+            latency = round((time.perf_counter() - began) * 1000, 2)
+        request_result.update(
+            {
+                "test": "tcp",
+                "host": host,
+                "port": port,
+                "connectMs": latency,
+                "ok": True,
+            }
+        )
+        return 0
+
+    def tls_handshake():
+        host, port = target_endpoint(443)
+        began = time.perf_counter()
+        raw = proxy_socket(host, port)
+        context = ssl.create_default_context()
+        with context.wrap_socket(raw, server_hostname=host) as secure:
+            certificate = secure.getpeercert()
+            subject = dict(
+                item for group in certificate.get("subject", ()) for item in group
+            )
+            request_result.update(
+                {
+                    "test": "tls",
+                    "host": host,
+                    "port": port,
+                    "handshakeMs": round((time.perf_counter() - began) * 1000, 2),
+                    "protocol": secure.version(),
+                    "cipher": secure.cipher()[0],
+                    "certificateSubject": subject.get("commonName", ""),
+                    "ok": True,
+                }
+            )
+        return 0
+
+    def download_test():
+        began = time.perf_counter()
+        response = requests.get(
+            target,
+            proxies={"http": SOCKS_PROXY, "https": SOCKS_PROXY},
+            timeout=REQUEST_TIMEOUT,
+            allow_redirects=True,
+            stream=True,
+            headers={"User-Agent": "UERANSIM-WASM-Runner/0.2.0"},
+        )
+        response.raise_for_status()
+        total = sum(len(chunk) for chunk in response.iter_content(65536) if chunk)
+        seconds = max(time.perf_counter() - began, 0.001)
+        request_result.update(
+            {
+                "test": "download",
+                "status": response.status_code,
+                "bytes": total,
+                "durationMs": round(seconds * 1000, 2),
+                "megabitsPerSecond": round((total * 8) / seconds / 1_000_000, 3),
+                "ok": True,
+            }
+        )
+        return 0
+
+    def egress_ip():
+        response = requests.get(
+            "https://api.ipify.org",
+            proxies={"http": SOCKS_PROXY, "https": SOCKS_PROXY},
+            timeout=REQUEST_TIMEOUT,
+            headers={"User-Agent": "UERANSIM-WASM-Runner/0.2.0"},
+        )
+        response.raise_for_status()
+        request_result.update(
+            {
+                "test": "egress",
+                "publicIp": response.text.strip(),
+                "ok": True,
+            }
+        )
+        return 0
 
     linker.define_func(
         "ue",
@@ -123,6 +237,18 @@ def run_scenario(name, target):
         wasmtime.FuncType([], [wasmtime.ValType.i32()]),
         http_get,
     )
+    for import_name, callback in (
+        ("tcp_connect", tcp_connect),
+        ("tls_handshake", tls_handshake),
+        ("download_test", download_test),
+        ("egress_ip", egress_ip),
+    ):
+        linker.define_func(
+            "ue",
+            import_name,
+            wasmtime.FuncType([], [wasmtime.ValType.i32()]),
+            callback,
+        )
     instance = linker.instantiate(store, module)
     exported_run = instance.exports(store).get("run")
     if exported_run is None:
@@ -130,7 +256,9 @@ def run_scenario(name, target):
     wasm_result = exported_run(store)
     result["wasmResult"] = wasm_result
     result["request"] = request_result
-    result["ok"] = 200 <= int(wasm_result) < 400
+    result["ok"] = bool(
+        request_result.get("ok", 200 <= int(wasm_result) < 400)
+    )
     result["durationMs"] = round((time.time() - started) * 1000)
     return result
 
@@ -170,12 +298,22 @@ const health = document.querySelector('#health');
 const scenario = document.querySelector('#scenario');
 const result = document.querySelector('#result');
 const button = document.querySelector('#run');
+const targets = {
+  'builtin-http': 'https://example.com',
+  'builtin-tcp': 'https://example.com',
+  'builtin-tls': 'https://example.com',
+  'builtin-download': 'https://speed.cloudflare.com/__down?bytes=1000000',
+  'builtin-egress': 'https://api.ipify.org'
+};
 async function refresh() {
   const r = await fetch('/api/status'); const s = await r.json();
   health.className = s.ready ? 'ready' : 'down';
   health.textContent = s.ready ? `Ready — ${s.interface} and SOCKS proxy configured` : `Not ready — ${s.interface} missing`;
   scenario.replaceChildren(...s.scenarios.map(n => Object.assign(document.createElement('option'), {value:n,textContent:n})));
 }
+scenario.addEventListener('change', () => {
+  if (targets[scenario.value]) document.querySelector('#target').value = targets[scenario.value];
+});
 document.querySelector('#runner').addEventListener('submit', async e => {
   e.preventDefault(); button.disabled = true; result.textContent = 'Running…';
   try {

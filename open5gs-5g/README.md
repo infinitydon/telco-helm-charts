@@ -78,10 +78,11 @@ https://<worker-node-ip>:30082
 The browser container generates a self-signed certificate by default. Accept
 the browser warning for the lab address, or provide a certificate trusted by
 your clients. Chromium starts maximized in the portrait session with its URL
-and navigation controls visible. Its web traffic is forced through the UE
-tunnel. A chart-managed responsive phone shell frames the embedded Selkies
-client and displays the simulated 5G connection state without requiring a
-separate UI image.
+and navigation controls visible. It uses an Android mobile user-agent, touch
+events, and the configured `390x844` viewport so responsive sites select their
+mobile layouts. Its web traffic is forced through the UE tunnel. A chart-managed
+responsive phone shell frames the embedded Selkies client and displays the
+simulated 5G connection state without requiring a separate UI image.
 
 The proxy image is private by default. Create an image pull secret and set:
 
@@ -106,6 +107,14 @@ Run the built-in HTTP scenario there independently of the phone UI. Requests
 are sent to the existing SOCKS5 proxy, whose outbound sockets are bound to
 `uesimtun0`.
 
+Built-in WASM scenarios include:
+
+- `builtin-http`: HTTP status, redirect, response size, and server
+- `builtin-tcp`: SOCKS-routed TCP connection time
+- `builtin-tls`: TLS handshake time, protocol, cipher, and certificate subject
+- `builtin-download`: downloaded bytes and calculated throughput
+- `builtin-egress`: public IP observed through the UE data path
+
 The runner refuses to execute when `uesimtun0` is missing. The phone UI remains
 available separately through NodePort `30082`. Override
 `wasmRunner.service.type` or `wasmRunner.service.nodePort` when needed.
@@ -117,6 +126,10 @@ their memory as `memory`, and may import:
 ```wat
 (import "ue" "log" (func $log (param i32 i32)))
 (import "ue" "http_get" (func $http_get (result i32)))
+(import "ue" "tcp_connect" (func $tcp_connect (result i32)))
+(import "ue" "tls_handshake" (func $tls_handshake (result i32)))
+(import "ue" "download_test" (func $download_test (result i32)))
+(import "ue" "egress_ip" (func $egress_ip (result i32)))
 ```
 
 The HTTP target is selected in the runner page. Set

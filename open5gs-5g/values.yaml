@@ -71,6 +71,7 @@ phoneUi:
   browserImage: lscr.io/linuxserver/chromium:bf9e0b4f-ls46
   tunnelPattern: "uesimtun*"
   homeUrl: https://example.com
+  mobileUserAgent: "Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP2A.240705.005) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
   display:
     width: 390
     height: 844
@@ -96,7 +97,7 @@ phoneUi:
 
 wasmRunner:
   enabled: true
-  image: ghcr.io/infinitydon/ueransim-wasm-runner:v0.1.0
+  image: ghcr.io/infinitydon/ueransim-wasm-runner:v0.2.0
   listenHost: 0.0.0.0
   listenPort: 8090
   defaultTarget: https://example.com

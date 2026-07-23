@@ -174,7 +174,7 @@ spec:
             - name: DASHBOARD
               value: phone-dashboard
             - name: CHROME_CLI
-              value: {{ printf "--start-maximized --force-device-scale-factor=1 --proxy-server=socks5://127.0.0.1:1080 %s" .Values.phoneUi.homeUrl | quote }}
+              value: {{ printf "--start-maximized --force-device-scale-factor=1 --touch-events=enabled --enable-features=OverlayScrollbar --user-agent=%q --proxy-server=socks5://127.0.0.1:1080 %s" .Values.phoneUi.mobileUserAgent .Values.phoneUi.homeUrl | quote }}
             - name: SELKIES_MANUAL_WIDTH
               value: {{ .Values.phoneUi.display.width | quote }}
             - name: SELKIES_MANUAL_HEIGHT
