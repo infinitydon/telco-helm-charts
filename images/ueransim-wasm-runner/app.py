@@ -3,7 +3,9 @@ import importlib.metadata
 import json
 import os
 import pathlib
+import re
 import ssl
+import subprocess
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -29,6 +31,9 @@ BUILTIN_FUNCTIONS = {
     "builtin-tls": "tls_handshake",
     "builtin-download": "download_test",
     "builtin-egress": "egress_ip",
+    "builtin-ping": "ping_test",
+    "builtin-traceroute": "traceroute_test",
+    "builtin-iperf3": "iperf3_test",
 }
 
 
@@ -100,6 +105,38 @@ def run_scenario(name, target):
         if not parsed.hostname:
             raise ValueError("target URL must contain a hostname")
         return parsed.hostname, parsed.port or default_port
+
+    def target_host():
+        parsed = requests.utils.urlparse(
+            target if "://" in target else f"//{target}"
+        )
+        if not parsed.hostname:
+            raise ValueError("target must contain a hostname or IP address")
+        return parsed.hostname, parsed.port
+
+    def run_command(arguments, timeout=None):
+        completed = subprocess.run(
+            arguments,
+            capture_output=True,
+            text=True,
+            timeout=timeout or REQUEST_TIMEOUT,
+            check=False,
+        )
+        output = (completed.stdout + completed.stderr).strip()
+        if completed.returncode != 0:
+            raise RuntimeError(
+                f"{arguments[0]} failed with exit code {completed.returncode}: {output}"
+            )
+        return output
+
+    def interface_address():
+        output = run_command(
+            ["ip", "-json", "address", "show", "dev", UE_INTERFACE]
+        )
+        for address in json.loads(output)[0].get("addr_info", []):
+            if address.get("family") == "inet":
+                return address["local"]
+        raise RuntimeError(f"{UE_INTERFACE} has no IPv4 address")
 
     def proxy_socket(host, port):
         parsed = requests.utils.urlparse(SOCKS_PROXY)
@@ -224,6 +261,101 @@ def run_scenario(name, target):
         )
         return 0
 
+    def ping_test():
+        host, _ = target_host()
+        output = run_command(
+            ["ping", "-n", "-I", UE_INTERFACE, "-c", "4", "-W", "2", host],
+            timeout=15,
+        )
+        loss = re.search(r"([\d.]+)% packet loss", output)
+        timing = re.search(
+            r"=\s*([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)\s*ms", output
+        )
+        request_result.update(
+            {
+                "test": "ping",
+                "host": host,
+                "interface": UE_INTERFACE,
+                "packetLossPercent": float(loss.group(1)) if loss else None,
+                "minMs": float(timing.group(1)) if timing else None,
+                "avgMs": float(timing.group(2)) if timing else None,
+                "maxMs": float(timing.group(3)) if timing else None,
+                "output": output,
+                "ok": not loss or float(loss.group(1)) < 100,
+            }
+        )
+        return 0
+
+    def traceroute_test():
+        host, _ = target_host()
+        output = run_command(
+            [
+                "traceroute",
+                "-n",
+                "-i",
+                UE_INTERFACE,
+                "-m",
+                "12",
+                "-w",
+                "2",
+                "-q",
+                "1",
+                host,
+            ],
+            timeout=35,
+        )
+        hops = [line.strip() for line in output.splitlines()[1:] if line.strip()]
+        request_result.update(
+            {
+                "test": "traceroute",
+                "host": host,
+                "interface": UE_INTERFACE,
+                "hopCount": len(hops),
+                "hops": hops,
+                "ok": bool(hops),
+            }
+        )
+        return 0
+
+    def iperf3_test():
+        host, requested_port = target_host()
+        port = requested_port or 5201
+        source = interface_address()
+        output = run_command(
+            [
+                "iperf3",
+                "-c",
+                host,
+                "-p",
+                str(port),
+                "-B",
+                source,
+                "-J",
+                "-t",
+                "3",
+            ],
+            timeout=20,
+        )
+        report = json.loads(output)
+        sent = report["end"]["sum_sent"]
+        received = report["end"]["sum_received"]
+        request_result.update(
+            {
+                "test": "iperf3",
+                "server": host,
+                "port": port,
+                "source": source,
+                "seconds": round(received["seconds"], 3),
+                "sentMbps": round(sent["bits_per_second"] / 1_000_000, 3),
+                "receivedMbps": round(
+                    received["bits_per_second"] / 1_000_000, 3
+                ),
+                "retransmits": sent.get("retransmits"),
+                "ok": True,
+            }
+        )
+        return 0
+
     linker.define_func(
         "ue",
         "log",
@@ -242,6 +374,9 @@ def run_scenario(name, target):
         ("tls_handshake", tls_handshake),
         ("download_test", download_test),
         ("egress_ip", egress_ip),
+        ("ping_test", ping_test),
+        ("traceroute_test", traceroute_test),
+        ("iperf3_test", iperf3_test),
     ):
         linker.define_func(
             "ue",
@@ -288,7 +423,7 @@ PAGE = """<!doctype html>
   <p id="health">Checking UE path…</p>
   <form id="runner">
     <label for="scenario">Scenario</label><select id="scenario"></select>
-    <label for="target">Target URL</label><input id="target" type="url" value="__DEFAULT_TARGET__" required>
+    <label for="target">Target URL, host, or IP</label><input id="target" value="__DEFAULT_TARGET__" required>
     <button id="run" type="submit">Run through 5G UE</button>
   </form>
   <h2>Result</h2><pre id="result">No scenario run yet.</pre>
@@ -303,7 +438,10 @@ const targets = {
   'builtin-tcp': 'https://www.cloudflare.com',
   'builtin-tls': 'https://www.cloudflare.com',
   'builtin-download': 'https://speed.cloudflare.com/__down?bytes=1000000',
-  'builtin-egress': 'https://api.ipify.org'
+  'builtin-egress': 'https://api.ipify.org',
+  'builtin-ping': '10.54.0.100',
+  'builtin-traceroute': '10.54.0.100',
+  'builtin-iperf3': '10.54.0.101:5201'
 };
 async function refresh() {
   const r = await fetch('/api/status'); const s = await r.json();
@@ -369,8 +507,9 @@ class Handler(BaseHTTPRequestHandler):
         fields = parse_qs(self.rfile.read(length).decode())
         name = fields.get("scenario", ["builtin-http"])[0]
         target = fields.get("target", [DEFAULT_TARGET])[0]
-        if not target.startswith(("http://", "https://")):
-            self.send_json(400, {"error": "target must use http or https"})
+        url_scenarios = {"builtin-http", "builtin-download", "builtin-egress"}
+        if name in url_scenarios and not target.startswith(("http://", "https://")):
+            self.send_json(400, {"error": "this scenario target must use http or https"})
             return
         with state_lock:
             if state["running"]:

@@ -10,6 +10,7 @@ MongoDB, the Open5GS 5G core, UERANSIM, and an N6 test endpoint.
 - UERANSIM gNB and UE
 - A subscriber created before the UE starts; WebUI does not replace it
 - A data pod at `10.54.0.100` for the end-to-end ping
+- A dedicated iperf3 server pod on N6 at `10.54.0.101`
 - An optional WebAssembly scenario runner sharing the UE network namespace
 
 ## Multus interfaces
@@ -24,7 +25,7 @@ addresses are assigned in pod annotations.
 | N2 | SCTP/NGAP | `10.51.0.0/24` | AMF `.2`, gNB `.10` |
 | N3 | GTP-U | `10.52.0.0/24` | UPF `.2`, gNB `.10` |
 | N4 | PFCP | `10.53.0.0/24` | SMF `.2`, UPF `.3` |
-| N6 | User data | `10.54.0.0/24` | UPF `.2`, test pod `.100` |
+| N6 | User data | `10.54.0.0/24` | UPF `.2`, test pod `.100`, iperf3 `.101` |
 
 The service-based interfaces between 5G core functions use ordinary
 Kubernetes Services on the default pod network. SBI does not use Multus.
@@ -114,10 +115,15 @@ Built-in WASM scenarios include:
 - `builtin-tls`: TLS handshake time, protocol, cipher, and certificate subject
 - `builtin-download`: downloaded bytes and calculated throughput
 - `builtin-egress`: public IP observed through the UE data path
+- `builtin-ping`: four ICMP probes bound directly to `uesimtun0`
+- `builtin-traceroute`: up to 12 hops bound directly to `uesimtun0`
+- `builtin-iperf3`: a three-second TCP throughput test to the dedicated N6 server
 
 Each selection supplies an operational default target: Cloudflare trace for
 HTTP, Cloudflare HTTPS for TCP and TLS, Cloudflare's 1 MB speed endpoint for
 download, and ipify for public egress. The target remains editable.
+Ping and traceroute default to `10.54.0.100`; iperf3 defaults to the dedicated
+chart-managed server at `10.54.0.101:5201`.
 
 The runner refuses to execute when `uesimtun0` is missing. The phone UI remains
 available separately through NodePort `30082`. Override
@@ -134,6 +140,9 @@ their memory as `memory`, and may import:
 (import "ue" "tls_handshake" (func $tls_handshake (result i32)))
 (import "ue" "download_test" (func $download_test (result i32)))
 (import "ue" "egress_ip" (func $egress_ip (result i32)))
+(import "ue" "ping_test" (func $ping_test (result i32)))
+(import "ue" "traceroute_test" (func $traceroute_test (result i32)))
+(import "ue" "iperf3_test" (func $iperf3_test (result i32)))
 ```
 
 The HTTP target is selected in the runner page. Set

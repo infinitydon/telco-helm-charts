@@ -55,6 +55,7 @@ addresses:
   upfN4: 10.53.0.3
   upfN6: 10.54.0.2
   dataN6: 10.54.0.100
+  iperfN6: 10.54.0.101
 
 resources: {}
 
@@ -75,8 +76,8 @@ phoneUi:
   # contain spaces. Android and Mobile tokens still trigger responsive sites.
   mobileUserAgent: "Mozilla/5.0(Android14;Pixel8)AppleWebKit/537.36(KHTML,likeGecko)Chrome/126.0.0.0MobileSafari/537.36"
   display:
-    width: 390
-    height: 844
+    width: 430
+    height: 930
   service:
     type: NodePort
     port: 443
@@ -99,7 +100,7 @@ phoneUi:
 
 wasmRunner:
   enabled: true
-  image: ghcr.io/infinitydon/ueransim-wasm-runner:v0.2.1
+  image: ghcr.io/infinitydon/ueransim-wasm-runner:v0.3.0
   listenHost: 0.0.0.0
   listenPort: 8090
   defaultTarget: https://www.cloudflare.com/cdn-cgi/trace
@@ -118,5 +119,10 @@ wasmRunner:
     limits:
       cpu: 250m
       memory: 192Mi
+
+iperf3Server:
+  enabled: true
+  image: alpine:3.21
+  port: 5201
 
 imagePullSecrets: []

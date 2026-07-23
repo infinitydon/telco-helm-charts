@@ -141,7 +141,7 @@ data:
     .device {
       position: relative;
       width: min(430px, calc((100vh - 126px) * .462085), calc(100vw - 40px));
-      aspect-ratio: 390 / 844;
+      aspect-ratio: 430 / 930;
       min-height: 0;
       overflow: hidden;
       border: 7px solid #111827;
@@ -204,6 +204,7 @@ data:
       width: 100% !important;
       height: 100% !important;
       box-sizing: border-box !important;
+      object-fit: contain !important;
     }
     .lab-footer {
       display: flex;

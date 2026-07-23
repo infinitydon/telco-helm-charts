@@ -258,6 +258,7 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
+              add: [NET_RAW]
           resources:
             {{- toYaml .Values.wasmRunner.resources | nindent 12 }}
           {{- if .Values.wasmRunner.existingScenarioConfigMap }}
@@ -371,3 +372,63 @@ spec:
               ip route add {{ .Values.ueSubnet }} via {{ .Values.addresses.upfN6 }} dev n6;
               iptables -t nat -A POSTROUTING -s {{ .Values.ueSubnet }} -o eth0 -j MASQUERADE;
               sleep infinity
+{{- if .Values.iperf3Server.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-iperf3
+  labels:
+    {{- include "open5gs-5g.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: iperf3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: iperf3
+      annotations:
+        checksum/nads: {{ include (print $.Template.BasePath "/nads.yaml") . | sha256sum }}
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-5g.fullname" . }}-n6","interface":"n6","ips":["{{ .Values.addresses.iperfN6 }}/24"]}]
+    spec:
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      containers:
+        - name: iperf3-server
+          image: {{ .Values.iperf3Server.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [NET_ADMIN]
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              apk add --no-cache iperf3;
+              ip route add {{ .Values.ueSubnet }} via {{ .Values.addresses.upfN6 }} dev n6;
+              exec iperf3 -s -p {{ .Values.iperf3Server.port }}
+          ports:
+            - name: iperf3
+              containerPort: {{ .Values.iperf3Server.port }}
+              protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: iperf3
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+{{- end }}

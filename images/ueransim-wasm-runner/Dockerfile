@@ -8,6 +8,9 @@ RUN pip install --no-cache-dir \
       "wasmtime==${WASMTIME_PY_VERSION}" \
       "requests==${REQUESTS_VERSION}" \
       "PySocks==${PYSOCKS_VERSION}" \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends iperf3 iproute2 iputils-ping traceroute \
+    && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 wasm
 
 COPY app.py /opt/wasm-runner/app.py
