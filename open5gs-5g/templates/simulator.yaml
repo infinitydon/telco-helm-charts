@@ -265,8 +265,10 @@ spec:
               add: [NET_RAW]
           resources:
             {{- toYaml .Values.wasmRunner.resources | nindent 12 }}
-          {{- if .Values.wasmRunner.existingScenarioConfigMap }}
           volumeMounts:
+            - name: wasm-tmp
+              mountPath: /tmp
+          {{- if .Values.wasmRunner.existingScenarioConfigMap }}
             - name: wasm-scenarios
               mountPath: /scenarios
               readOnly: true
@@ -287,6 +289,10 @@ spec:
         - name: wasm-scenarios
           configMap:
             name: {{ .Values.wasmRunner.existingScenarioConfigMap }}
+        {{- end }}
+        {{- if .Values.wasmRunner.enabled }}
+        - name: wasm-tmp
+          emptyDir: {}
         {{- end }}
 {{- if .Values.phoneUi.enabled }}
 ---
