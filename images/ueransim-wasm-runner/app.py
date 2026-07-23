@@ -4,6 +4,7 @@ import json
 import os
 import pathlib
 import re
+import socket
 import ssl
 import subprocess
 import threading
@@ -307,14 +308,23 @@ def run_scenario(name, target):
             timeout=35,
         )
         hops = [line.strip() for line in output.splitlines()[1:] if line.strip()]
+        destination = socket.gethostbyname(host)
+        reached = any(
+            re.search(rf"(^|\s){re.escape(destination)}(\s|$)", hop)
+            for hop in hops
+        )
         request_result.update(
             {
                 "test": "traceroute",
                 "host": host,
+                "destinationIp": destination,
                 "interface": UE_INTERFACE,
                 "hopCount": len(hops),
+                "timedOutHops": sum(hop.endswith("*") for hop in hops),
+                "completed": True,
+                "reachedDestination": reached,
                 "hops": hops,
-                "ok": bool(hops),
+                "ok": reached,
             }
         )
         return 0
