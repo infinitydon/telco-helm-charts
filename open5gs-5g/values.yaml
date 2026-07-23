@@ -71,7 +71,9 @@ phoneUi:
   browserImage: lscr.io/linuxserver/chromium:bf9e0b4f-ls46
   tunnelPattern: "uesimtun*"
   homeUrl: https://example.com
-  mobileUserAgent: "Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP2A.240705.005) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+  # The LinuxServer wrapper word-splits CHROME_CLI, so this value must not
+  # contain spaces. Android and Mobile tokens still trigger responsive sites.
+  mobileUserAgent: "Mozilla/5.0(Android14;Pixel8)AppleWebKit/537.36(KHTML,likeGecko)Chrome/126.0.0.0MobileSafari/537.36"
   display:
     width: 390
     height: 844
