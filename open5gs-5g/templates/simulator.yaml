@@ -237,6 +237,10 @@ spec:
               value: "socks5h://127.0.0.1:1080"
             - name: DEFAULT_TARGET
               value: {{ .Values.wasmRunner.defaultTarget | quote }}
+            - name: PING_TARGET
+              value: {{ .Values.addresses.dataN6 | quote }}
+            - name: IPERF3_TARGET
+              value: {{ printf "%s:%v" .Values.addresses.iperfN6 .Values.iperf3Server.port | quote }}
             - name: REQUEST_TIMEOUT_SECONDS
               value: {{ .Values.wasmRunner.requestTimeoutSeconds | quote }}
             - name: WASM_FUEL

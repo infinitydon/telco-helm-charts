@@ -22,6 +22,8 @@ UE_INTERFACE = os.getenv("UE_INTERFACE", "uesimtun0")
 SOCKS_PROXY = os.getenv("SOCKS_PROXY", "socks5h://127.0.0.1:1080")
 SCENARIO_DIR = pathlib.Path(os.getenv("SCENARIO_DIR", "/scenarios"))
 DEFAULT_TARGET = os.getenv("DEFAULT_TARGET", "https://example.com")
+PING_TARGET = os.getenv("PING_TARGET", "10.54.0.100")
+IPERF3_TARGET = os.getenv("IPERF3_TARGET", "10.54.0.101:5201")
 REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "20"))
 WASM_FUEL = int(os.getenv("WASM_FUEL", "1000000"))
 
@@ -439,9 +441,9 @@ const targets = {
   'builtin-tls': 'https://www.cloudflare.com',
   'builtin-download': 'https://speed.cloudflare.com/__down?bytes=1000000',
   'builtin-egress': 'https://api.ipify.org',
-  'builtin-ping': '10.54.0.100',
-  'builtin-traceroute': '10.54.0.100',
-  'builtin-iperf3': '10.54.0.101:5201'
+  'builtin-ping': '__PING_TARGET__',
+  'builtin-traceroute': '__PING_TARGET__',
+  'builtin-iperf3': '__IPERF3_TARGET__'
 };
 async function refresh() {
   const r = await fetch('/api/status'); const s = await r.json();
@@ -462,7 +464,13 @@ document.querySelector('#runner').addEventListener('submit', async e => {
   button.disabled = false; refresh();
 });
 refresh().catch(e => { health.className='down'; health.textContent=String(e); });
-</script></body></html>""".replace("__DEFAULT_TARGET__", html.escape(DEFAULT_TARGET, quote=True))
+</script></body></html>""".replace(
+    "__DEFAULT_TARGET__", html.escape(DEFAULT_TARGET, quote=True)
+).replace(
+    "__PING_TARGET__", html.escape(PING_TARGET, quote=True)
+).replace(
+    "__IPERF3_TARGET__", html.escape(IPERF3_TARGET, quote=True)
+)
 
 
 class Handler(BaseHTTPRequestHandler):
