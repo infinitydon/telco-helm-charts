@@ -34,3 +34,40 @@ adb connect <worker-address>:30555
 This manifest validates Android independently of the simulated 5G user plane.
 Attaching Android application traffic to UERANSIM or PacketRusher requires a
 separate routing sidecar or VRF/network-namespace integration.
+
+## Windows client with Winget
+
+Open PowerShell and install Android Platform Tools and scrcpy:
+
+```powershell
+winget install --id Google.PlatformTools --exact
+winget install --id Genymobile.scrcpy --exact
+```
+
+Open a new PowerShell window after installation so the updated `PATH` is used.
+
+Start a session:
+
+```powershell
+adb start-server
+adb connect 192.168.88.98:30555
+adb devices
+scrcpy -s 192.168.88.98:30555
+```
+
+Closing the scrcpy window, or pressing `Ctrl+C` in its PowerShell window, stops
+screen viewing and control but leaves the ADB connection available. Disconnect
+this redroid instance with:
+
+```powershell
+adb disconnect 192.168.88.98:30555
+```
+
+To stop the local ADB background service and disconnect every ADB device:
+
+```powershell
+adb kill-server
+```
+
+To start another session later, repeat `adb connect` followed by `scrcpy`; ADB
+will automatically start its local service if it is not already running.
