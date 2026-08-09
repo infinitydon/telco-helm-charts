@@ -62,7 +62,11 @@ spec:
         - name: ue
           image: gradiant/ueransim:3.2.6
           imagePullPolicy: IfNotPresent
-          args: ["ue"]
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              sleep 25;
+              exec nr-ue -c /etc/ueransim/ue.yaml
           securityContext:
             privileged: true
             capabilities:
