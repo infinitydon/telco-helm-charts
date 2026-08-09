@@ -22,7 +22,120 @@ spec:
       automountServiceAccountToken: false
       nodeSelector:
         redroid.io/enabled: "true"
+      initContainers:
+        - name: provision-5g-subscriber
+          image: gradiant/open5gs-dbctl:0.10.3
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DB_URI
+              value: mongodb://open5gs-open5gs-5g-mongodb.open5gs.svc.cluster.local/open5gs
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until open5gs-dbctl showall >/dev/null 2>&1; do sleep 2; done;
+              open5gs-dbctl remove 001010000000002 || true;
+              open5gs-dbctl add_ue_with_slice 001010000000002
+              465B5CE8B199B49FAA5F0A2EE238A6BC
+              E8ED289DEBA952E4283B54E88E6183CA internet 1 111111
+        - name: wait-for-gnb
+          image: alpine:3.21
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until nc -zu -w 1
+              open5gs-open5gs-5g-gnb.open5gs.svc.cluster.local 4997
+              >/dev/null 2>&1; do sleep 2; done
       containers:
+        - name: ue
+          image: gradiant/ueransim:3.2.6
+          imagePullPolicy: IfNotPresent
+          args: ["ue"]
+          securityContext:
+            privileged: true
+            capabilities:
+              add: [NET_ADMIN]
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-ec", "ip link show uesimtun0 >/dev/null 2>&1"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 60
+          volumeMounts:
+            - name: ue-config
+              mountPath: /etc/ueransim/ue.yaml
+              subPath: ue.yaml
+        - name: ue-socks-proxy
+          image: alpine:3.21
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              apk add --no-cache dante-server;
+              until ip -4 addr show uesimtun0 >/dev/null 2>&1;
+              do sleep 1; done;
+              printf '%s\n'
+              'logoutput: stdout'
+              'internal: 0.0.0.0 port = 1080'
+              'external: uesimtun0'
+              'clientmethod: none'
+              'socksmethod: none'
+              'user.privileged: root'
+              'user.unprivileged: nobody'
+              'client pass { from: 0.0.0.0/0 to: 0.0.0.0/0 }'
+              'socks pass { from: 0.0.0.0/0 to: 0.0.0.0/0 command: connect }'
+              >/tmp/sockd.conf;
+              exec sockd -f /tmp/sockd.conf
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [SETGID, SETUID]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+        - name: android-http-proxy
+          image: ginuerzh/gost:2.12.0
+          imagePullPolicy: IfNotPresent
+          args: ["-L=:8118", "-F=socks5://127.0.0.1:1080"]
+          ports:
+            - name: http-proxy
+              containerPort: 8118
+          readinessProbe:
+            tcpSocket:
+              port: http-proxy
+            initialDelaySeconds: 3
+            periodSeconds: 5
+        - name: android-5g-indicator
+          image: alpine:3.21
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              apk add --no-cache android-tools;
+              until adb connect 127.0.0.1:5555 >/dev/null 2>&1; do sleep 1; done;
+              until [ "$(adb -s 127.0.0.1:5555 shell getprop sys.boot_completed
+              2>/dev/null | tr -d '\r')" = "1" ]; do sleep 1; done;
+              sleep 5;
+              adb -s 127.0.0.1:5555 shell settings put global
+              sysui_demo_allowed 1;
+              adb -s 127.0.0.1:5555 shell am broadcast
+              -a com.android.systemui.demo -e command enter;
+              adb -s 127.0.0.1:5555 shell am broadcast
+              -a com.android.systemui.demo -e command network -e mobile show
+              -e datatype 5g -e level 4 -e fully true -e sims 1 -e nosim false;
+              exec sleep infinity
+          resources:
+            requests:
+              cpu: 10m
+              memory: 24Mi
+            limits:
+              cpu: 100m
+              memory: 96Mi
         - name: android
           image: redroid/redroid:12.0.0_64only-240527
           imagePullPolicy: IfNotPresent
@@ -32,6 +145,12 @@ spec:
             - androidboot.redroid_dpi=320
             - androidboot.redroid_fps=30
             - androidboot.use_memfd=true
+            - androidboot.redroid_net_proxy_type=static
+            - androidboot.redroid_net_proxy_host=127.0.0.1
+            - androidboot.redroid_net_proxy_port=8118
+            - ro.product.brand=Open5GS
+            - ro.product.manufacturer=Open5GS-Lab
+            - ro.product.model=UERANSIM-5G-SA-Phone
           securityContext:
             privileged: true
             allowPrivilegeEscalation: true
@@ -62,6 +181,9 @@ spec:
       volumes:
         - name: data
           emptyDir: {}
+        - name: ue-config
+          configMap:
+            name: redroid-ueransim-config
 ---
 apiVersion: v1
 kind: Service
@@ -78,3 +200,40 @@ spec:
       targetPort: adb
       nodePort: 30555
       protocol: TCP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redroid-ueransim-config
+  namespace: redroid
+data:
+  ue.yaml: |
+    supi: "imsi-001010000000002"
+    mcc: "001"
+    mnc: "01"
+    key: "465B5CE8B199B49FAA5F0A2EE238A6BC"
+    op: "E8ED289DEBA952E4283B54E88E6183CA"
+    opType: OPC
+    amf: "8000"
+    imei: "356938035643804"
+    gnbSearchList:
+      - open5gs-open5gs-5g-gnb.open5gs.svc.cluster.local
+    uacAic: { mps: false, mcs: false }
+    uacAcc:
+      normalClass: 0
+      class11: false
+      class12: false
+      class13: false
+      class14: false
+      class15: false
+    sessions:
+      - type: IPv4
+        apn: internet
+        slice: { sst: 1, sd: 0x111111 }
+    configured-nssai:
+      - { sst: 1, sd: 0x111111 }
+    default-nssai:
+      - { sst: 1, sd: 0x111111 }
+    integrity: { IA1: true, IA2: true, IA3: true }
+    ciphering: { EA1: true, EA2: true, EA3: true }
+    integrityMaxRate: { uplink: full, downlink: full }

@@ -31,9 +31,17 @@ kubectl -n redroid wait --for=condition=Ready pod/redroid-test-0 --timeout=10m
 adb connect <worker-address>:30555
 ```
 
-This manifest validates Android independently of the simulated 5G user plane.
-Attaching Android application traffic to UERANSIM or PacketRusher requires a
-separate routing sidecar or VRF/network-namespace integration.
+The supplied test manifest includes a dedicated UERANSIM UE using IMSI
+`001010000000002`. Android HTTP and HTTPS traffic is sent to a local HTTP proxy,
+forwarded to a SOCKS server bound to `uesimtun0`, and carried over that UE's PDU
+session. The original chart UE remains deployed separately.
+
+The Android product name is customized to `UERANSIM-5G-SA-Phone`. After boot,
+the manifest also enables Android SystemUI's demo mobile-network indicator and
+shows `5G` in the status bar. This icon represents the verified lab data path;
+it is cosmetic rather than radio telemetry because redroid has no modem or
+Android Radio Interface Layer. UERANSIM registration, PDU-session logs, tunnel
+address, and interface counters remain the authoritative status sources.
 
 ## Windows client with Winget
 
