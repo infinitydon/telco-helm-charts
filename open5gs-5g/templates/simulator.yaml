@@ -90,6 +90,7 @@ spec:
         checksum/phone-ui: {{ include (print $.Template.BasePath "/phone-ui-configmap.yaml") . | sha256sum }}
         {{- end }}
     spec:
+      automountServiceAccountToken: false
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -143,7 +144,17 @@ spec:
         - name: ue
           image: {{ .Values.image.ueransim }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.redroid.enabled }}
+          command: ["/usr/bin/bash", "-ec"]
+          args:
+            - >-
+              until timeout 1 bash -c '</dev/tcp/127.0.0.1/5555'
+              >/dev/null 2>&1; do sleep 1; done;
+              sleep 10;
+              exec nr-ue -c /etc/ueransim/ue.yaml
+          {{- else }}
           args: ["ue"]
+          {{- end }}
           securityContext:
             privileged: true
             capabilities: { add: [NET_ADMIN] }
@@ -151,6 +162,108 @@ spec:
             - name: config
               mountPath: /etc/ueransim/ue.yaml
               subPath: ue.yaml
+        {{- if .Values.redroid.enabled }}
+        - name: redroid-socks-proxy
+          image: {{ .Values.redroid.helperImage }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              apk add --no-cache dante-server;
+              until ip -4 addr show uesimtun0 >/dev/null 2>&1; do sleep 1; done;
+              printf '%s\n'
+              'logoutput: stdout'
+              'internal: 0.0.0.0 port = 1081'
+              'external: uesimtun0'
+              'clientmethod: none'
+              'socksmethod: none'
+              'user.privileged: root'
+              'user.unprivileged: nobody'
+              'client pass { from: 0.0.0.0/0 to: 0.0.0.0/0 }'
+              'socks pass { from: 0.0.0.0/0 to: 0.0.0.0/0 command: connect }'
+              >/tmp/sockd.conf;
+              exec sockd -f /tmp/sockd.conf
+          resources:
+            {{- toYaml .Values.redroid.resources.helper | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [SETGID, SETUID]
+        - name: redroid-http-proxy
+          image: {{ .Values.redroid.proxyImage }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["-L=:8118", "-F=socks5://127.0.0.1:1081"]
+          ports:
+            - name: redroid-proxy
+              containerPort: 8118
+          readinessProbe:
+            tcpSocket:
+              port: redroid-proxy
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.redroid.resources.helper | nindent 12 }}
+        {{- if .Values.redroid.show5gIndicator }}
+        - name: redroid-5g-indicator
+          image: {{ .Values.redroid.helperImage }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              apk add --no-cache android-tools;
+              until adb connect 127.0.0.1:5555 >/dev/null 2>&1; do sleep 1; done;
+              until [ "$(adb -s 127.0.0.1:5555 shell getprop sys.boot_completed
+              2>/dev/null | tr -d '\r')" = "1" ]; do sleep 1; done;
+              sleep 5;
+              adb -s 127.0.0.1:5555 shell settings put global sysui_demo_allowed 1;
+              adb -s 127.0.0.1:5555 shell am broadcast
+              -a com.android.systemui.demo -e command enter;
+              adb -s 127.0.0.1:5555 shell am broadcast
+              -a com.android.systemui.demo -e command network -e mobile show
+              -e datatype 5g -e level 4 -e fully true -e sims 1 -e nosim false;
+              exec sleep infinity
+          resources:
+            {{- toYaml .Values.redroid.resources.helper | nindent 12 }}
+        {{- end }}
+        - name: redroid
+          image: {{ .Values.redroid.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - androidboot.redroid_width={{ .Values.redroid.display.width }}
+            - androidboot.redroid_height={{ .Values.redroid.display.height }}
+            - androidboot.redroid_dpi={{ .Values.redroid.display.dpi }}
+            - androidboot.redroid_fps={{ .Values.redroid.display.fps }}
+            - androidboot.use_memfd=true
+            - androidboot.redroid_net_proxy_type=static
+            - androidboot.redroid_net_proxy_host=127.0.0.1
+            - androidboot.redroid_net_proxy_port=8118
+            - ro.product.brand={{ .Values.redroid.device.brand }}
+            - ro.product.manufacturer={{ .Values.redroid.device.manufacturer }}
+            - ro.product.model={{ .Values.redroid.device.model }}
+          securityContext:
+            privileged: true
+            allowPrivilegeEscalation: true
+          ports:
+            - name: redroid-adb
+              containerPort: 5555
+              protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+                - /system/bin/sh
+                - -c
+                - '[ "$(getprop sys.boot_completed)" = "1" ]'
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 60
+          resources:
+            {{- toYaml .Values.redroid.resources.android | nindent 12 }}
+          volumeMounts:
+            - name: redroid-data
+              mountPath: /data
+        {{- end }}
         {{- if .Values.phoneUi.enabled }}
         - name: phone-proxy
           image: {{ .Values.phoneUi.proxyImage }}
@@ -305,6 +418,10 @@ spec:
         - name: wasm-tmp
           emptyDir: {}
         {{- end }}
+        {{- if .Values.redroid.enabled }}
+        - name: redroid-data
+          emptyDir: {}
+        {{- end }}
 {{- if .Values.phoneUi.enabled }}
 ---
 apiVersion: v1
@@ -326,6 +443,29 @@ spec:
       protocol: TCP
       {{- if and (eq .Values.phoneUi.service.type "NodePort") .Values.phoneUi.service.nodePort }}
       nodePort: {{ .Values.phoneUi.service.nodePort }}
+      {{- end }}
+{{- end }}
+{{- if .Values.redroid.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-redroid-adb
+  labels:
+    {{- include "open5gs-5g.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redroid
+spec:
+  type: {{ .Values.redroid.service.type }}
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: ue
+  ports:
+    - name: adb
+      port: {{ .Values.redroid.service.port }}
+      targetPort: redroid-adb
+      protocol: TCP
+      {{- if and (eq .Values.redroid.service.type "NodePort") .Values.redroid.service.nodePort }}
+      nodePort: {{ .Values.redroid.service.nodePort }}
       {{- end }}
 {{- end }}
 {{- if .Values.wasmRunner.enabled }}

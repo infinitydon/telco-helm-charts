@@ -10,7 +10,7 @@ Label only nodes intended to run privileged Android workloads:
 ```bash
 kubectl label node <worker> redroid.io/enabled=true
 kubectl apply -f redroid-support/binder-modules-daemonset.yaml
-kubectl -n redroid-system rollout status ds/redroid-binder-modules
+kubectl -n kube-system rollout status ds/redroid-binder-modules
 ```
 
 Modern kernels expose Binder through BinderFS. Static `/dev/binder*` devices

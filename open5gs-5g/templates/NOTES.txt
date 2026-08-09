@@ -33,5 +33,19 @@ Check registration and the PDU session:
 Ping the N6 test endpoint through the UE tunnel:
   kubectl exec deploy/{{ include "open5gs-5g.fullname" . }}-ue -- ping -I uesimtun0 {{ .Values.addresses.dataN6 }}
 
+{{- if .Values.phoneUi.enabled }}
 Verify phone traffic exits through the UE tunnel:
   kubectl exec deploy/{{ include "open5gs-5g.fullname" . }}-ue -c phone-proxy -- verify-ue-path
+{{- end }}
+
+{{- if .Values.redroid.enabled }}
+Connect to the redroid Android UE:
+{{- if eq .Values.redroid.service.type "NodePort" }}
+  adb connect <worker-node-ip>:{{ .Values.redroid.service.nodePort }}
+  scrcpy -s <worker-node-ip>:{{ .Values.redroid.service.nodePort }}
+{{- else }}
+  kubectl port-forward service/{{ include "open5gs-5g.fullname" . }}-redroid-adb 5555:{{ .Values.redroid.service.port }}
+  adb connect localhost:5555
+  scrcpy -s localhost:5555
+{{- end }}
+{{- end }}

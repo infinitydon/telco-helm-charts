@@ -121,6 +121,49 @@ wasmRunner:
       cpu: 250m
       memory: 192Mi
 
+# Full Android instance sharing the UERANSIM UE pod network namespace. Android
+# HTTP(S) traffic is bridged through a SOCKS server bound to uesimtun0.
+redroid:
+  enabled: false
+  image: redroid/redroid:12.0.0_64only-240527
+  proxyImage: ginuerzh/gost:2.12.0
+  helperImage: alpine:3.21
+  display:
+    width: 720
+    height: 1280
+    dpi: 320
+    fps: 30
+  device:
+    brand: Open5GS
+    manufacturer: Open5GS-Lab
+    model: UERANSIM-5G-SA-Phone
+  show5gIndicator: true
+  service:
+    type: NodePort
+    port: 5555
+    nodePort: 30555
+  resources:
+    android:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: "2"
+        memory: 3Gi
+    helper:
+      requests:
+        cpu: 10m
+        memory: 24Mi
+      limits:
+        cpu: 100m
+        memory: 96Mi
+  binder:
+    enabled: false
+    namespace: kube-system
+    image: ubuntu:24.04
+    nodeSelector:
+      redroid.io/enabled: "true"
+
 iperf3Server:
   enabled: true
   image: alpine:3.21

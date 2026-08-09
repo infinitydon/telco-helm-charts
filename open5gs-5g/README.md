@@ -162,6 +162,41 @@ their memory as `memory`, and may import:
 The HTTP target is selected in the runner page. Set
 `wasmRunner.enabled=false` to omit only this sidecar.
 
+## Full Android UE with redroid
+
+Enable `redroid.enabled=true` to run Android in the same Kubernetes pod and
+network namespace as the chart's UERANSIM UE. The UE creates `uesimtun0`; an
+HTTP-to-SOCKS bridge sends Android HTTP(S) traffic through sockets bound to that
+interface. This uses the chart's existing subscriber and does not create a
+second simulated UE.
+
+The optional Binder DaemonSet is installed in `kube-system` and targets only
+nodes labelled `redroid.io/enabled=true`:
+
+```powershell
+kubectl label node <worker> redroid.io/enabled=true
+helm upgrade --install open5gs .\open5gs-5g -n open5gs --create-namespace `
+  --set redroid.enabled=true `
+  --set redroid.binder.enabled=true
+```
+
+All container images use versioned tags. ADB is exposed on NodePort `30555` by
+default. Do not expose it to an untrusted network.
+
+```powershell
+winget install --id Google.PlatformTools --exact
+winget install --id Genymobile.scrcpy --exact
+adb connect <worker-node-ip>:30555
+scrcpy -s <worker-node-ip>:30555
+```
+
+The Android model is `UERANSIM-5G-SA-Phone`. Its SystemUI 5G indicator is a
+visual representation of the verified UERANSIM data path, not modem telemetry;
+redroid does not provide a cellular modem or Android RIL.
+
+Disable Android without removing the rest of the core with
+`redroid.enabled=false`.
+
 ## Verify
 
 ```powershell
