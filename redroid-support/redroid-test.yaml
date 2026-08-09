@@ -45,7 +45,19 @@ spec:
             - >-
               until nc -zu -w 1
               open5gs-open5gs-5g-gnb.open5gs.svc.cluster.local 4997
-              >/dev/null 2>&1; do sleep 2; done
+              >/dev/null 2>&1; do sleep 2; done;
+              GNB_IP="$(getent hosts
+              open5gs-open5gs-5g-gnb.open5gs.svc.cluster.local |
+              awk 'NR==1 {print $1}')";
+              test -n "$GNB_IP";
+              sed "s/open5gs-open5gs-5g-gnb.open5gs.svc.cluster.local/$GNB_IP/"
+              /ue-config-source/ue.yaml >/ue-config/ue.yaml
+          volumeMounts:
+            - name: ue-config-source
+              mountPath: /ue-config-source
+              readOnly: true
+            - name: ue-config
+              mountPath: /ue-config
       containers:
         - name: ue
           image: gradiant/ueransim:3.2.6
@@ -182,6 +194,8 @@ spec:
         - name: data
           emptyDir: {}
         - name: ue-config
+          emptyDir: {}
+        - name: ue-config-source
           configMap:
             name: redroid-ueransim-config
 ---
