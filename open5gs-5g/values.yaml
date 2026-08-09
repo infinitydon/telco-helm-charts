@@ -59,6 +59,7 @@ addresses:
   upfN6: 10.54.0.2
   dataN6: 10.54.0.100
   iperfN6: 10.54.0.101
+  librespeedN6: 10.54.0.102
 
 resources: {}
 
@@ -169,5 +170,22 @@ iperf3Server:
   enabled: true
   image: alpine:3.21
   port: 5201
+
+librespeed:
+  enabled: true
+  image: ghcr.io/librespeed/speedtest:6.2.0-alpine
+  port: 8080
+  title: "5G UE Speed Test"
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "2"
+      memory: 1Gi
 
 imagePullSecrets: []

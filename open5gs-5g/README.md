@@ -11,6 +11,7 @@ MongoDB, the Open5GS 5G core, UERANSIM, and an N6 test endpoint.
 - A subscriber created before the UE starts; WebUI does not replace it
 - A data pod at `10.54.0.100` for the end-to-end ping
 - A dedicated iperf3 server pod on N6 at `10.54.0.101`
+- A private LibreSpeed server on N6 at `10.54.0.102` for browser-based tests
 - An optional WebAssembly scenario runner sharing the UE network namespace
 
 ## Multus interfaces
@@ -25,7 +26,7 @@ addresses are assigned in pod annotations.
 | N2 | SCTP/NGAP | `10.51.0.0/24` | AMF `.2`, gNB `.10` |
 | N3 | GTP-U | `10.52.0.0/24` | UPF `.2`, gNB `.10` |
 | N4 | PFCP | `10.53.0.0/24` | SMF `.2`, UPF `.3` |
-| N6 | User data | `10.54.0.0/24` | UPF `.2`, test pod `.100`, iperf3 `.101` |
+| N6 | User data | `10.54.0.0/24` | UPF `.2`, test pod `.100`, iperf3 `.101`, LibreSpeed `.102` |
 
 The service-based interfaces between 5G core functions use ordinary
 Kubernetes Services on the default pod network. SBI does not use Multus.
@@ -102,6 +103,25 @@ imagePullSecrets:
 ```
 
 Set `phoneUi.enabled=false` to deploy the original command-line-only UE.
+
+## Browser speed test
+
+The chart deploys LibreSpeed directly on N6 with the fixed image tag
+`ghcr.io/librespeed/speedtest:6.2.0-alpine`. Open the following URL inside the
+phone UI or redroid Android browser:
+
+```text
+http://10.54.0.102:8080
+```
+
+The direct N6 address is intentional: requests travel through the Android
+proxy or phone proxy, `uesimtun0`, UERANSIM gNB, Open5GS UPF, and then N6. The
+service is ClusterIP only and is provided for Kubernetes health and
+administration; using it from outside the UE is not an end-to-end 5G test.
+LibreSpeed telemetry and client public-IP lookup are disabled by default, so
+the course UI does not collect or display students' public addresses. Override
+`addresses.librespeedN6` when `.102` is already allocated, or set
+`librespeed.enabled=false` to omit the server.
 
 ## UE WebAssembly scenarios
 

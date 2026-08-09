@@ -459,6 +459,97 @@ spec:
       nodePort: {{ .Values.phoneUi.service.nodePort }}
       {{- end }}
 {{- end }}
+{{- if .Values.librespeed.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-librespeed
+  labels:
+    {{- include "open5gs-5g.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: librespeed
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: librespeed
+      annotations:
+        checksum/nads: {{ include (print $.Template.BasePath "/nads.yaml") . | sha256sum }}
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-5g.fullname" . }}-n6","interface":"n6","ips":["{{ .Values.addresses.librespeedN6 }}/24"]}]
+    spec:
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      initContainers:
+        - name: configure-n6-route
+          image: {{ .Values.image.toolbox }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [NET_ADMIN]
+          command: ["/bin/sh", "-ec"]
+          args:
+            - ip route replace {{ .Values.ueSubnet }} via {{ .Values.addresses.upfN6 }} dev n6 onlink
+      containers:
+        - name: librespeed
+          image: {{ .Values.librespeed.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: MODE
+              value: standalone
+            - name: TITLE
+              value: {{ .Values.librespeed.title | quote }}
+            - name: TELEMETRY
+              value: "false"
+            - name: REDACT_IP_ADDRESSES
+              value: "true"
+            - name: DISABLE_IPINFO
+              value: "true"
+            - name: USE_NEW_DESIGN
+              value: "true"
+            - name: WEBPORT
+              value: {{ .Values.librespeed.port | quote }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.librespeed.port }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.librespeed.resources | nindent 12 }}
+{{- if .Values.librespeed.service.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-librespeed
+  labels:
+    {{- include "open5gs-5g.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.librespeed.service.type }}
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: librespeed
+  ports:
+    - name: http
+      port: {{ .Values.librespeed.service.port }}
+      targetPort: http
+      protocol: TCP
+{{- end }}
+{{- end }}
 {{- if .Values.redroid.enabled }}
 ---
 apiVersion: v1

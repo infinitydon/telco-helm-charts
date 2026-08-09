@@ -38,6 +38,12 @@ Verify phone traffic exits through the UE tunnel:
   kubectl exec deploy/{{ include "open5gs-5g.fullname" . }}-ue -c phone-proxy -- verify-ue-path
 {{- end }}
 
+{{- if .Values.librespeed.enabled }}
+Run the browser-based speed test over the 5G user plane:
+  Open http://{{ .Values.addresses.librespeedN6 }}:{{ .Values.librespeed.port }} inside the UE phone or redroid browser.
+  LibreSpeed telemetry and public-IP lookup are disabled.
+{{- end }}
+
 {{- if .Values.redroid.enabled }}
 Connect to the redroid Android UE:
 {{- if eq .Values.redroid.service.type "NodePort" }}
