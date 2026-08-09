@@ -81,51 +81,40 @@ spec:
             - name: ue-config
               mountPath: /etc/ueransim/ue.yaml
               subPath: ue.yaml
-        - name: ue-socks-proxy
-          image: alpine:3.21
+        - name: redroid-ue-proxy
+          image: ghcr.io/infinitydon/ueransim-http-proxy:v0.1.0
           imagePullPolicy: IfNotPresent
-          command: ["/bin/sh", "-ec"]
-          args:
-            - >-
-              apk add --no-cache dante-server;
-              until ip -4 addr show uesimtun0 >/dev/null 2>&1;
-              do sleep 1; done;
-              printf '%s\n'
-              'logoutput: stdout'
-              'internal: 0.0.0.0 port = 1080'
-              'external: uesimtun0'
-              'clientmethod: none'
-              'socksmethod: none'
-              'user.privileged: root'
-              'user.unprivileged: nobody'
-              'client pass { from: 0.0.0.0/0 to: 0.0.0.0/0 }'
-              'socks pass { from: 0.0.0.0/0 to: 0.0.0.0/0 command: connect }'
-              >/tmp/sockd.conf;
-              exec sockd -f /tmp/sockd.conf
+          env:
+            - name: LISTEN_ADDRESS
+              value: 0.0.0.0:8118
+            - name: UE_INTERFACE_PATTERN
+              value: uesimtun*
+            - name: DNS_SERVER
+              value: 1.1.1.1:53
+          ports:
+            - name: ue-proxy
+              containerPort: 8118
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: ue-proxy
+            initialDelaySeconds: 3
+            periodSeconds: 5
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsUser: 0
+            runAsGroup: 0
             capabilities:
               drop: [ALL]
-              add: [SETGID, SETUID]
+              add: [NET_RAW]
           resources:
             requests:
               cpu: 10m
-              memory: 16Mi
+              memory: 24Mi
             limits:
               cpu: 100m
-              memory: 64Mi
-        - name: android-http-proxy
-          image: ginuerzh/gost:2.12.0
-          imagePullPolicy: IfNotPresent
-          args: ["-L=:8118", "-F=socks5://127.0.0.1:1080"]
-          ports:
-            - name: http-proxy
-              containerPort: 8118
-          readinessProbe:
-            tcpSocket:
-              port: http-proxy
-            initialDelaySeconds: 3
-            periodSeconds: 5
+              memory: 96Mi
         - name: android-5g-indicator
           image: alpine:3.21
           imagePullPolicy: IfNotPresent

@@ -123,6 +123,24 @@ spec:
             - >-
               until nc -zu -w 1 {{ include "open5gs-5g.fullname" . }}-gnb 4997
               >/dev/null 2>&1; do sleep 2; done
+        {{- if .Values.redroid.enabled }}
+        - name: prepare-redroid-ue-config
+          image: {{ .Values.image.toolbox }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until GNB_IP="$(getent hosts {{ include "open5gs-5g.fullname" . }}-gnb |
+              awk 'NR==1 {print $1}')" && [ -n "$GNB_IP" ]; do sleep 1; done;
+              sed "s/{{ include "open5gs-5g.fullname" . }}-gnb/$GNB_IP/"
+              /source/ue.yaml >/runtime/ue.yaml
+          volumeMounts:
+            - name: config
+              mountPath: /source
+              readOnly: true
+            - name: redroid-ue-config
+              mountPath: /runtime
+        {{- end }}
         {{- if .Values.phoneUi.enabled }}
         - name: prepare-phone-ui
           image: {{ .Values.phoneUi.browserImage }}
@@ -159,51 +177,45 @@ spec:
             privileged: true
             capabilities: { add: [NET_ADMIN] }
           volumeMounts:
+            {{- if .Values.redroid.enabled }}
+            - name: redroid-ue-config
+              mountPath: /etc/ueransim/ue.yaml
+              subPath: ue.yaml
+            {{- else }}
             - name: config
               mountPath: /etc/ueransim/ue.yaml
               subPath: ue.yaml
+            {{- end }}
         {{- if .Values.redroid.enabled }}
-        - name: redroid-socks-proxy
-          image: {{ .Values.redroid.helperImage }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["/bin/sh", "-ec"]
-          args:
-            - >-
-              apk add --no-cache dante-server;
-              until ip -4 addr show uesimtun0 >/dev/null 2>&1; do sleep 1; done;
-              printf '%s\n'
-              'logoutput: stdout'
-              'internal: 0.0.0.0 port = 1081'
-              'external: uesimtun0'
-              'clientmethod: none'
-              'socksmethod: none'
-              'user.privileged: root'
-              'user.unprivileged: nobody'
-              'client pass { from: 0.0.0.0/0 to: 0.0.0.0/0 }'
-              'socks pass { from: 0.0.0.0/0 to: 0.0.0.0/0 command: connect }'
-              >/tmp/sockd.conf;
-              exec sockd -f /tmp/sockd.conf
-          resources:
-            {{- toYaml .Values.redroid.resources.helper | nindent 12 }}
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: [ALL]
-              add: [SETGID, SETUID]
-        - name: redroid-http-proxy
+        - name: redroid-ue-proxy
           image: {{ .Values.redroid.proxyImage }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          args: ["-L=:8118", "-F=socks5://127.0.0.1:1081"]
+          env:
+            - name: LISTEN_ADDRESS
+              value: 0.0.0.0:8118
+            - name: UE_INTERFACE_PATTERN
+              value: uesimtun*
+            - name: DNS_SERVER
+              value: {{ .Values.redroid.dnsServer | quote }}
           ports:
             - name: redroid-proxy
               containerPort: 8118
           readinessProbe:
-            tcpSocket:
+            httpGet:
+              path: /healthz
               port: redroid-proxy
             initialDelaySeconds: 3
             periodSeconds: 5
           resources:
             {{- toYaml .Values.redroid.resources.helper | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsUser: 0
+            runAsGroup: 0
+            capabilities:
+              drop: [ALL]
+              add: [NET_RAW]
         {{- if .Values.redroid.show5gIndicator }}
         - name: redroid-5g-indicator
           image: {{ .Values.redroid.helperImage }}
@@ -420,6 +432,8 @@ spec:
         {{- end }}
         {{- if .Values.redroid.enabled }}
         - name: redroid-data
+          emptyDir: {}
+        - name: redroid-ue-config
           emptyDir: {}
         {{- end }}
 {{- if .Values.phoneUi.enabled }}

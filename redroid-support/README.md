@@ -32,9 +32,9 @@ adb connect <worker-address>:30555
 ```
 
 The supplied test manifest includes a dedicated UERANSIM UE using IMSI
-`001010000000002`. Android HTTP and HTTPS traffic is sent to a local HTTP proxy,
-forwarded to a SOCKS server bound to `uesimtun0`, and carried over that UE's PDU
-session. The original chart UE remains deployed separately.
+`001010000000002`. A custom HTTP/HTTPS proxy resolves DNS through the UE and
+binds every outbound socket directly to `uesimtun0`, carrying Android traffic
+over that UE's PDU session. The original chart UE remains deployed separately.
 
 The Android product name is customized to `UERANSIM-5G-SA-Phone`. After boot,
 the manifest also enables Android SystemUI's demo mobile-network indicator and

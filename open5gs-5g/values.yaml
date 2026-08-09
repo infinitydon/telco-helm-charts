@@ -121,13 +121,14 @@ wasmRunner:
       cpu: 250m
       memory: 192Mi
 
-# Full Android instance sharing the UERANSIM UE pod network namespace. Android
-# HTTP(S) traffic is bridged through a SOCKS server bound to uesimtun0.
+# Full Android instance sharing the UERANSIM UE pod network namespace. The
+# custom forward proxy binds Android HTTP(S) and DNS sockets to uesimtun0.
 redroid:
   enabled: false
   image: redroid/redroid:12.0.0_64only-240527
-  proxyImage: ginuerzh/gost:2.12.0
+  proxyImage: ghcr.io/infinitydon/ueransim-http-proxy:v0.1.0
   helperImage: alpine:3.21
+  dnsServer: 1.1.1.1:53
   display:
     width: 720
     height: 1280

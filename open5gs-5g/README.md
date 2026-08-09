@@ -166,9 +166,9 @@ The HTTP target is selected in the runner page. Set
 
 Enable `redroid.enabled=true` to run Android in the same Kubernetes pod and
 network namespace as the chart's UERANSIM UE. The UE creates `uesimtun0`; an
-HTTP-to-SOCKS bridge sends Android HTTP(S) traffic through sockets bound to that
-interface. This uses the chart's existing subscriber and does not create a
-second simulated UE.
+custom HTTP/HTTPS forward proxy resolves DNS through the UE and binds every
+outbound socket directly to that interface. This uses the chart's existing
+subscriber and does not create a second simulated UE.
 
 The optional Binder DaemonSet is installed in `kube-system` and targets only
 nodes labelled `redroid.io/enabled=true`:
