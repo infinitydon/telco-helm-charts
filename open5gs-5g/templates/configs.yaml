@@ -163,7 +163,7 @@ data:
     nci: {{ .Values.gnb.nci | quote }}
     idLength: 32
     tac: {{ printf "%06d" (.Values.plmn.tac | int) | quote }}
-    linkIp: 0.0.0.0
+    linkIp: {{ .Values.addresses.gnbRls }}
     ngapIp: {{ .Values.addresses.gnbN2 }}
     gtpIp: {{ .Values.addresses.gnbN3 }}
     amfConfigs:
@@ -183,7 +183,7 @@ data:
     amf: {{ .Values.subscriber.amf | quote }}
     imei: "356938035643803"
     gnbSearchList:
-      - {{ include "open5gs-5g.fullname" . }}-gnb
+      - {{ .Values.addresses.gnbRls }}
     uacAic:
       mps: false
       mcs: false

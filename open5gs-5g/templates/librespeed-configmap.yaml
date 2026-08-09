@@ -1,0 +1,23 @@
+{{- if .Values.librespeed.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-librespeed-settings
+  labels:
+    {{- include "open5gs-5g.labels" . | nindent 4 }}
+data:
+  settings.json: |-
+    {
+      "telemetry_level": "off",
+      "test_order": "ID_U_P",
+      "time_dl_max": {{ .Values.librespeed.test.downloadSeconds }},
+      "time_ul_max": {{ .Values.librespeed.test.uploadSeconds }},
+      "time_dlGraceTime": 0,
+      "time_ulGraceTime": 0,
+      "time_auto": false,
+      "xhr_dlMultistream": {{ .Values.librespeed.test.downloadStreams }},
+      "xhr_ulMultistream": {{ .Values.librespeed.test.uploadStreams }},
+      "xhr_ignoreErrors": 0,
+      "count_ping": {{ .Values.librespeed.test.pingCount }}
+    }
+{{- end }}

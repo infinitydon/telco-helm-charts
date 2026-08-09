@@ -1,0 +1,67 @@
+{{- if .Values.ueransim.nodeUdpTuning.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-udp-tuning
+  labels:
+    {{- include "open5gs-5g.labels" . | nindent 4 }}
+    app.kubernetes.io/component: udp-tuning
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: udp-tuning
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: udp-tuning
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      containers:
+        - name: sysctl
+          image: {{ .Values.image.toolbox }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            privileged: true
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              tune_max() {
+                file="$1"
+                for value in {{ printf "%.0f" (float64 .Values.ueransim.udpBuffers.receiveMax) }} 8388608 4194304 2097152 1048576; do
+                  if echo "$value" >"/host-net-core/$file" 2>/dev/null; then return 0; fi
+                done
+                return 1
+              }
+              tune_max rmem_max
+              tune_max wmem_max
+              rmax="$(cat /host-net-core/rmem_max)"
+              wmax="$(cat /host-net-core/wmem_max)"
+              rdefault={{ printf "%.0f" (float64 .Values.ueransim.udpBuffers.receiveDefault) }}
+              wdefault={{ printf "%.0f" (float64 .Values.ueransim.udpBuffers.sendDefault) }}
+              [ "$rdefault" -le "$rmax" ] || rdefault="$rmax"
+              [ "$wdefault" -le "$wmax" ] || wdefault="$wmax"
+              echo "$rdefault" >/host-net-core/rmem_default
+              echo "$wdefault" >/host-net-core/wmem_default
+              echo "effective rmem_max=$rmax rmem_default=$rdefault wmem_max=$wmax wmem_default=$wdefault"
+              exec sleep infinity
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -ec
+                - test "$(cat /host-net-core/rmem_max)" -ge 1048576
+            initialDelaySeconds: 1
+            periodSeconds: 10
+          volumeMounts:
+            - name: host-net-core
+              mountPath: /host-net-core
+      volumes:
+        - name: host-net-core
+          hostPath:
+            path: /proc/sys/net/core
+            type: Directory
+{{- end }}

@@ -40,6 +40,8 @@ multusDefaults:
 # Each entry creates one Multus NAD. Static workload addresses are assigned
 # in the pod annotations so the packet path is easy to follow.
 multus:
+  rls:
+    subnet: 10.55.0.0/24
   n2:
     subnet: 10.51.0.0/24
   n3:
@@ -50,6 +52,8 @@ multus:
     subnet: 10.54.0.0/24
 
 addresses:
+  gnbRls: 10.55.0.10
+  ueRls: 10.55.0.20
   amfN2: 10.51.0.2
   gnbN2: 10.51.0.10
   upfN3: 10.52.0.2
@@ -62,6 +66,15 @@ addresses:
   librespeedN6: 10.54.0.102
 
 resources: {}
+
+ueransim:
+  nodeUdpTuning:
+    enabled: true
+  udpBuffers:
+    receiveMax: 16777216
+    receiveDefault: 4194304
+    sendMax: 16777216
+    sendDefault: 4194304
 
 webui:
   enabled: true
@@ -176,6 +189,12 @@ librespeed:
   image: ghcr.io/librespeed/speedtest:6.2.0-alpine
   port: 8080
   title: "5G UE Speed Test"
+  test:
+    downloadStreams: 2
+    uploadStreams: 2
+    downloadSeconds: 8
+    uploadSeconds: 8
+    pingCount: 8
   service:
     enabled: true
     type: ClusterIP

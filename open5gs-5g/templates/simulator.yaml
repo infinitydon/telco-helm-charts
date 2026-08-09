@@ -37,7 +37,7 @@ spec:
         checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
         checksum/nads: {{ include (print $.Template.BasePath "/nads.yaml") . | sha256sum }}
         k8s.v1.cni.cncf.io/networks: >-
-          [{"name":"{{ include "open5gs-5g.fullname" . }}-n2","interface":"n2","ips":["{{ .Values.addresses.gnbN2 }}/24"]},{"name":"{{ include "open5gs-5g.fullname" . }}-n3","interface":"n3","ips":["{{ .Values.addresses.gnbN3 }}/24"]}]
+          [{"name":"{{ include "open5gs-5g.fullname" . }}-rls","interface":"rls0","ips":["{{ .Values.addresses.gnbRls }}/24"]},{"name":"{{ include "open5gs-5g.fullname" . }}-n2","interface":"n2","ips":["{{ .Values.addresses.gnbN2 }}/24"]},{"name":"{{ include "open5gs-5g.fullname" . }}-n3","interface":"n3","ips":["{{ .Values.addresses.gnbN3 }}/24"]}]
     spec:
       terminationGracePeriodSeconds: 5
       nodeSelector:
@@ -86,6 +86,9 @@ spec:
         app.kubernetes.io/component: ue
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
+        checksum/nads: {{ include (print $.Template.BasePath "/nads.yaml") . | sha256sum }}
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-5g.fullname" . }}-rls","interface":"rls0","ips":["{{ .Values.addresses.ueRls }}/24"]}]
         {{- if .Values.phoneUi.enabled }}
         checksum/phone-ui: {{ include (print $.Template.BasePath "/phone-ui-configmap.yaml") . | sha256sum }}
         {{- end }}
@@ -121,7 +124,7 @@ spec:
           command: ["/bin/sh", "-ec"]
           args:
             - >-
-              until nc -zu -w 1 {{ include "open5gs-5g.fullname" . }}-gnb 4997
+              until nc -zu -w 1 {{ .Values.addresses.gnbRls }} 4997
               >/dev/null 2>&1; do sleep 2; done
         {{- if .Values.redroid.enabled }}
         - name: prepare-redroid-ue-config
@@ -169,6 +172,8 @@ spec:
               until timeout 1 bash -c '</dev/tcp/127.0.0.1/5555'
               >/dev/null 2>&1; do sleep 1; done;
               sleep 10;
+              ip rule del priority 9000 2>/dev/null || true;
+              ip rule add priority 9000 to {{ .Values.multus.rls.subnet }} lookup main;
               exec nr-ue -c /etc/ueransim/ue.yaml
           {{- else }}
           args: ["ue"]
@@ -530,6 +535,15 @@ spec:
             periodSeconds: 5
           resources:
             {{- toYaml .Values.librespeed.resources | nindent 12 }}
+          volumeMounts:
+            - name: librespeed-settings
+              mountPath: /speedtest/frontend/settings.json
+              subPath: settings.json
+              readOnly: true
+      volumes:
+        - name: librespeed-settings
+          configMap:
+            name: {{ include "open5gs-5g.fullname" . }}-librespeed-settings
 {{- if .Values.librespeed.service.enabled }}
 ---
 apiVersion: v1

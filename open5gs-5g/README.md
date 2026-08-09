@@ -23,6 +23,7 @@ addresses are assigned in pod annotations.
 
 | Interface | Protocol or purpose | Subnet | Endpoints |
 | --- | --- | --- | --- |
+| RLS | Simulated UE radio link (UDP 4997) | `10.55.0.0/24` | gNB `.10`, UE `.20` |
 | N2 | SCTP/NGAP | `10.51.0.0/24` | AMF `.2`, gNB `.10` |
 | N3 | GTP-U | `10.52.0.0/24` | UPF `.2`, gNB `.10` |
 | N4 | PFCP | `10.53.0.0/24` | SMF `.2`, UPF `.3` |
@@ -30,6 +31,11 @@ addresses are assigned in pod annotations.
 
 The service-based interfaces between 5G core functions use ordinary
 Kubernetes Services on the default pod network. SBI does not use Multus.
+The UE-to-gNB simulated radio link has its own Multus network and does not
+traverse a Kubernetes Service. A node-selected DaemonSet raises the kernel UDP
+socket buffer defaults and maxima to tolerate tunneled traffic bursts. This is
+a node-wide sysctl change and can be disabled with
+`ueransim.nodeUdpTuning.enabled=false` when the node is managed externally.
 
 ## Prerequisites
 
@@ -122,6 +128,9 @@ LibreSpeed telemetry and client public-IP lookup are disabled by default, so
 the course UI does not collect or display students' public addresses. Override
 `addresses.librespeedN6` when `.102` is already allocated, or set
 `librespeed.enabled=false` to omit the server.
+The default lab profile uses two download streams and two upload streams with
+eight-second phases. These values avoid overwhelming UERANSIM's UDP-based RLS
+simulation and can be adjusted under `librespeed.test`.
 
 ## UE WebAssembly scenarios
 
