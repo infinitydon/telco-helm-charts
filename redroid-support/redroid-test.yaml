@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: redroid
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redroid-test
+  namespace: redroid
+spec:
+  serviceName: redroid-test
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redroid-test
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: redroid-test
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        redroid.io/enabled: "true"
+      containers:
+        - name: android
+          image: redroid/redroid:12.0.0_64only-240527
+          imagePullPolicy: IfNotPresent
+          args:
+            - androidboot.redroid_width=720
+            - androidboot.redroid_height=1280
+            - androidboot.redroid_dpi=320
+            - androidboot.redroid_fps=30
+            - androidboot.use_memfd=true
+          securityContext:
+            privileged: true
+            allowPrivilegeEscalation: true
+          ports:
+            - name: adb
+              containerPort: 5555
+              protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+                - /system/bin/sh
+                - -c
+                - '[ "$(getprop sys.boot_completed)" = "1" ]'
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 60
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 3Gi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redroid-adb
+  namespace: redroid
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: redroid-test
+  ports:
+    - name: adb
+      port: 5555
+      targetPort: adb
+      nodePort: 30555
+      protocol: TCP
