@@ -18,6 +18,8 @@ data:
       "xhr_dlMultistream": {{ .Values.librespeed.test.downloadStreams }},
       "xhr_ulMultistream": {{ .Values.librespeed.test.uploadStreams }},
       "xhr_ignoreErrors": 0,
+      "garbagePhp_chunkSize": 20,
+      "xhr_ul_blob_megabytes": 2,
       "count_ping": {{ .Values.librespeed.test.pingCount }}
     }
 {{- end }}

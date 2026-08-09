@@ -75,6 +75,11 @@ ueransim:
     receiveDefault: 4194304
     sendMax: 16777216
     sendDefault: 4194304
+  trafficShaping:
+    enabled: true
+    rate: 40mbit
+    burst: 512kb
+    latency: 100ms
 
 webui:
   enabled: true
@@ -190,8 +195,8 @@ librespeed:
   port: 8080
   title: "5G UE Speed Test"
   test:
-    downloadStreams: 2
-    uploadStreams: 2
+    downloadStreams: 1
+    uploadStreams: 1
     downloadSeconds: 8
     uploadSeconds: 8
     pingCount: 8

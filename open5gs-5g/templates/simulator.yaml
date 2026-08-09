@@ -36,6 +36,7 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
         checksum/nads: {{ include (print $.Template.BasePath "/nads.yaml") . | sha256sum }}
+        checksum/traffic-profile: {{ toJson .Values.ueransim.trafficShaping | sha256sum }}
         k8s.v1.cni.cncf.io/networks: >-
           [{"name":"{{ include "open5gs-5g.fullname" . }}-rls","interface":"rls0","ips":["{{ .Values.addresses.gnbRls }}/24"]},{"name":"{{ include "open5gs-5g.fullname" . }}-n2","interface":"n2","ips":["{{ .Values.addresses.gnbN2 }}/24"]},{"name":"{{ include "open5gs-5g.fullname" . }}-n3","interface":"n3","ips":["{{ .Values.addresses.gnbN3 }}/24"]}]
     spec:
@@ -87,6 +88,7 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
         checksum/nads: {{ include (print $.Template.BasePath "/nads.yaml") . | sha256sum }}
+        checksum/traffic-profile: {{ toJson .Values.ueransim.trafficShaping | sha256sum }}
         k8s.v1.cni.cncf.io/networks: >-
           [{"name":"{{ include "open5gs-5g.fullname" . }}-rls","interface":"rls0","ips":["{{ .Values.addresses.ueRls }}/24"]}]
         {{- if .Values.phoneUi.enabled }}
@@ -221,6 +223,25 @@ spec:
             capabilities:
               drop: [ALL]
               add: [NET_RAW]
+        {{- if .Values.ueransim.trafficShaping.enabled }}
+        - name: ue-traffic-shaper
+          image: {{ .Values.image.ueransim }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [NET_ADMIN]
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              until interface="$(ip -o link show | awk -F': ' '$2 ~ /^uesimtun/ {print $2; exit}')" && [ -n "$interface" ]; do sleep 1; done
+              tc qdisc replace dev "$interface" root tbf rate {{ .Values.ueransim.trafficShaping.rate }} burst {{ .Values.ueransim.trafficShaping.burst }} latency {{ .Values.ueransim.trafficShaping.latency }}
+              echo "UE uplink limited on $interface to {{ .Values.ueransim.trafficShaping.rate }}"
+              exec sleep infinity
+          resources:
+            {{- toYaml .Values.redroid.resources.helper | nindent 12 }}
+        {{- end }}
         {{- if .Values.redroid.show5gIndicator }}
         - name: redroid-5g-indicator
           image: {{ .Values.redroid.helperImage }}
@@ -503,7 +524,12 @@ spec:
               add: [NET_ADMIN]
           command: ["/bin/sh", "-ec"]
           args:
-            - ip route replace {{ .Values.ueSubnet }} via {{ .Values.addresses.upfN6 }} dev n6 onlink
+            - >-
+              ip route replace {{ .Values.ueSubnet }} via {{ .Values.addresses.upfN6 }} dev n6 onlink;
+              {{- if .Values.ueransim.trafficShaping.enabled }}
+              apk add --no-cache iproute2-tc;
+              tc qdisc replace dev n6 root tbf rate {{ .Values.ueransim.trafficShaping.rate }} burst {{ .Values.ueransim.trafficShaping.burst }} latency {{ .Values.ueransim.trafficShaping.latency }}
+              {{- end }}
       containers:
         - name: librespeed
           image: {{ .Values.librespeed.image }}

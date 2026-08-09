@@ -128,9 +128,12 @@ LibreSpeed telemetry and client public-IP lookup are disabled by default, so
 the course UI does not collect or display students' public addresses. Override
 `addresses.librespeedN6` when `.102` is already allocated, or set
 `librespeed.enabled=false` to omit the server.
-The default lab profile uses two download streams and two upload streams with
-eight-second phases. These values avoid overwhelming UERANSIM's UDP-based RLS
-simulation and can be adjusted under `librespeed.test`.
+The default lab profile uses one download stream and one upload stream with
+eight-second phases. A 40 Mbit/s bidirectional lab-link ceiling is enforced at
+the LibreSpeed N6 egress for downloads and at `uesimtun*` for uploads. This is
+intentional: UERANSIM simulates both RLS and GTP-U in software and sustained
+line-rate bursts can starve its radio heartbeat. Adjust the stream profile
+under `librespeed.test` and the ceiling under `ueransim.trafficShaping`.
 
 ## UE WebAssembly scenarios
 
