@@ -1,0 +1,102 @@
+{{- if and .Values.packetRusher.enabled .Values.packetRusher.gtp5g.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-gtp5g-modules
+  namespace: kube-system
+  labels:
+    {{- include "open5gs-5g.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gtp5g-modules
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: gtp5g-modules
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: gtp5g-modules
+      annotations:
+        checksum/source-commit: {{ .Values.packetRusher.gtp5g.sourceCommit | sha256sum }}
+    spec:
+      hostNetwork: true
+      hostPID: true
+      nodeSelector:
+        {{- toYaml .Values.packetRusher.gtp5g.workerSelector | nindent 8 }}
+      initContainers:
+        - name: build-and-load-gtp5g
+          image: {{ .Values.packetRusher.gtp5g.builderImage }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            privileged: true
+          command: ["/bin/bash", "-ec"]
+          args:
+            - |
+              kernel="$(uname -r)"
+              if [ -f "/host/lib/modules/$kernel/kernel/drivers/net/gtp5g.ko" ]; then
+                printf 'udp_tunnel\ngtp5g\nvrf\n' >/host/etc/modules-load.d/gtp5g.conf
+                chroot /host modprobe udp_tunnel
+                chroot /host modprobe gtp5g
+                chroot /host modprobe vrf
+                exit 0
+              fi
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y --no-install-recommends build-essential ca-certificates curl kmod libelf1
+              test -d "/host/lib/modules/$kernel/build"
+              curl --fail --location --retry 3 \
+                "https://github.com/HewlettPackard/PacketRusher/archive/{{ .Values.packetRusher.gtp5g.sourceCommit }}.tar.gz" \
+                -o /tmp/packetrusher.tar.gz
+              mkdir -p /tmp/packetrusher
+              tar -xzf /tmp/packetrusher.tar.gz --strip-components=1 -C /tmp/packetrusher
+              make -C /tmp/packetrusher/lib/gtp5g \
+                KVER="$kernel" KDIR="/host/lib/modules/$kernel/build"
+              install -D -m 0644 /tmp/packetrusher/lib/gtp5g/gtp5g.ko \
+                "/host/lib/modules/$kernel/kernel/drivers/net/gtp5g.ko"
+              printf 'udp_tunnel\ngtp5g\nvrf\n' >/host/etc/modules-load.d/gtp5g.conf
+              while ! mkdir /host/run/lock/open5gs-kmod.lock 2>/dev/null; do sleep 1; done
+              trap 'rmdir /host/run/lock/open5gs-kmod.lock' EXIT
+              chroot /host depmod -a "$kernel"
+              rmdir /host/run/lock/open5gs-kmod.lock
+              trap - EXIT
+              chroot /host modprobe udp_tunnel
+              chroot /host modprobe gtp5g
+              chroot /host modprobe vrf
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+            - name: host-usr-src
+              mountPath: /usr/src
+              readOnly: true
+      containers:
+        - name: verifier
+          image: {{ .Values.image.toolbox }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            privileged: true
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              grep -q '^gtp5g ' /proc/modules
+              grep -q '^vrf ' /proc/modules
+              exec sleep infinity
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-ec", "grep -q '^gtp5g ' /proc/modules && grep -q '^vrf ' /proc/modules"]
+            initialDelaySeconds: 1
+            periodSeconds: 10
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+              readOnly: true
+      volumes:
+        - name: host-root
+          hostPath:
+            path: /
+            type: Directory
+        - name: host-usr-src
+          hostPath:
+            path: /usr/src
+            type: Directory
+{{- end }}

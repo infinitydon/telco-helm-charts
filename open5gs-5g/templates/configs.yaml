@@ -14,7 +14,6 @@ data:
         server:
           - dev: eth0
             port: 7777
-            advertise: {{ include "open5gs-5g.fullname" . }}-nrf
   ausf.yaml: |
     logger: { level: info }
     ausf:
@@ -22,7 +21,6 @@ data:
         server:
           - dev: eth0
             port: 7777
-            advertise: {{ include "open5gs-5g.fullname" . }}-ausf
         client:
           nrf:
             - uri: http://{{ include "open5gs-5g.fullname" . }}-nrf:7777
@@ -33,7 +31,6 @@ data:
         server:
           - dev: eth0
             port: 7777
-            advertise: {{ include "open5gs-5g.fullname" . }}-udm
         client:
           nrf:
             - uri: http://{{ include "open5gs-5g.fullname" . }}-nrf:7777
@@ -45,7 +42,6 @@ data:
         server:
           - dev: eth0
             port: 7777
-            advertise: {{ include "open5gs-5g.fullname" . }}-udr
         client:
           nrf:
             - uri: http://{{ include "open5gs-5g.fullname" . }}-nrf:7777
@@ -57,7 +53,6 @@ data:
         server:
           - dev: eth0
             port: 7777
-            advertise: {{ include "open5gs-5g.fullname" . }}-pcf
         client:
           nrf:
             - uri: http://{{ include "open5gs-5g.fullname" . }}-nrf:7777
@@ -68,7 +63,6 @@ data:
         server:
           - dev: eth0
             port: 7777
-            advertise: {{ include "open5gs-5g.fullname" . }}-nssf
         client:
           nrf:
             - uri: http://{{ include "open5gs-5g.fullname" . }}-nrf:7777
@@ -84,7 +78,6 @@ data:
         server:
           - dev: eth0
             port: 7777
-            advertise: {{ include "open5gs-5g.fullname" . }}-amf
         client:
           nrf:
             - uri: http://{{ include "open5gs-5g.fullname" . }}-nrf:7777
@@ -117,7 +110,6 @@ data:
         server:
           - dev: eth0
             port: 7777
-            advertise: {{ include "open5gs-5g.fullname" . }}-smf
         client:
           nrf:
             - uri: http://{{ include "open5gs-5g.fullname" . }}-nrf:7777

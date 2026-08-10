@@ -34,13 +34,21 @@ spec:
           args:
             - |
               kernel="$(uname -r)"
+              installed=false
               if ! chroot /host modinfo binder_linux >/dev/null 2>&1; then
                 chroot /host apt-get update
                 chroot /host env DEBIAN_FRONTEND=noninteractive \
                   apt-get install --yes --no-install-recommends \
                   "linux-modules-extra-${kernel}"
+                installed=true
               fi
-              chroot /host depmod -a "${kernel}"
+              if [ "$installed" = true ]; then
+                while ! mkdir /host/run/lock/open5gs-kmod.lock 2>/dev/null; do sleep 1; done
+                trap 'rmdir /host/run/lock/open5gs-kmod.lock' EXIT
+                chroot /host depmod -a "${kernel}"
+                rmdir /host/run/lock/open5gs-kmod.lock
+                trap - EXIT
+              fi
               install -d /host/etc/modules-load.d /host/etc/modprobe.d
               printf '%s\n' binder_linux > /host/etc/modules-load.d/redroid.conf
               printf '%s\n' \

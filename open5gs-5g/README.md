@@ -8,6 +8,8 @@ MongoDB, the Open5GS 5G core, UERANSIM, and an N6 test endpoint.
 - NRF, AUSF, UDM, UDR, PCF, NSSF, AMF, SMF, and UPF
 - Open5GS WebUI for viewing and managing subscribers
 - UERANSIM gNB and UE
+- Optional PacketRusher gNB/UE using dedicated N2/N3 addresses and a worker-only
+  `gtp5g` kernel-module DaemonSet
 - A subscriber created before the UE starts; WebUI does not replace it
 - A data pod at `10.54.0.100` for the end-to-end ping
 - A dedicated iperf3 server pod on N6 at `10.54.0.101`
@@ -36,6 +38,27 @@ traverse a Kubernetes Service. A node-selected DaemonSet raises the kernel UDP
 socket buffer defaults and maxima to tolerate tunneled traffic bursts. This is
 a node-wide sysctl change and can be disabled with
 `ueransim.nodeUdpTuning.enabled=false` when the node is managed externally.
+
+## PacketRusher
+
+Set `packetRusher.enabled=true` to run PacketRusher alongside UERANSIM; it does
+not replace the existing UE. The chart provisions a separate subscriber and
+assigns PacketRusher dedicated N2 and N3 Multus addresses. Its pinned image is
+configured in `packetRusher.image`.
+
+Set `redroid.backend=packetrusher` to place Android in a separate pod and route
+its HTTP(S) traffic through an internal, fail-closed proxy bound to
+PacketRusher's `val*` UE interface. Android cannot safely share PacketRusher's
+network namespace because Android `netd` replaces the VRF policy rules. The
+ADB NodePort continues to select the Android pod.
+
+PacketRusher's high-performance tunnel requires `gtp5g` and `vrf` on every
+eligible worker. The chart therefore installs a privileged DaemonSet in
+`kube-system`, selected by `packetRusher.gtp5g.workerSelector`. On first use it
+builds `gtp5g` from the exact PacketRusher commit in `sourceCommit`, installs it
+under the host's matching kernel module tree, loads it, and configures boot-time
+module loading. Worker kernel headers must already exist under `/usr/src`.
+Review this privileged host mutation before enabling it outside a lab.
 
 ## Prerequisites
 

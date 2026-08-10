@@ -1,0 +1,111 @@
+{{- if and .Values.packetRusher.enabled .Values.redroid.enabled (eq .Values.redroid.backend "packetrusher") }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-packetrusher-proxy
+  labels:
+    {{- include "open5gs-5g.labels" . | nindent 4 }}
+    app.kubernetes.io/component: packetrusher-proxy
+spec:
+  clusterIP: {{ .Values.redroid.proxyService.clusterIP }}
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: packetrusher
+  ports:
+    - name: http
+      port: 8118
+      targetPort: redroid-proxy
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-redroid-packetrusher
+  labels:
+    {{- include "open5gs-5g.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redroid-packetrusher
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: redroid-packetrusher
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: redroid-packetrusher
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      containers:
+        {{- if .Values.redroid.show5gIndicator }}
+        - name: redroid-5g-indicator
+          image: {{ .Values.redroid.helperImage }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              apk add --no-cache android-tools;
+              until adb connect 127.0.0.1:5555 >/dev/null 2>&1; do sleep 1; done;
+              until [ "$(adb -s 127.0.0.1:5555 shell getprop sys.boot_completed
+              2>/dev/null | tr -d '\r')" = "1" ]; do sleep 1; done;
+              until adb connect 127.0.0.1:5555 >/dev/null 2>&1
+              && adb -s 127.0.0.1:5555 shell settings put global http_proxy
+              {{ .Values.redroid.proxyService.clusterIP }}:8118 >/dev/null 2>&1;
+              do sleep 2; done;
+              sleep 5;
+              adb -s 127.0.0.1:5555 shell settings put global sysui_demo_allowed 1 || true;
+              adb -s 127.0.0.1:5555 shell am broadcast
+              -a com.android.systemui.demo -e command enter || true;
+              adb -s 127.0.0.1:5555 shell am broadcast
+              -a com.android.systemui.demo -e command network -e mobile show
+              -e datatype 5g -e level 4 -e fully true -e sims 1 -e nosim false || true;
+              exec tail -f /dev/null
+          resources:
+            {{- toYaml .Values.redroid.resources.helper | nindent 12 }}
+        {{- end }}
+        - name: redroid
+          image: {{ .Values.redroid.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - androidboot.redroid_width={{ .Values.redroid.display.width }}
+            - androidboot.redroid_height={{ .Values.redroid.display.height }}
+            - androidboot.redroid_dpi={{ .Values.redroid.display.dpi }}
+            - androidboot.redroid_fps={{ .Values.redroid.display.fps }}
+            - androidboot.use_memfd=true
+            - androidboot.redroid_net_proxy_type=static
+            - androidboot.redroid_net_proxy_host={{ .Values.redroid.proxyService.clusterIP }}
+            - androidboot.redroid_net_proxy_port=8118
+            - ro.product.brand={{ .Values.redroid.device.brand }}
+            - ro.product.manufacturer={{ .Values.redroid.device.manufacturer }}
+            - ro.product.model={{ .Values.redroid.device.model }}
+          securityContext:
+            privileged: true
+            allowPrivilegeEscalation: true
+          ports:
+            - name: redroid-adb
+              containerPort: 5555
+              protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+                - /system/bin/sh
+                - -c
+                - '[ "$(getprop sys.boot_completed)" = "1" ]'
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 60
+          resources:
+            {{- toYaml .Values.redroid.resources.android | nindent 12 }}
+          volumeMounts:
+            - name: redroid-data
+              mountPath: /data
+      volumes:
+        - name: redroid-data
+          emptyDir: {}
+{{- end }}

@@ -64,10 +64,14 @@ addresses:
   dataN6: 10.54.0.100
   iperfN6: 10.54.0.101
   librespeedN6: 10.54.0.102
+  packetRusherN2: 10.51.0.11
+  packetRusherN3: 10.52.0.11
 
 resources: {}
 
 ueransim:
+  gnbReplicas: 1
+  ueReplicas: 1
   nodeUdpTuning:
     enabled: true
   udpBuffers:
@@ -80,6 +84,29 @@ ueransim:
     rate: 40mbit
     burst: 512kb
     latency: 100ms
+
+packetRusher:
+  enabled: false
+  image: gradiant/packetrusher:5bf8b4e
+  gtp5g:
+    enabled: true
+    builderImage: ubuntu:24.04
+    sourceCommit: 5bf8b4ed9350a4dfc732eb6a6074aa97d1426308
+    workerSelector:
+      node.kubernetes.io/microk8s-worker: microk8s-worker
+  gnbId: "000009"
+  subscriber:
+    imsi: "001010000000002"
+    msin: "0000000002"
+    key: "465B5CE8B199B49FAA5F0A2EE238A6BC"
+    opc: "E8ED289DEBA952E4283B54E88E6183CA"
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "4"
+      memory: 2Gi
 
 webui:
   enabled: true
@@ -144,8 +171,12 @@ wasmRunner:
 # custom forward proxy binds Android HTTP(S) and DNS sockets to uesimtun0.
 redroid:
   enabled: false
-  image: redroid/redroid:12.0.0_64only-240527
-  proxyImage: ghcr.io/infinitydon/ueransim-http-proxy:v0.1.0
+  # Select the pod network namespace used by Android and its tunnel-bound proxy.
+  backend: ueransim
+  proxyService:
+    clusterIP: 10.152.183.242
+  image: redroid/redroid:14.0.0_64only-240527
+  proxyImage: ghcr.io/infinitydon/5g-ue-http-proxy:v1.0.0
   helperImage: alpine:3.21
   dnsServer: 1.1.1.1:53
   display:
@@ -177,6 +208,13 @@ redroid:
       limits:
         cpu: 100m
         memory: 96Mi
+    proxy:
+      requests:
+        cpu: 250m
+        memory: 64Mi
+      limits:
+        cpu: "1"
+        memory: 256Mi
   binder:
     enabled: false
     namespace: kube-system
@@ -196,7 +234,8 @@ librespeed:
   title: "5G UE Speed Test"
   test:
     downloadStreams: 1
-    uploadStreams: 1
+    uploadStreams: 2
+    uploadBlobMegabytes: 1
     downloadSeconds: 8
     uploadSeconds: 8
     pingCount: 8

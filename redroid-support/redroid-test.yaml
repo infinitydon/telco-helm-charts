@@ -81,8 +81,8 @@ spec:
             - name: ue-config
               mountPath: /etc/ueransim/ue.yaml
               subPath: ue.yaml
-        - name: redroid-ue-proxy
-          image: ghcr.io/infinitydon/ueransim-http-proxy:v0.1.0
+        - name: ue-http-proxy
+          image: ghcr.io/infinitydon/5g-ue-http-proxy:v1.0.0
           imagePullPolicy: IfNotPresent
           env:
             - name: LISTEN_ADDRESS

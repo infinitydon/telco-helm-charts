@@ -27,11 +27,13 @@ Multus networks:
   N4: {{ include "open5gs-5g.fullname" . }}-n4
   N6: {{ include "open5gs-5g.fullname" . }}-n6
 
-Check registration and the PDU session:
+{{- if gt (int .Values.ueransim.ueReplicas) 0 }}
+Check UERANSIM registration and the PDU session:
   kubectl logs deploy/{{ include "open5gs-5g.fullname" . }}-ue
 
-Ping the N6 test endpoint through the UE tunnel:
+Ping the N6 test endpoint through the UERANSIM tunnel:
   kubectl exec deploy/{{ include "open5gs-5g.fullname" . }}-ue -- ping -I uesimtun0 {{ .Values.addresses.dataN6 }}
+{{- end }}
 
 {{- if .Values.phoneUi.enabled }}
 Verify phone traffic exits through the UE tunnel:
@@ -54,4 +56,12 @@ Connect to the redroid Android UE:
   adb connect localhost:5555
   scrcpy -s localhost:5555
 {{- end }}
+{{- end }}
+
+{{- if .Values.packetRusher.enabled }}
+Check the parallel PacketRusher UE:
+  kubectl logs deploy/{{ include "open5gs-5g.fullname" . }}-packetrusher
+  kubectl -n kube-system get daemonset {{ include "open5gs-5g.fullname" . }}-gtp5g-modules
+PacketRusher uses subscriber {{ .Values.packetRusher.subscriber.imsi }} and dedicated N2/N3 addresses
+{{ .Values.addresses.packetRusherN2 }} / {{ .Values.addresses.packetRusherN3 }}.
 {{- end }}

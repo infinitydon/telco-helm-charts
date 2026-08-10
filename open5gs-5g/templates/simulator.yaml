@@ -21,7 +21,7 @@ metadata:
   labels:
     {{- include "open5gs-5g.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.ueransim.gnbReplicas }}
   strategy:
     type: Recreate
   selector:
@@ -73,7 +73,7 @@ metadata:
   labels:
     {{- include "open5gs-5g.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.ueransim.ueReplicas }}
   strategy:
     type: Recreate
   selector:
@@ -128,7 +128,7 @@ spec:
             - >-
               until nc -zu -w 1 {{ .Values.addresses.gnbRls }} 4997
               >/dev/null 2>&1; do sleep 2; done
-        {{- if .Values.redroid.enabled }}
+        {{- if and .Values.redroid.enabled (eq .Values.redroid.backend "ueransim") }}
         - name: prepare-redroid-ue-config
           image: {{ .Values.image.toolbox }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -167,7 +167,7 @@ spec:
         - name: ue
           image: {{ .Values.image.ueransim }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if .Values.redroid.enabled }}
+          {{- if and .Values.redroid.enabled (eq .Values.redroid.backend "ueransim") }}
           command: ["/usr/bin/bash", "-ec"]
           args:
             - >-
@@ -182,9 +182,11 @@ spec:
           {{- end }}
           securityContext:
             privileged: true
+            runAsUser: 0
+            runAsGroup: 0
             capabilities: { add: [NET_ADMIN] }
           volumeMounts:
-            {{- if .Values.redroid.enabled }}
+            {{- if and .Values.redroid.enabled (eq .Values.redroid.backend "ueransim") }}
             - name: redroid-ue-config
               mountPath: /etc/ueransim/ue.yaml
               subPath: ue.yaml
@@ -193,8 +195,8 @@ spec:
               mountPath: /etc/ueransim/ue.yaml
               subPath: ue.yaml
             {{- end }}
-        {{- if .Values.redroid.enabled }}
-        - name: redroid-ue-proxy
+        {{- if and .Values.redroid.enabled (eq .Values.redroid.backend "ueransim") }}
+        - name: ue-http-proxy
           image: {{ .Values.redroid.proxyImage }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
@@ -456,7 +458,7 @@ spec:
         - name: wasm-tmp
           emptyDir: {}
         {{- end }}
-        {{- if .Values.redroid.enabled }}
+        {{- if and .Values.redroid.enabled (eq .Values.redroid.backend "ueransim") }}
         - name: redroid-data
           emptyDir: {}
         - name: redroid-ue-config
@@ -525,11 +527,7 @@ spec:
           command: ["/bin/sh", "-ec"]
           args:
             - >-
-              ip route replace {{ .Values.ueSubnet }} via {{ .Values.addresses.upfN6 }} dev n6 onlink;
-              {{- if .Values.ueransim.trafficShaping.enabled }}
-              apk add --no-cache iproute2-tc;
-              tc qdisc replace dev n6 root tbf rate {{ .Values.ueransim.trafficShaping.rate }} burst {{ .Values.ueransim.trafficShaping.burst }} latency {{ .Values.ueransim.trafficShaping.latency }}
-              {{- end }}
+              ip route replace {{ .Values.ueSubnet }} via {{ .Values.addresses.upfN6 }} dev n6 onlink
       containers:
         - name: librespeed
           image: {{ .Values.librespeed.image }}
@@ -553,6 +551,17 @@ spec:
             - name: http
               containerPort: {{ .Values.librespeed.port }}
               protocol: TCP
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -ec
+                  - |
+                    worker=/var/www/html/speedtest_worker.js
+                    until [ -f "$worker" ]; do sleep 0.1; done
+                    sed -i 's/settings\.xhr_ul_blob_megabytes = 4;/settings.xhr_ul_blob_megabytes = {{ .Values.librespeed.test.uploadBlobMegabytes }};/' "$worker"
+                    grep -q 'settings.xhr_ul_blob_megabytes = {{ .Values.librespeed.test.uploadBlobMegabytes }};' "$worker"
           readinessProbe:
             httpGet:
               path: /
@@ -603,7 +612,7 @@ spec:
   type: {{ .Values.redroid.service.type }}
   selector:
     app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/component: ue
+    app.kubernetes.io/component: {{ ternary "redroid-packetrusher" "ue" (eq .Values.redroid.backend "packetrusher") }}
   ports:
     - name: adb
       port: {{ .Values.redroid.service.port }}
@@ -665,18 +674,21 @@ spec:
         {{- toYaml .Values.nodeSelector | nindent 8 }}
       containers:
         - name: data
-          image: {{ .Values.image.toolbox }}
+          image: {{ .Values.image.open5gs }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             privileged: true
+            runAsUser: 0
+            runAsGroup: 0
             capabilities: { add: [NET_ADMIN] }
           command: ["/bin/sh", "-ec"]
           args:
             - >-
-              apk add --no-cache iptables;
               sysctl -w net.ipv4.ip_forward=1;
               sysctl -w net.ipv4.conf.all.rp_filter=0;
-              ip route add {{ .Values.ueSubnet }} via {{ .Values.addresses.upfN6 }} dev n6;
-              iptables -t nat -A POSTROUTING -s {{ .Values.ueSubnet }} -o eth0 -j MASQUERADE;
+              ip route replace {{ .Values.ueSubnet }} via {{ .Values.addresses.upfN6 }} dev n6;
+              iptables-legacy -t nat -C POSTROUTING -s {{ .Values.ueSubnet }} -o eth0 -j MASQUERADE 2>/dev/null ||
+              iptables-legacy -t nat -A POSTROUTING -s {{ .Values.ueSubnet }} -o eth0 -j MASQUERADE;
               sleep infinity
 {{- if .Values.iperf3Server.enabled }}
 ---

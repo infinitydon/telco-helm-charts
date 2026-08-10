@@ -1,0 +1,134 @@
+{{- if .Values.packetRusher.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-packetrusher
+  labels:
+    {{- include "open5gs-5g.labels" . | nindent 4 }}
+    app.kubernetes.io/component: packetrusher
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: packetrusher
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: packetrusher
+      annotations:
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-5g.fullname" . }}-n2","interface":"n2","ips":["{{ .Values.addresses.packetRusherN2 }}/24"]},{"name":"{{ include "open5gs-5g.fullname" . }}-n3","interface":"n3","ips":["{{ .Values.addresses.packetRusherN3 }}/24"]}]
+        checksum/gtp5g-source: {{ .Values.packetRusher.gtp5g.sourceCommit | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      initContainers:
+        - name: provision-subscriber
+          image: {{ .Values.image.dbctl }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: DB_URI
+              value: mongodb://{{ include "open5gs-5g.fullname" . }}-mongodb/open5gs
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until open5gs-dbctl showall >/dev/null 2>&1; do sleep 2; done;
+              open5gs-dbctl remove {{ .Values.packetRusher.subscriber.imsi }} || true;
+              open5gs-dbctl add_ue_with_slice
+              {{ .Values.packetRusher.subscriber.imsi }}
+              {{ .Values.packetRusher.subscriber.key }}
+              {{ .Values.packetRusher.subscriber.opc }}
+              {{ .Values.subscriber.dnn }}
+              {{ .Values.subscriber.sst }}
+              {{ trimPrefix "0x" .Values.subscriber.sd }}
+        - name: wait-for-gtp5g-and-amf
+          image: {{ .Values.packetRusher.gtp5g.builderImage }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            privileged: true
+          command: ["/bin/bash", "-ec"]
+          args:
+            - |
+              until grep -q '^gtp5g ' /proc/modules; do sleep 2; done
+              sleep 2
+      containers:
+        - name: packetrusher
+          image: {{ .Values.packetRusher.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["ue"]
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["NET_ADMIN", "NET_RAW"]
+          env:
+            - name: GNB_NGAP_DEV
+              value: n2
+            - name: GNB_GTPU_DEV
+              value: n3
+            - name: AMF_ADDR
+              value: {{ .Values.addresses.amfN2 | quote }}
+            - name: AMF_HOSTNAME
+              value: ""
+            - name: MCC
+              value: {{ .Values.plmn.mcc | quote }}
+            - name: MNC
+              value: {{ .Values.plmn.mnc | quote }}
+            - name: TAC
+              value: {{ printf "%06d" (int .Values.plmn.tac) | quote }}
+            - name: GNBID
+              value: {{ .Values.packetRusher.gnbId | quote }}
+            - name: GNBSST
+              value: {{ printf "%02x" (int .Values.subscriber.sst) | quote }}
+            - name: GNBSD
+              value: {{ trimPrefix "0x" .Values.subscriber.sd | quote }}
+            - name: MSIN
+              value: {{ .Values.packetRusher.subscriber.msin | quote }}
+            - name: KEY
+              value: {{ .Values.packetRusher.subscriber.key | quote }}
+            - name: OPC
+              value: {{ .Values.packetRusher.subscriber.opc | quote }}
+            - name: DNN
+              value: {{ .Values.subscriber.dnn | quote }}
+            - name: UESST
+              value: {{ printf "%02x" (int .Values.subscriber.sst) | quote }}
+            - name: UESD
+              value: {{ trimPrefix "0x" .Values.subscriber.sd | quote }}
+          resources:
+            {{- toYaml .Values.packetRusher.resources | nindent 12 }}
+        {{- if and .Values.redroid.enabled (eq .Values.redroid.backend "packetrusher") }}
+        - name: ue-http-proxy
+          image: {{ .Values.redroid.proxyImage }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: LISTEN_ADDRESS
+              value: 0.0.0.0:8118
+            - name: UE_INTERFACE_PATTERN
+              value: val*
+            - name: DNS_SERVER
+              value: {{ .Values.redroid.dnsServer | quote }}
+          ports:
+            - name: redroid-proxy
+              containerPort: 8118
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: redroid-proxy
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.redroid.resources.proxy | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsUser: 0
+            runAsGroup: 0
+            capabilities:
+              drop: [ALL]
+              add: [NET_RAW]
+        {{- end }}
+{{- end }}

@@ -52,8 +52,16 @@ spec:
     spec:
       nodeSelector:
         {{- toYaml $root.Values.nodeSelector | nindent 8 }}
-      {{- if or (eq $name "upf") (eq $name "udr") (eq $name "pcf") }}
+      {{- if ne $name "nrf" }}
       initContainers:
+        - name: wait-for-nrf
+          image: {{ $root.Values.image.toolbox }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until nc -z {{ include "open5gs-5g.fullname" $root }}-nrf 7777;
+              do sleep 2; done
         {{- if or (eq $name "udr") (eq $name "pcf") }}
         - name: wait-for-mongodb
           image: {{ $root.Values.image.mongodb }}
@@ -78,15 +86,16 @@ spec:
           command: ["/bin/sh", "-ec"]
           args:
             - >-
-              ip tuntap add name ogstun mode tun;
-              ip addr add {{ $root.Values.ueGateway }}/16 dev ogstun;
+              ip link show ogstun >/dev/null 2>&1 || ip tuntap add name ogstun mode tun;
+              ip addr replace {{ $root.Values.ueGateway }}/16 dev ogstun;
               ip link set ogstun up;
               sysctl -w net.ipv4.ip_forward=1;
               sysctl -w net.ipv4.conf.all.rp_filter=0;
               sysctl -w net.ipv4.conf.n3.rp_filter=0;
               sysctl -w net.ipv4.conf.n6.rp_filter=0;
+              ip rule del priority 100 from {{ $root.Values.ueSubnet }} table 65 2>/dev/null || true;
               ip rule add priority 100 from {{ $root.Values.ueSubnet }} table 65;
-              ip route add default via {{ $root.Values.addresses.dataN6 }} dev n6 table 65;
+              ip route replace default via {{ $root.Values.addresses.dataN6 }} dev n6 table 65;
         {{- end }}
       {{- end }}
       containers:
