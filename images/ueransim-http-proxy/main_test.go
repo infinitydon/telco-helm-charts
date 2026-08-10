@@ -19,3 +19,20 @@ func TestRemoveHopHeaders(t *testing.T) {
 		t.Fatal("end-to-end header was removed")
 	}
 }
+
+func TestUploadsUseDedicatedConnections(t *testing.T) {
+	p := newProxy("lo", "127.0.0.1:53")
+
+	shared, dedicated := p.requestTransport(http.MethodGet)
+	if dedicated || shared != p.transport {
+		t.Fatal("GET should use the shared transport")
+	}
+
+	upload, dedicated := p.requestTransport(http.MethodPost)
+	if !dedicated || upload == p.transport {
+		t.Fatal("POST should use a dedicated transport")
+	}
+	if !upload.DisableKeepAlives {
+		t.Fatal("POST transport must disable connection reuse")
+	}
+}

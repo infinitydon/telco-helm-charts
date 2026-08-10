@@ -23,6 +23,21 @@ type proxy struct {
 	transport *http.Transport
 }
 
+// requestTransport returns the shared transport for idempotent traffic. Upload
+// requests get a dedicated connection because browser benchmarks intentionally
+// cancel preceding download requests; reusing one of those sockets can leave
+// the first upload blocked behind unread data in the TCP/GTP path.
+func (p *proxy) requestTransport(method string) (*http.Transport, bool) {
+	if method != http.MethodPost && method != http.MethodPut && method != http.MethodPatch {
+		return p.transport, false
+	}
+	transport := p.transport.Clone()
+	transport.DisableKeepAlives = true
+	transport.MaxIdleConns = 0
+	transport.MaxIdleConnsPerHost = -1
+	return transport, true
+}
+
 func env(name, fallback string) string {
 	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
 		return value
@@ -154,6 +169,7 @@ func transfer(destination, source net.Conn) {
 }
 
 func (p *proxy) forward(writer http.ResponseWriter, request *http.Request) {
+	started := time.Now()
 	outbound := request.Clone(request.Context())
 	outbound.RequestURI = ""
 	if outbound.URL.Scheme == "" {
@@ -163,10 +179,15 @@ func (p *proxy) forward(writer http.ResponseWriter, request *http.Request) {
 		outbound.URL.Host = request.Host
 	}
 	removeHopHeaders(outbound.Header)
-	response, err := p.transport.RoundTrip(outbound)
+	transport, dedicated := p.requestTransport(request.Method)
+	if dedicated {
+		outbound.Close = true
+		defer transport.CloseIdleConnections()
+	}
+	response, err := transport.RoundTrip(outbound)
 	if err != nil {
 		http.Error(writer, "UE tunnel request failed", http.StatusBadGateway)
-		log.Printf("%s %s via %s failed: %v", request.Method, outbound.URL, p.iface, err)
+		log.Printf("%s %s via %s failed after %s (content-length=%d): %v", request.Method, outbound.URL, p.iface, time.Since(started).Round(time.Millisecond), request.ContentLength, err)
 		return
 	}
 	defer response.Body.Close()
@@ -174,7 +195,7 @@ func (p *proxy) forward(writer http.ResponseWriter, request *http.Request) {
 	copyHeaders(writer.Header(), response.Header)
 	writer.WriteHeader(response.StatusCode)
 	_, _ = io.Copy(writer, response.Body)
-	log.Printf("%s %s -> %d via %s", request.Method, outbound.URL, response.StatusCode, p.iface)
+	log.Printf("%s %s -> %d via %s in %s (content-length=%d dedicated=%t)", request.Method, outbound.URL, response.StatusCode, p.iface, time.Since(started).Round(time.Millisecond), request.ContentLength, dedicated)
 }
 
 func main() {
