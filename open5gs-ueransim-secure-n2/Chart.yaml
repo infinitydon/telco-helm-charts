@@ -1,0 +1,6 @@
+apiVersion: v2
+name: open5gs-ueransim-secure-n2
+description: Open5GS and UERANSIM with a gNB proxy and HA QUIC/mTLS middleware securing N2 over Multus
+type: application
+version: 0.2.0
+appVersion: "2.7.5"

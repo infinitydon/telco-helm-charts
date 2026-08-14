@@ -10,6 +10,7 @@ high-availability Ella Core private 5G deployments.
 | [`open5gs-4g`](open5gs-4g/) | Open5GS EPC learning lab | LTE signaling and user-plane interfaces | Included srsRAN eNB/UE attach and SGi ping |
 | [`open5gs-5g`](open5gs-5g/) | Open5GS standalone 5G learning lab | N2, N3, N4, and N6 | Included UERANSIM registration, PDU session, and N6 ping |
 | [`open5gs-5g-dra`](open5gs-5g-dra/) | Open5GS standalone 5G using DRA macvlan | DRA N2, N3, N4, and N6 | UERANSIM registration, PDU session, ping, and iperf3 |
+| [`open5gs-ueransim-secure-n2`](open5gs-ueransim-secure-n2/) | Open5GS and UERANSIM with a gNB sidecar proxy and HA QUIC/mTLS middleware securing N2 | Separate Multus `secure-n2` proxy path and `core-n2` AMF path, plus N3, N4, N6, and simulated radio networks | Floating middleware VIP, cross-worker failover, NG Setup replay, supervised UE re-registration, and PDU-session validation |
 | [`open5gs-openupf-dra`](open5gs-openupf-dra/) | Open5GS 5G core with OpenUPF split UPF | DRA macvlan for Open5GS/SMU N4 and Intel VF DPDK for LBU/FPU | OpenUPF backend validation, 10-UE registration, ping, and iperf3 |
 | [`magma-ebpf`](magma-ebpf/) | Guarded workflow for Magma AGW with the TOSSI eBPF GTP-U datapath | Host-level AGW N3/S1-U eBPF TC attachment | Helm lint/template, server dry-run, and safe Helm test |
 | [`magma-agw-upstream`](magma-agw-upstream/) | Magma 1.9.0 upstream containerized AGW baseline | Host-networked AGW services | Helm lint/template and server dry-run |
@@ -28,6 +29,15 @@ networks; `open5gs-5g-dra` uses DRA macvlan without secondary CNI attachments.
 `open5gs-openupf-dra` keeps `open5gs-5g-dra` intact and provides a separate
 Open5GS plus OpenUPF split-UPF reference chart. The 5G SBI and all WebUIs use
 the default Kubernetes Pod network.
+
+`open5gs-ueransim-secure-n2` is the secured-N2 reference lab. UERANSIM connects
+to a local `gnb_proxy` sidecar over SCTP; the proxy carries NGAP through an
+mTLS-authenticated QUIC tunnel to an HA middleware StatefulSet. A kube-vip
+leader makes one middleware replica authoritative on the Multus `secure-n2`
+network, while a separate Multus `core-n2` network carries SCTP from the active
+middleware to Open5GS AMF. The proxy reconnects and replays NG Setup after a
+leader failure, and the supervised UE process can re-register when it detects
+a lost registration or PDU session.
 
 ## Ella Core
 

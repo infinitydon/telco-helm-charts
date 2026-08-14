@@ -1,4 +1,4 @@
-# Open5GS + UERANSIM + zero-trust N2
+# Open5GS + UERANSIM secured N2 proxy
 
 This chart installs a minimal Open5GS 5G SA core, one UERANSIM gNB, one UERANSIM UE, Multus networks, a `gnb_proxy` sidecar, and a two-replica N2 middleware tier.
 
@@ -31,11 +31,11 @@ The chart creates its PKI only on the first install and preserves it on upgrades
 
 ```console
 kubectl -n n2lab get pods -o wide
-kubectl -n n2lab logs deploy/n2lab-open5gs-ueransim-n2-gnb -c gnb-proxy
-kubectl -n n2lab logs statefulset/n2lab-open5gs-ueransim-n2-middleware -c middleware
+kubectl -n n2lab logs deploy/n2lab-open5gs-ueransim-secure-n2-gnb -c gnb-proxy
+kubectl -n n2lab logs statefulset/n2lab-open5gs-ueransim-secure-n2-middleware -c middleware
 kubectl -n n2lab get lease plndr-cp-lock
-kubectl -n n2lab logs deploy/n2lab-open5gs-ueransim-n2-amf
-kubectl -n n2lab logs deploy/n2lab-open5gs-ueransim-n2-ue -c ue
+kubectl -n n2lab logs deploy/n2lab-open5gs-ueransim-secure-n2-amf
+kubectl -n n2lab logs deploy/n2lab-open5gs-ueransim-secure-n2-ue -c ue
 ```
 
 Expected messages include `QUIC mTLS session established`, `gNB QUIC connected`, `gNB-N2 accepted`, and successful UE registration/session establishment.
