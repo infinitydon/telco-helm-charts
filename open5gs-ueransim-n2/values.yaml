@@ -4,7 +4,7 @@ images:
   dbctl: gradiant/open5gs-dbctl:0.10.3
   ueransim: gradiant/ueransim:3.2.6
   toolbox: alpine:3.21.3
-  n2Tunnel: ghcr.io/infinitydon/telco-n2-sctp-middleware:0.2.0
+  n2Tunnel: ghcr.io/infinitydon/telco-n2-sctp-middleware:0.2.1
   kubeVip: ghcr.io/kube-vip/kube-vip:v1.2.2
   pullPolicy: IfNotPresent
 
