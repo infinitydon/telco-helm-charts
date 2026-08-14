@@ -1,0 +1,142 @@
+﻿diff --git a/cmd/gnb_proxy/main.go b/cmd/gnb_proxy/main.go
+index d58bf12..6c105e0 100644
+--- a/cmd/gnb_proxy/main.go
++++ b/cmd/gnb_proxy/main.go
+@@ -53,6 +53,7 @@ type Config struct {
+ 	QUICIdleTimeoutSeconds   int    `yaml:"quic_idle_timeout_seconds"`
+ 	QUICKeepAliveMS          int    `yaml:"quic_keepalive_ms"`
+ 	EnrollmentTimeoutSeconds int    `yaml:"enrollment_timeout_seconds"`
++	ReconnectBackoffMS       int    `yaml:"reconnect_backoff_ms"`
+ }
+ 
+ type TunnelFrame struct {
+@@ -86,6 +87,7 @@ func defaultConfig() Config {
+ 		QUICIdleTimeoutSeconds:   90,
+ 		QUICKeepAliveMS:          20000,
+ 		EnrollmentTimeoutSeconds: 10,
++		ReconnectBackoffMS:       1000,
+ 	}
+ }
+ 
+@@ -137,6 +139,7 @@ func loadConfig(path string) (Config, error) {
+ 	cfg.QUICIdleTimeoutSeconds = envIntOrDefault("QUIC_IDLE_TIMEOUT_SECONDS", cfg.QUICIdleTimeoutSeconds)
+ 	cfg.QUICKeepAliveMS = envIntOrDefault("QUIC_KEEPALIVE_MS", cfg.QUICKeepAliveMS)
+ 	cfg.EnrollmentTimeoutSeconds = envIntOrDefault("ENROLLMENT_TIMEOUT_SECONDS", cfg.EnrollmentTimeoutSeconds)
++	cfg.ReconnectBackoffMS = envIntOrDefault("RECONNECT_BACKOFF_MS", cfg.ReconnectBackoffMS)
+ 
+ 	if net.ParseIP(cfg.MiddlewareListenIP) == nil {
+ 		return cfg, fmt.Errorf("invalid middleware_listen_ip: %s", cfg.MiddlewareListenIP)
+@@ -159,6 +162,7 @@ func loadConfig(path string) (Config, error) {
+ 	if cfg.EnrollmentTimeoutSeconds <= 0 {
+ 		cfg.EnrollmentTimeoutSeconds = 10
+ 	}
++	if cfg.ReconnectBackoffMS <= 0 { cfg.ReconnectBackoffMS = 1000 }
+ 
+ 	return cfg, nil
+ }
+@@ -414,7 +418,7 @@ func dialQUIC(cfg Config, clientCert tls.Certificate, caPool *x509.CertPool) (*q
+ 	return qConn, udpConn, nil
+ }
+ 
+-func forwardGNBToStream(gnbConn *sctp.SCTPConn, stream *quic.Stream) error {
++func readGNBFrames(gnbConn *sctp.SCTPConn, frames chan<- TunnelFrame, setup chan<- TunnelFrame) error {
+ 	buf := make([]byte, 65535)
+ 	for {
+ 		n, info, err := gnbConn.SCTPRead(buf)
+@@ -430,10 +434,17 @@ func forwardGNBToStream(gnbConn *sctp.SCTPConn, stream *quic.Stream) error {
+ 		}
+ 
+ 		payload := append([]byte(nil), buf[:n]...)
+-		if err := writeTunnelFrame(stream, streamID, ppid, payload); err != nil {
+-			return err
+-		}
++		frame := TunnelFrame{Stream: streamID, PPID: ppid, Payload: payload}
++		select { case setup <- frame: default: }
++		frames <- frame
++	}
++}
++
++func forwardFramesToStream(frames <-chan TunnelFrame, stream *quic.Stream) error {
++	for frame := range frames {
++		if err := writeTunnelFrame(stream, frame.Stream, frame.PPID, frame.Payload); err != nil { return err }
+ 	}
++	return io.EOF
+ }
+ 
+ func forwardStreamToGNB(stream *quic.Stream, gnbConn *sctp.SCTPConn) error {
+@@ -463,42 +474,39 @@ func handleUERANSIMGNB(cfg Config, caPool *x509.CertPool, gnbConn *sctp.SCTPConn
+ 		return
+ 	}
+ 
+-	qConn, udpConn, err := dialQUIC(cfg, clientCert, caPool)
+-	if err != nil {
+-		log.Printf("connect QUIC middleware failed: %v", err)
+-		return
+-	}
+-	defer udpConn.Close()
+-	defer qConn.CloseWithError(0, "session closed")
+-
+-	stream, err := qConn.OpenStreamSync(context.Background())
+-	if err != nil {
+-		log.Printf("open QUIC stream failed: %v", err)
+-		return
+-	}
+-
+-	log.Printf("Accepted SCTP from %s; QUIC mTLS session established to %s:%d", gnbConn.RemoteAddr(), cfg.MiddlewareListenIP, cfg.MiddlewareListenPort)
+-
+-	errCh := make(chan error, 2)
+-	go func() {
+-		errCh <- forwardGNBToStream(gnbConn, stream)
+-	}()
+-	go func() {
+-		errCh <- forwardStreamToGNB(stream, gnbConn)
+-	}()
+-
+-	firstErr := <-errCh
+-	stream.CancelRead(0)
+-	stream.CancelWrite(0)
+-	_ = qConn.CloseWithError(0, "closing after one side ended")
+-	_ = gnbConn.Close()
+-	secondErr := <-errCh
+-
+-	if firstErr != nil && !errors.Is(firstErr, io.EOF) {
+-		log.Printf("gNB forwarding path ended with error: %v", firstErr)
+-	}
+-	if secondErr != nil && !errors.Is(secondErr, io.EOF) {
+-		log.Printf("middleware forwarding path ended with error: %v", secondErr)
++	frames := make(chan TunnelFrame, 256)
++	setupCh := make(chan TunnelFrame, 1)
++	gnbErr := make(chan error, 1)
++	go func() { gnbErr <- readGNBFrames(gnbConn, frames, setupCh) }()
++	var setup TunnelFrame
++	setupKnown := false
++	attempt := 0
++	for {
++		qConn, udpConn, err := dialQUIC(cfg, clientCert, caPool)
++		if err != nil {
++			log.Printf("connect QUIC middleware failed (will retry): %v", err)
++			select { case err = <-gnbErr: log.Printf("gNB SCTP ended: %v", err); return; case <-time.After(time.Duration(cfg.ReconnectBackoffMS)*time.Millisecond): continue }
++		}
++		stream, err := qConn.OpenStreamSync(context.Background())
++		if err != nil { _ = qConn.CloseWithError(0, "stream open failed"); _ = udpConn.Close(); continue }
++		if !setupKnown {
++			select { case setup = <-setupCh: setupKnown = true; case err = <-gnbErr: _ = qConn.CloseWithError(0, "gNB ended"); _ = udpConn.Close(); log.Printf("gNB SCTP ended: %v", err); return }
++		}
++		if attempt > 0 {
++			if err = writeTunnelFrame(stream, setup.Stream, setup.PPID, setup.Payload); err != nil { _ = qConn.CloseWithError(0, "setup replay failed"); _ = udpConn.Close(); continue }
++			log.Printf("Replayed cached NG Setup Request after middleware failover")
++		}
++		log.Printf("SCTP %s connected by QUIC mTLS to VIP %s:%d (attempt %d)", gnbConn.RemoteAddr(), cfg.MiddlewareListenIP, cfg.MiddlewareListenPort, attempt+1)
++		errCh := make(chan error, 2)
++		go func() { errCh <- forwardFramesToStream(frames, stream) }()
++		go func() { errCh <- forwardStreamToGNB(stream, gnbConn) }()
++		select {
++		case err = <-gnbErr:
++			_ = qConn.CloseWithError(0, "gNB ended"); _ = udpConn.Close(); log.Printf("gNB SCTP ended: %v", err); return
++		case err = <-errCh:
++			log.Printf("middleware path ended (will reconnect): %v", err)
++			stream.CancelRead(0); stream.CancelWrite(0); _ = qConn.CloseWithError(0, "reconnecting"); _ = udpConn.Close(); attempt++
++		}
+ 	}
+ }
+ 

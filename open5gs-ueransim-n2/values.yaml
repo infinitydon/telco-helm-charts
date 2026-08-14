@@ -4,7 +4,8 @@ images:
   dbctl: gradiant/open5gs-dbctl:0.10.3
   ueransim: gradiant/ueransim:3.2.6
   toolbox: alpine:3.21.3
-  n2Tunnel: ghcr.io/infinitydon/telco-n2-sctp-middleware:0.1.0
+  n2Tunnel: ghcr.io/infinitydon/telco-n2-sctp-middleware:0.2.0
+  kubeVip: ghcr.io/kube-vip/kube-vip:v1.2.2
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
@@ -45,29 +46,30 @@ multusDefaults:
     type: static
 
 multus:
-  rls: { subnet: 10.65.0.0/24 }
-  n2: { subnet: 10.61.0.0/24 }
-  n3: { subnet: 10.62.0.0/24 }
-  n4: { subnet: 10.63.0.0/24 }
-  n6: { subnet: 10.64.0.0/24 }
+  secure-n2: { subnet: 10.61.0.0/28, unmanaged: true }
+  core-n2: { subnet: 10.61.0.16/28, unmanaged: true }
+  n3: { subnet: 10.61.0.32/28 }
+  n4: { subnet: 10.61.0.48/28 }
+  n6: { subnet: 10.61.0.64/28 }
+  rls: { subnet: 10.61.0.80/28 }
 
 addresses:
-  gnbRls: 10.65.0.10
-  ueRls: 10.65.0.20
-  amfN2: 10.61.0.2
-  gnbN2: 10.61.0.10
-  upfN3: 10.62.0.2
-  gnbN3: 10.62.0.10
-  smfN4: 10.63.0.2
-  upfN4: 10.63.0.3
-  upfN6: 10.64.0.2
-  dataN6: 10.64.0.100
+  secureN2VIP: 10.61.0.1
+  proxySecureN2: 10.61.0.2
+  middlewareSecureN2: [10.61.0.3, 10.61.0.4]
+  amfN2: 10.61.0.18
+  middlewareCoreN2: [10.61.0.19, 10.61.0.20]
+  upfN3: 10.61.0.34
+  gnbN3: 10.61.0.35
+  smfN4: 10.61.0.50
+  upfN4: 10.61.0.51
+  upfN6: 10.61.0.66
+  dataN6: 10.61.0.67
+  gnbRls: 10.61.0.82
+  ueRls: 10.61.0.83
 
 n2Tunnel:
-  amfServiceClusterIP: 10.152.183.231
   service:
-    # Stable address is required by the pinned upstream proxy, which accepts IPs only.
-    clusterIP: 10.152.183.230
     quicPort: 29502
     enrollmentPort: 8443
   pki:
@@ -80,6 +82,11 @@ n2Tunnel:
     resources:
       requests: { cpu: 50m, memory: 64Mi }
       limits: { cpu: 500m, memory: 256Mi }
+    nodeSelector: { workload-type: general }
+    vip:
+      leaseDuration: 5
+      renewDeadline: 3
+      retryPeriod: 1
   proxy:
     clientCertificateValidityHours: 8760
     resources:

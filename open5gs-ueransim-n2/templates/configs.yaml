@@ -55,7 +55,7 @@ data:
         server: [{ dev: eth0, port: 7777 }]
         client: { nrf: [{ uri: http://{{ include "n2lab.fullname" . }}-nrf:7777 }] }
       ngap:
-        server: [{ address: 0.0.0.0 }]
+        server: [{ address: {{ .Values.addresses.amfN2 }} }]
       guami:
         - plmn_id: { mcc: {{ .Values.plmn.mcc | quote }}, mnc: {{ .Values.plmn.mnc | quote }} }
           amf_id: { region: 2, set: 1 }
@@ -109,9 +109,9 @@ data:
     idLength: 32
     tac: {{ printf "%06d" (.Values.plmn.tac | int) | quote }}
     linkIp: {{ .Values.addresses.gnbRls }}
-    ngapIp: {{ .Values.addresses.gnbN2 }}
+    ngapIp: 127.0.0.1
     gtpIp: {{ .Values.addresses.gnbN3 }}
-    amfConfigs: [{ address: {{ .Values.addresses.gnbN2 }}, port: 38412 }]
+    amfConfigs: [{ address: 127.0.0.1, port: 38412 }]
     slices: [{ sst: {{ .Values.slice.sst }}, sd: {{ .Values.slice.sd }} }]
     ignoreStreamIds: true
   ue.yaml: |

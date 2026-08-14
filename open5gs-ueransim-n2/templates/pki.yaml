@@ -16,7 +16,7 @@ data:
 {{- else }}
 {{- $days := int .Values.n2Tunnel.pki.validityDays }}
 {{- $ca := genCA (printf "%s N2 root" (include "n2lab.fullname" .)) $days }}
-{{- $server := genSignedCert (printf "%s-middleware" (include "n2lab.fullname" .)) (list .Values.n2Tunnel.service.clusterIP) (list (printf "%s-middleware" (include "n2lab.fullname" .)) (printf "%s-middleware.%s.svc" (include "n2lab.fullname" .) .Release.Namespace)) $days $ca }}
+{{- $server := genSignedCert (printf "%s-middleware" (include "n2lab.fullname" .)) (list .Values.addresses.secureN2VIP) (list (printf "%s-middleware" (include "n2lab.fullname" .))) $days $ca }}
 {{- $client := genSignedCert "ueransim-gnb-proxy" nil nil $days $ca }}
 apiVersion: v1
 kind: Secret
@@ -35,4 +35,3 @@ stringData:
   jwt-secret: {{ randAlphaNum 64 | quote }}
 {{- end }}
 {{- end }}
-

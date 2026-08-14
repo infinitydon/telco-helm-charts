@@ -19,7 +19,10 @@ spec:
       "master": "{{ default $.Values.multusDefaults.master $network.master }}",
       "mode": "{{ default $.Values.multusDefaults.mode $network.mode }}",
       {{- end }}
+      {{- if $network.unmanaged }}
+      "capabilities": { "ips": true }
+      {{- else }}
       "ipam": { "type": "{{ dig "ipam" "type" $.Values.multusDefaults.ipam.type $network }}" }
+      {{- end }}
     }
 {{- end }}
-

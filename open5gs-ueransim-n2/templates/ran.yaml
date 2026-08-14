@@ -20,7 +20,7 @@ spec:
       labels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: gnb }
       annotations:
         k8s.v1.cni.cncf.io/networks: >-
-          [{"name":"{{ include "n2lab.fullname" . }}-rls","interface":"rls0","ips":["{{ .Values.addresses.gnbRls }}/24"]},{"name":"{{ include "n2lab.fullname" . }}-n2","interface":"n2","ips":["{{ .Values.addresses.gnbN2 }}/24"]},{"name":"{{ include "n2lab.fullname" . }}-n3","interface":"n3","ips":["{{ .Values.addresses.gnbN3 }}/24"]}]
+          [{"name":"{{ include "n2lab.fullname" . }}-rls","interface":"rls0","ips":["{{ .Values.addresses.gnbRls }}/28"]},{"name":"{{ include "n2lab.fullname" . }}-secure-n2","interface":"secure-n2"},{"name":"{{ include "n2lab.fullname" . }}-n3","interface":"n3","ips":["{{ .Values.addresses.gnbN3 }}/28"]}]
     spec:
       securityContext: { fsGroup: 65532, fsGroupChangePolicy: OnRootMismatch }
       {{- with .Values.nodeSelector }}
@@ -30,10 +30,15 @@ spec:
       imagePullSecrets: {{ toYaml . | nindent 8 }}
       {{- end }}
       initContainers:
+        - name: configure-secure-n2
+          image: {{ .Values.images.toolbox }}
+          securityContext: { runAsUser: 0, capabilities: { add: [NET_ADMIN] } }
+          command: ["/bin/sh", "-ec"]
+          args: ["ip address add {{ .Values.addresses.proxySecureN2 }}/28 dev secure-n2"]
         - name: wait-for-middleware
           image: {{ .Values.images.toolbox }}
           command: ["/bin/sh", "-ec"]
-          args: ["until nc -z {{ .Values.n2Tunnel.service.clusterIP }} {{ .Values.n2Tunnel.service.enrollmentPort }}; do sleep 2; done"]
+          args: ["until nc -z {{ .Values.addresses.secureN2VIP }} {{ .Values.n2Tunnel.service.enrollmentPort }}; do sleep 2; done"]
       containers:
         - name: gnb
           image: {{ .Values.images.ueransim }}
@@ -82,7 +87,7 @@ spec:
       labels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: ue }
       annotations:
         k8s.v1.cni.cncf.io/networks: >-
-          [{"name":"{{ include "n2lab.fullname" . }}-rls","interface":"rls0","ips":["{{ .Values.addresses.ueRls }}/24"]}]
+          [{"name":"{{ include "n2lab.fullname" . }}-rls","interface":"rls0","ips":["{{ .Values.addresses.ueRls }}/28"]}]
     spec:
       {{- with .Values.nodeSelector }}
       nodeSelector: {{ toYaml . | nindent 8 }}

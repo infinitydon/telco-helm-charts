@@ -4,7 +4,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ca-certific
 RUN git clone https://github.com/DBGR18/N2-SCTP-middleware.git /src && cd /src && git checkout "$SOURCE_COMMIT"
 WORKDIR /src
 COPY 0001-support-rsa-ca.patch /tmp/0001-support-rsa-ca.patch
-RUN git apply /tmp/0001-support-rsa-ca.patch
+COPY 0002-proxy-vip-reconnect.patch /tmp/0002-proxy-vip-reconnect.patch
+RUN git apply /tmp/0001-support-rsa-ca.patch && git apply /tmp/0002-proxy-vip-reconnect.patch
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/middleware ./cmd/middleware && \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/gnb_proxy ./cmd/gnb_proxy
 
