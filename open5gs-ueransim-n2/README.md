@@ -44,10 +44,10 @@ Expected messages include `QUIC mTLS session established`, `gNB QUIC connected`,
 
 An active-session failure test was performed on the `n2lab` deployment:
 
-1. The elected VIP leader (`middleware-1`, `10.61.0.20` on `core-n2`) was deleted at `14:22:11Z`.
-2. The Lease moved to `middleware-0`; the proxy detected QUIC loss, reconnected to the unchanged `10.61.0.1` VIP, and replayed its cached NG Setup Request at `14:22:23Z`.
+1. The elected VIP leader (`middleware-1`, `10.61.0.20` on `core-n2`) was deleted at `14:27:41Z`.
+2. The Lease moved to `middleware-0`; the proxy detected QUIC loss, reconnected to the unchanged `10.61.0.1` VIP, and replayed its cached NG Setup Request at `14:27:52Z`.
 3. Open5GS accepted the replacement N2 association from `10.61.0.19` and restored its gNB count to one.
-4. UERANSIM logged a successful NG Setup Response at `14:22:23Z`.
-5. The gNB pod UID remained `35729797-caed-4251-967d-54c5dfc7ee65`; neither UERANSIM nor its SCTP association to the local proxy was restarted.
+4. UERANSIM logged a successful NG Setup Response at `14:27:52Z`.
+5. The gNB pod UID remained `12d3ce47-9e84-4ad1-924d-a51b601e66e6`; neither UERANSIM nor its SCTP association to the local proxy was restarted.
 
-Observed recovery was about 12 seconds with a 10-second QUIC idle timeout and 5-second VIP lease. This restores N2 signaling without restarting the gNB pod; messages in flight during the outage are not transactionally replayed. The proxy modification specifically caches and replays NG Setup, not arbitrary UE signaling.
+Observed recovery was about 11 seconds with a 10-second QUIC idle timeout and 5-second VIP lease. This restores the gNB's N2 association without restarting the gNB pod. It is not seamless UE-session failover: Open5GS removed the existing gNB-UE context when the old SCTP association disappeared, and the UE had not automatically re-registered in the first 20 seconds after recovery. Messages in flight are not transactionally replayed; the proxy modification specifically caches and replays NG Setup, not arbitrary UE signaling.
