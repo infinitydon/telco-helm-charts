@@ -9,7 +9,7 @@ images:
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
-nodeSelector: {}
+nodeSelector: { workload-type: general }
 
 plmn:
   mcc: "001"

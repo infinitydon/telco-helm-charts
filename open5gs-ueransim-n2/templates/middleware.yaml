@@ -52,6 +52,7 @@ spec:
           [{"name":"{{ include "n2lab.fullname" . }}-secure-n2","interface":"secure-n2"},{"name":"{{ include "n2lab.fullname" . }}-core-n2","interface":"core-n2"}]
     spec:
       serviceAccountName: {{ include "n2lab.fullname" . }}-middleware-vip
+      securityContext: { fsGroup: 65532, fsGroupChangePolicy: OnRootMismatch }
       nodeSelector: {{ toYaml .Values.n2Tunnel.middleware.nodeSelector | nindent 8 }}
       affinity:
         podAntiAffinity:
