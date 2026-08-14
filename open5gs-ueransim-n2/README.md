@@ -40,6 +40,12 @@ kubectl -n n2lab logs deploy/n2lab-open5gs-ueransim-n2-ue -c ue
 
 Expected messages include `QUIC mTLS session established`, `gNB QUIC connected`, `gNB-N2 accepted`, and successful UE registration/session establishment.
 
+### UE recovery supervisor
+
+The UE container runs `nr-ue` under a small in-container supervisor. It restarts only the `nr-ue` child when the process exits, registration timer T3510 expires, or PDU-session establishment explicitly fails. This avoids restarting the Kubernetes pod and preserves its Multus attachment. Configure the delay and T3510 behavior with `ueransim.ueSupervisor`.
+
+This is failure-driven rather than a fixed periodic restart. If an idle UE receives no failure indication after N2 changes, it will not be recycled until it next attempts NAS signaling and encounters a detectable failure.
+
 ## Measured middleware VIP failure behavior
 
 An active-session failure test was performed on the `n2lab` deployment:

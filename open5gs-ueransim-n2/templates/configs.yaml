@@ -135,3 +135,47 @@ data:
     integrity: { IA1: true, IA2: true, IA3: true }
     ciphering: { EA1: true, EA2: true, EA3: true }
     integrityMaxRate: { uplink: full, downlink: full }
+  ue-supervisor.sh: |
+    #!/bin/sh
+    set -u
+    fifo=/tmp/nr-ue.log
+    restart=/tmp/nr-ue.restart
+    rm -f "$fifo" "$restart"
+    mkfifo "$fifo"
+    ue_pid=""
+    monitor_pid=""
+    stop() {
+      [ -z "$ue_pid" ] || kill "$ue_pid" 2>/dev/null || true
+      [ -z "$monitor_pid" ] || kill "$monitor_pid" 2>/dev/null || true
+      exit 0
+    }
+    trap stop TERM INT
+    while true; do
+      rm -f "$restart"
+      awk -v restartOnTimeout={{ .Values.ueransim.ueSupervisor.restartOnRegistrationTimeout | quote }} '
+        { print; fflush() }
+        restartOnTimeout == "true" && /NAS timer\[3510\] expired/ {
+          system("touch /tmp/nr-ue.restart")
+        }
+        /PDU Session establishment is failed/ {
+          system("touch /tmp/nr-ue.restart")
+        }
+      ' < "$fifo" &
+      monitor_pid=$!
+      nr-ue -c /etc/ueransim/ue.yaml > "$fifo" 2>&1 &
+      ue_pid=$!
+      while kill -0 "$ue_pid" 2>/dev/null; do
+        if [ -f "$restart" ]; then
+          echo "UE supervisor: registration/session failure detected; restarting nr-ue" >&2
+          kill "$ue_pid" 2>/dev/null || true
+          break
+        fi
+        sleep 1
+      done
+      wait "$ue_pid" 2>/dev/null || true
+      kill "$monitor_pid" 2>/dev/null || true
+      wait "$monitor_pid" 2>/dev/null || true
+      ue_pid=""
+      monitor_pid=""
+      sleep {{ .Values.ueransim.ueSupervisor.restartDelaySeconds }}
+    done

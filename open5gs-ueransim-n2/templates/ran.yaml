@@ -101,7 +101,9 @@ spec:
       containers:
         - name: ue
           image: {{ .Values.images.ueransim }}
-          args: ["ue"]
+          command: ["/bin/sh", "/etc/ueransim/ue-supervisor.sh"]
           securityContext: { privileged: true, runAsUser: 0 }
-          volumeMounts: [{ name: config, mountPath: /etc/ueransim/ue.yaml, subPath: ue.yaml }]
+          volumeMounts:
+            - { name: config, mountPath: /etc/ueransim/ue.yaml, subPath: ue.yaml }
+            - { name: config, mountPath: /etc/ueransim/ue-supervisor.sh, subPath: ue-supervisor.sh }
       volumes: [{ name: config, configMap: { name: {{ include "n2lab.fullname" . }}-configs } }]

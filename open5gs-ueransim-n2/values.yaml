@@ -33,6 +33,10 @@ gnb:
 ueransim:
   gnbReplicas: 1
   ueReplicas: 1
+  ueSupervisor:
+    restartDelaySeconds: 2
+    # nr-ue can stay alive after NAS registration failure; recycle it on T3510.
+    restartOnRegistrationTimeout: true
 
 ueNetwork:
   subnet: 10.45.0.0/16
