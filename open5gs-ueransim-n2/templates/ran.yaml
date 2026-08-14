@@ -86,6 +86,7 @@ spec:
     metadata:
       labels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: ue }
       annotations:
+        checksum/config: {{ include (print .Template.BasePath "/configs.yaml") . | sha256sum }}
         k8s.v1.cni.cncf.io/networks: >-
           [{"name":"{{ include "n2lab.fullname" . }}-rls","interface":"rls0","ips":["{{ .Values.addresses.ueRls }}/28"]}]
     spec:
