@@ -90,6 +90,7 @@ spec:
         k8s.v1.cni.cncf.io/networks: >-
           [{"name":"{{ include "n2lab.fullname" . }}-rls","interface":"rls0","ips":["{{ .Values.addresses.ueRls }}/28"]}]
     spec:
+      securityContext: { fsGroup: 999, fsGroupChangePolicy: OnRootMismatch }
       {{- with .Values.nodeSelector }}
       nodeSelector: {{ toYaml . | nindent 8 }}
       {{- end }}
@@ -99,6 +100,7 @@ spec:
           env: [{ name: DB_URI, value: mongodb://{{ include "n2lab.fullname" . }}-mongodb/open5gs }]
           command: ["/bin/sh", "-ec"]
           args: ["until open5gs-dbctl showall >/dev/null 2>&1; do sleep 2; done; open5gs-dbctl remove {{ .Values.subscriber.imsi }} || true; open5gs-dbctl add_ue_with_slice {{ .Values.subscriber.imsi }} {{ .Values.subscriber.key }} {{ .Values.subscriber.opc }} {{ .Values.subscriber.dnn }} {{ .Values.slice.sst }} {{ trimPrefix "0x" .Values.slice.sd }}"]
+          volumeMounts: [{ name: dbctl-home, mountPath: /data/db }]
       containers:
         - name: ue
           image: {{ .Values.images.ueransim }}
@@ -107,4 +109,6 @@ spec:
           volumeMounts:
             - { name: config, mountPath: /etc/ueransim/ue.yaml, subPath: ue.yaml }
             - { name: config, mountPath: /etc/ueransim/ue-supervisor.sh, subPath: ue-supervisor.sh }
-      volumes: [{ name: config, configMap: { name: {{ include "n2lab.fullname" . }}-configs } }]
+      volumes:
+        - { name: config, configMap: { name: {{ include "n2lab.fullname" . }}-configs } }
+        - { name: dbctl-home, emptyDir: {} }
