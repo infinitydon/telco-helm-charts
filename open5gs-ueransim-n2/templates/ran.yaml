@@ -43,7 +43,7 @@ spec:
         - name: gnb
           image: {{ .Values.images.ueransim }}
           command: ["/bin/sh", "-ec"]
-          args: ["sleep 5; exec nr-gnb -c /etc/ueransim/gnb.yaml"]
+          args: ["until awk '$6 == 38412 { found=1 } END { exit !found }' /proc/net/sctp/eps 2>/dev/null; do sleep 1; done; exec nr-gnb -c /etc/ueransim/gnb.yaml"]
           volumeMounts: [{ name: core-config, mountPath: /etc/ueransim/gnb.yaml, subPath: gnb.yaml }]
         - name: gnb-proxy
           image: {{ .Values.images.n2Tunnel }}
