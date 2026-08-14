@@ -38,7 +38,7 @@ spec:
         - name: wait-for-middleware
           image: {{ .Values.images.toolbox }}
           command: ["/bin/sh", "-ec"]
-          args: ["until nc -z {{ .Values.addresses.secureN2VIP }} {{ .Values.n2Tunnel.service.enrollmentPort }}; do sleep 2; done"]
+          args: ["until wget -q --spider --no-check-certificate https://{{ .Values.addresses.secureN2VIP }}:{{ .Values.n2Tunnel.service.enrollmentPort }}/healthz; do sleep 2; done"]
       containers:
         - name: gnb
           image: {{ .Values.images.ueransim }}
