@@ -152,15 +152,19 @@ data:
     trap stop TERM INT
     while true; do
       rm -f "$restart"
-      awk -v restartOnTimeout={{ .Values.ueransim.ueSupervisor.restartOnRegistrationTimeout | quote }} '
-        { print; fflush() }
-        restartOnTimeout == "true" && /NAS timer\[3510\] expired/ {
-          system("touch /tmp/nr-ue.restart")
-        }
-        /PDU Session establishment is failed/ {
-          system("touch /tmp/nr-ue.restart")
-        }
-      ' < "$fifo" &
+      while IFS= read -r line; do
+        printf '%s\n' "$line"
+        case "$line" in
+          *"NAS timer[3510] expired"*)
+            {{- if .Values.ueransim.ueSupervisor.restartOnRegistrationTimeout }}
+            touch "$restart"
+            {{- end }}
+            ;;
+          *"PDU Session establishment is failed"*)
+            touch "$restart"
+            ;;
+        esac
+      done < "$fifo" &
       monitor_pid=$!
       nr-ue -c /etc/ueransim/ue.yaml > "$fifo" 2>&1 &
       ue_pid=$!
