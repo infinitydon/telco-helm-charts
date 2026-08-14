@@ -1,0 +1,19 @@
+diff --git a/cmd/middleware/main.go b/cmd/middleware/main.go
+--- a/cmd/middleware/main.go
++++ b/cmd/middleware/main.go
+@@ -738,6 +738,15 @@ func startEnrollmentServer(cfg Config, pki *PKI) (*http.Server, error) {
+ 	h := &enrollmentHandler{cfg: cfg, pki: pki}
+ 	mux := http.NewServeMux()
+ 	mux.Handle("/enroll", h)
++	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
++		if r.Method != http.MethodGet && r.Method != http.MethodHead {
++			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
++			return
++		}
++		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
++		w.WriteHeader(http.StatusOK)
++		_, _ = w.Write([]byte("ok\n"))
++	})
+ 
+ 	addr := net.JoinHostPort(cfg.EnrollListenIP, strconv.Itoa(cfg.EnrollListenPort))
+ 	server := &http.Server{

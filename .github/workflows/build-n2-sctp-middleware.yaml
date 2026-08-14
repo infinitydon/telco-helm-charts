@@ -27,6 +27,6 @@ jobs:
         with:
           context: open5gs-ueransim-secure-n2/container
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/telco-n2-sctp-middleware:0.2.1
+          tags: ghcr.io/${{ github.repository_owner }}/telco-n2-sctp-middleware:0.2.2
           provenance: true
           sbom: true

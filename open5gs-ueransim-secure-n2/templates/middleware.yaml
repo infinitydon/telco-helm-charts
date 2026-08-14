@@ -89,7 +89,10 @@ spec:
           ports:
             - { name: quic, containerPort: {{ .Values.n2Tunnel.service.quicPort }}, protocol: UDP }
             - { name: enrollment, containerPort: {{ .Values.n2Tunnel.service.enrollmentPort }}, protocol: TCP }
-          readinessProbe: { tcpSocket: { port: enrollment }, initialDelaySeconds: 2, periodSeconds: 3 }
+          readinessProbe:
+            httpGet: { scheme: HTTPS, path: /healthz, port: enrollment }
+            initialDelaySeconds: 2
+            periodSeconds: 3
           resources: {{ toYaml .Values.n2Tunnel.middleware.resources | nindent 12 }}
           volumeMounts:
             - { name: config, mountPath: /etc/n2/config.yaml, subPath: middleware.yaml, readOnly: true }
