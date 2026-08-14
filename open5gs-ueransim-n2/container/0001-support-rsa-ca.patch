@@ -1,0 +1,83 @@
+diff --git a/cmd/middleware/main.go b/cmd/middleware/main.go
+index e9b97b8..6807a28 100644
+--- a/cmd/middleware/main.go
++++ b/cmd/middleware/main.go
+@@ -2,9 +2,11 @@ package main
+ 
+ import (
+ 	"context"
++	"crypto"
+ 	"crypto/ecdsa"
+ 	"crypto/elliptic"
+ 	"crypto/rand"
++	"crypto/rsa"
+ 	"crypto/tls"
+ 	"crypto/x509"
+ 	"crypto/x509/pkix"
+@@ -72,7 +74,7 @@ type TunnelFrame struct {
+ 
+ type PKI struct {
+ 	CACert      *x509.Certificate
+-	CAKey       *ecdsa.PrivateKey
++	CAKey       crypto.Signer
+ 	CACertPEM   []byte
+ 	ServerTLS   tls.Certificate
+ 	ServerLeaf  *x509.Certificate
+@@ -239,7 +241,7 @@ func parsePEMCertificate(path string) (*x509.Certificate, []byte, error) {
+ 	return cert, raw, nil
+ }
+ 
+-func parsePEMECDSAKey(path string) (*ecdsa.PrivateKey, error) {
++func parsePEMSigner(path string) (crypto.Signer, error) {
+ 	raw, err := os.ReadFile(path)
+ 	if err != nil {
+ 		return nil, err
+@@ -251,18 +253,22 @@ func parsePEMECDSAKey(path string) (*ecdsa.PrivateKey, error) {
+ 	if key, err := x509.ParseECPrivateKey(block.Bytes); err == nil {
+ 		return key, nil
+ 	}
+-	keyAny, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+-	if err != nil {
+-		return nil, fmt.Errorf("parse private key %s: %w", path, err)
++	if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
++		return key, nil
+ 	}
+-	key, ok := keyAny.(*ecdsa.PrivateKey)
+-	if !ok {
+-		return nil, fmt.Errorf("private key in %s is not ECDSA", path)
++	keyAny, err := x509.ParsePKCS8PrivateKey(block.Bytes)
++	if err == nil {
++		switch key := keyAny.(type) {
++		case *ecdsa.PrivateKey:
++			return key, nil
++		case *rsa.PrivateKey:
++			return key, nil
++		}
+ 	}
+-	return key, nil
++	return nil, fmt.Errorf("private key in %s is not a supported ECDSA or RSA key", path)
+ }
+ 
+-func loadOrCreateCA(cfg Config) (*x509.Certificate, *ecdsa.PrivateKey, []byte, error) {
++func loadOrCreateCA(cfg Config) (*x509.Certificate, crypto.Signer, []byte, error) {
+ 	certExists := fileExists(cfg.CACertPath)
+ 	keyExists := fileExists(cfg.CAKeyPath)
+ 
+@@ -275,7 +281,7 @@ func loadOrCreateCA(cfg Config) (*x509.Certificate, *ecdsa.PrivateKey, []byte, e
+ 		if err != nil {
+ 			return nil, nil, nil, fmt.Errorf("load root CA cert: %w", err)
+ 		}
+-		key, err := parsePEMECDSAKey(cfg.CAKeyPath)
++		key, err := parsePEMSigner(cfg.CAKeyPath)
+ 		if err != nil {
+ 			return nil, nil, nil, fmt.Errorf("load root CA key: %w", err)
+ 		}
+@@ -351,7 +357,7 @@ func uniqueIPs(ips ...net.IP) []net.IP {
+ 	return out
+ }
+ 
+-func loadOrCreateServerCert(cfg Config, caCert *x509.Certificate, caKey *ecdsa.PrivateKey, caPEM []byte) (tls.Certificate, *x509.Certificate, error) {
++func loadOrCreateServerCert(cfg Config, caCert *x509.Certificate, caKey crypto.Signer, caPEM []byte) (tls.Certificate, *x509.Certificate, error) {
+ 	certExists := fileExists(cfg.ServerCertPath)
+ 	keyExists := fileExists(cfg.ServerKeyPath)
+ 

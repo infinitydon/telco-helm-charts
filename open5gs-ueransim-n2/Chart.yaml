@@ -1,0 +1,6 @@
+apiVersion: v2
+name: open5gs-ueransim-n2
+description: Minimal Open5GS and UERANSIM lab with Multus and a zero-trust N2 tunnel
+type: application
+version: 0.1.1
+appVersion: "2.7.5"

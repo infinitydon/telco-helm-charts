@@ -1,0 +1,102 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "n2lab.fullname" . }}-gnb
+spec:
+  selector: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: gnb }
+  ports: [{ name: radio, port: 4997, targetPort: 4997, protocol: UDP }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "n2lab.fullname" . }}-gnb
+spec:
+  replicas: {{ .Values.ueransim.gnbReplicas }}
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: gnb }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: gnb }
+      annotations:
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "n2lab.fullname" . }}-rls","interface":"rls0","ips":["{{ .Values.addresses.gnbRls }}/24"]},{"name":"{{ include "n2lab.fullname" . }}-n2","interface":"n2","ips":["{{ .Values.addresses.gnbN2 }}/24"]},{"name":"{{ include "n2lab.fullname" . }}-n3","interface":"n3","ips":["{{ .Values.addresses.gnbN3 }}/24"]}]
+    spec:
+      securityContext: { fsGroup: 65532, fsGroupChangePolicy: OnRootMismatch }
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: wait-for-middleware
+          image: {{ .Values.images.toolbox }}
+          command: ["/bin/sh", "-ec"]
+          args: ["until nc -z {{ .Values.n2Tunnel.service.clusterIP }} {{ .Values.n2Tunnel.service.enrollmentPort }}; do sleep 2; done"]
+      containers:
+        - name: gnb
+          image: {{ .Values.images.ueransim }}
+          command: ["/bin/sh", "-ec"]
+          args: ["sleep 5; exec nr-gnb -c /etc/ueransim/gnb.yaml"]
+          volumeMounts: [{ name: core-config, mountPath: /etc/ueransim/gnb.yaml, subPath: gnb.yaml }]
+        - name: gnb-proxy
+          image: {{ .Values.images.n2Tunnel }}
+          command: ["/usr/local/bin/gnb_proxy"]
+          args: ["-config", "/etc/n2/config.yaml"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            capabilities: { drop: [ALL] }
+          resources: {{ toYaml .Values.n2Tunnel.proxy.resources | nindent 12 }}
+          volumeMounts:
+            - { name: n2-config, mountPath: /etc/n2/config.yaml, subPath: proxy.yaml, readOnly: true }
+            - { name: pki, mountPath: /etc/n2/pki, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: core-config, configMap: { name: {{ include "n2lab.fullname" . }}-configs } }
+        - { name: n2-config, configMap: { name: {{ include "n2lab.fullname" . }}-n2-config } }
+        - name: pki
+          secret:
+            secretName: {{ include "n2lab.pkiSecret" . }}
+            defaultMode: 0440
+            items:
+              - { key: ca_cert.pem, path: ca_cert.pem }
+              - { key: gnb_client_cert.pem, path: gnb_client_cert.pem }
+              - { key: gnb_client_key.pem, path: gnb_client_key.pem }
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "n2lab.fullname" . }}-ue
+spec:
+  replicas: {{ .Values.ueransim.ueReplicas }}
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: ue }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: ue }
+      annotations:
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "n2lab.fullname" . }}-rls","interface":"rls0","ips":["{{ .Values.addresses.ueRls }}/24"]}]
+    spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: provision-subscriber
+          image: {{ .Values.images.dbctl }}
+          env: [{ name: DB_URI, value: mongodb://{{ include "n2lab.fullname" . }}-mongodb/open5gs }]
+          command: ["/bin/sh", "-ec"]
+          args: ["until open5gs-dbctl showall >/dev/null 2>&1; do sleep 2; done; open5gs-dbctl remove {{ .Values.subscriber.imsi }} || true; open5gs-dbctl add_ue_with_slice {{ .Values.subscriber.imsi }} {{ .Values.subscriber.key }} {{ .Values.subscriber.opc }} {{ .Values.subscriber.dnn }} {{ .Values.slice.sst }} {{ trimPrefix "0x" .Values.slice.sd }}"]
+      containers:
+        - name: ue
+          image: {{ .Values.images.ueransim }}
+          args: ["ue"]
+          securityContext: { privileged: true, runAsUser: 0 }
+          volumeMounts: [{ name: config, mountPath: /etc/ueransim/ue.yaml, subPath: ue.yaml }]
+      volumes: [{ name: config, configMap: { name: {{ include "n2lab.fullname" . }}-configs } }]

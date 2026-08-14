@@ -1,0 +1,25 @@
+{{- range $name, $network := .Values.multus }}
+{{- $type := default $.Values.multusDefaults.type $network.type }}
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: {{ include "n2lab.fullname" $ }}-{{ $name }}
+  labels:
+    {{- include "n2lab.labels" $ | nindent 4 }}
+spec:
+  config: |-
+    {
+      "cniVersion": "0.3.1",
+      "name": "{{ include "n2lab.fullname" $ }}-{{ $name }}",
+      "type": "{{ $type }}",
+      {{- if eq $type "bridge" }}
+      "bridge": "{{ include "n2lab.fullname" $ | trunc 8 }}-{{ $name }}",
+      {{- else }}
+      "master": "{{ default $.Values.multusDefaults.master $network.master }}",
+      "mode": "{{ default $.Values.multusDefaults.mode $network.mode }}",
+      {{- end }}
+      "ipam": { "type": "{{ dig "ipam" "type" $.Values.multusDefaults.ipam.type $network }}" }
+    }
+{{- end }}
+

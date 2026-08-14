@@ -1,0 +1,95 @@
+images:
+  open5gs: gradiant/open5gs:2.7.5
+  mongodb: mongo:6.0.26
+  dbctl: gradiant/open5gs-dbctl:0.10.3
+  ueransim: gradiant/ueransim:3.2.6
+  toolbox: alpine:3.21.3
+  n2Tunnel: ghcr.io/infinitydon/n2-sctp-middleware:0.1.2
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nodeSelector: {}
+
+plmn:
+  mcc: "001"
+  mnc: "01"
+  tac: 1
+
+slice:
+  sst: 1
+  sd: "0x111111"
+
+subscriber:
+  imsi: "001010000000001"
+  key: "465B5CE8B199B49FAA5F0A2EE238A6BC"
+  opc: "E8ED289DEBA952E4283B54E88E6183CA"
+  amf: "8000"
+  dnn: internet
+
+gnb:
+  nci: "0x000000010"
+
+ueransim:
+  gnbReplicas: 1
+  ueReplicas: 1
+
+ueNetwork:
+  subnet: 10.45.0.0/16
+  gateway: 10.45.0.1
+
+multusDefaults:
+  type: macvlan
+  master: enp8s19
+  mode: bridge
+  ipam:
+    type: static
+
+multus:
+  rls: { subnet: 10.65.0.0/24 }
+  n2: { subnet: 10.61.0.0/24 }
+  n3: { subnet: 10.62.0.0/24 }
+  n4: { subnet: 10.63.0.0/24 }
+  n6: { subnet: 10.64.0.0/24 }
+
+addresses:
+  gnbRls: 10.65.0.10
+  ueRls: 10.65.0.20
+  amfN2: 10.61.0.2
+  gnbN2: 10.61.0.10
+  upfN3: 10.62.0.2
+  gnbN3: 10.62.0.10
+  smfN4: 10.63.0.2
+  upfN4: 10.63.0.3
+  upfN6: 10.64.0.2
+  dataN6: 10.64.0.100
+
+n2Tunnel:
+  amfServiceClusterIP: 10.152.183.231
+  service:
+    # Stable address is required by the pinned upstream proxy, which accepts IPs only.
+    clusterIP: 10.152.183.230
+    quicPort: 29502
+    enrollmentPort: 8443
+  pki:
+    existingSecret: ""
+    validityDays: 3650
+  middleware:
+    replicas: 2
+    disruptionBudget:
+      minAvailable: 1
+    resources:
+      requests: { cpu: 50m, memory: 64Mi }
+      limits: { cpu: 500m, memory: 256Mi }
+  proxy:
+    clientCertificateValidityHours: 8760
+    resources:
+      requests: { cpu: 25m, memory: 32Mi }
+      limits: { cpu: 250m, memory: 128Mi }
+
+mongodb:
+  persistence:
+    enabled: true
+    size: 2Gi
+    storageClass: ""
+
+resources: {}

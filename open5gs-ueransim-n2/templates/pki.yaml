@@ -1,0 +1,38 @@
+{{- if not .Values.n2Tunnel.pki.existingSecret }}
+{{- $name := include "n2lab.pkiSecret" . }}
+{{- $old := lookup "v1" "Secret" .Release.Namespace $name }}
+{{- if $old }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "n2lab.labels" . | nindent 4 }}
+type: Opaque
+data:
+  {{- range $key, $value := $old.data }}
+  {{ $key }}: {{ $value }}
+  {{- end }}
+{{- else }}
+{{- $days := int .Values.n2Tunnel.pki.validityDays }}
+{{- $ca := genCA (printf "%s N2 root" (include "n2lab.fullname" .)) $days }}
+{{- $server := genSignedCert (printf "%s-middleware" (include "n2lab.fullname" .)) (list .Values.n2Tunnel.service.clusterIP) (list (printf "%s-middleware" (include "n2lab.fullname" .)) (printf "%s-middleware.%s.svc" (include "n2lab.fullname" .) .Release.Namespace)) $days $ca }}
+{{- $client := genSignedCert "ueransim-gnb-proxy" nil nil $days $ca }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "n2lab.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  ca_cert.pem: {{ $ca.Cert | quote }}
+  ca_key.pem: {{ $ca.Key | quote }}
+  middleware_server_cert.pem: {{ $server.Cert | quote }}
+  middleware_server_key.pem: {{ $server.Key | quote }}
+  gnb_client_cert.pem: {{ $client.Cert | quote }}
+  gnb_client_key.pem: {{ $client.Key | quote }}
+  jwt-secret: {{ randAlphaNum 64 | quote }}
+{{- end }}
+{{- end }}
+

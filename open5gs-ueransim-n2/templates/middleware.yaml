@@ -1,0 +1,124 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "n2lab.fullname" . }}-middleware
+  labels:
+    {{- include "n2lab.labels" . | nindent 4 }}
+spec:
+  clusterIP: {{ .Values.n2Tunnel.service.clusterIP }}
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: n2-middleware
+  ports:
+    - { name: quic, port: {{ .Values.n2Tunnel.service.quicPort }}, targetPort: quic, protocol: UDP }
+    - { name: enrollment, port: {{ .Values.n2Tunnel.service.enrollmentPort }}, targetPort: enrollment, protocol: TCP }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "n2lab.fullname" . }}-middleware
+  labels:
+    {{- include "n2lab.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.n2Tunnel.middleware.replicas }}
+  selector:
+    matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: n2-middleware }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: n2-middleware }
+      annotations:
+        checksum/pki-name: {{ include "n2lab.pkiSecret" . | sha256sum }}
+    spec:
+      securityContext: { fsGroup: 65532, fsGroupChangePolicy: OnRootMismatch }
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: n2-middleware }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: n2-middleware }
+      containers:
+        - name: middleware
+          image: {{ .Values.images.n2Tunnel }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          args: ["-config", "/etc/n2/config.yaml"]
+          env:
+            - name: JWT_SECRET
+              valueFrom: { secretKeyRef: { name: {{ include "n2lab.pkiSecret" . }}, key: jwt-secret } }
+          ports:
+            - { name: quic, containerPort: {{ .Values.n2Tunnel.service.quicPort }}, protocol: UDP }
+            - { name: enrollment, containerPort: {{ .Values.n2Tunnel.service.enrollmentPort }}, protocol: TCP }
+          readinessProbe: { tcpSocket: { port: enrollment }, initialDelaySeconds: 2, periodSeconds: 5 }
+          livenessProbe: { tcpSocket: { port: enrollment }, initialDelaySeconds: 10, periodSeconds: 10 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            capabilities: { drop: [ALL] }
+          resources: {{ toYaml .Values.n2Tunnel.middleware.resources | nindent 12 }}
+          volumeMounts:
+            - { name: config, mountPath: /etc/n2/config.yaml, subPath: middleware.yaml, readOnly: true }
+            - { name: pki, mountPath: /etc/n2/pki, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: config, configMap: { name: {{ include "n2lab.fullname" . }}-n2-config } }
+        - { name: pki, secret: { secretName: {{ include "n2lab.pkiSecret" . }}, defaultMode: 0440 } }
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "n2lab.fullname" . }}-middleware
+spec:
+  minAvailable: {{ .Values.n2Tunnel.middleware.disruptionBudget.minAvailable }}
+  selector:
+    matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: n2-middleware }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "n2lab.fullname" . }}-n2-config
+data:
+  middleware.yaml: |
+    middleware_listen_ip: "0.0.0.0"
+    middleware_listen_port: {{ .Values.n2Tunnel.service.quicPort }}
+    enroll_listen_ip: "0.0.0.0"
+    enroll_listen_port: {{ .Values.n2Tunnel.service.enrollmentPort }}
+    middleware_sctp_local_ip: "0.0.0.0"
+    middleware_sctp_listen_port: 38413
+    amf_target_ip: "{{ .Values.n2Tunnel.amfServiceClusterIP }}"
+    amf_target_port: 38412
+    jwt_secret: "set-by-environment"
+    ca_cert_path: "/etc/n2/pki/ca_cert.pem"
+    ca_key_path: "/etc/n2/pki/ca_key.pem"
+    server_cert_path: "/etc/n2/pki/middleware_server_cert.pem"
+    server_key_path: "/etc/n2/pki/middleware_server_key.pem"
+    client_cert_validity_hours: {{ .Values.n2Tunnel.proxy.clientCertificateValidityHours }}
+    middleware_tls_server_name: "{{ .Values.n2Tunnel.service.clusterIP }}"
+    quic_idle_timeout_seconds: 90
+    quic_keepalive_ms: 20000
+  proxy.yaml: |
+    middleware_listen_ip: "{{ .Values.n2Tunnel.service.clusterIP }}"
+    middleware_listen_port: {{ .Values.n2Tunnel.service.quicPort }}
+    enroll_url: "https://{{ .Values.n2Tunnel.service.clusterIP }}:{{ .Values.n2Tunnel.service.enrollmentPort }}/enroll"
+    gnb_local_ip: "0.0.0.0"
+    gnb_proxy_listen_ip: "{{ .Values.addresses.gnbN2 }}"
+    gnb_proxy_listen_port: 38412
+    enrollment_jwt: "unused-with-preissued-certificate"
+    ca_cert_path: "/etc/n2/pki/ca_cert.pem"
+    client_cert_path: "/etc/n2/pki/gnb_client_cert.pem"
+    client_key_path: "/etc/n2/pki/gnb_client_key.pem"
+    middleware_tls_server_name: "{{ .Values.n2Tunnel.service.clusterIP }}"
+    quic_idle_timeout_seconds: 90
+    quic_keepalive_ms: 20000
