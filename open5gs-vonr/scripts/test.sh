@@ -18,8 +18,8 @@ done < <(awk '$1 == "image:" {gsub(/"/, "", $2); print $2}' <<<"$rendered")
 for component in ue1 ue2; do
   deployment="$RELEASE-open5gs-vonr-$component"
   kubectl -n "$NAMESPACE" rollout status "deployment/$deployment" --timeout="$TIMEOUT"
-  kubectl -n "$NAMESPACE" logs "deployment/$deployment" -c ue --tail=250 |
-    grep -q 'PDU Session establishment is successful'
+  ue_logs="$(kubectl -n "$NAMESPACE" logs "deployment/$deployment" -c ue --tail=250)"
+  grep -q 'PDU Session establishment is successful' <<<"$ue_logs"
 done
 kubectl -n "$NAMESPACE" rollout status "deployment/$RELEASE-open5gs-vonr-pcscf" --timeout="$TIMEOUT"
 

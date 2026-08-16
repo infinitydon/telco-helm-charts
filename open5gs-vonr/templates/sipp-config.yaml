@@ -110,7 +110,7 @@ data:
         Via: SIP/2.0/UDP [local_ip]:[local_port];branch=[branch]
         [routes]
         From: <sip:1001@ims.mnc001.mcc001.3gppnetwork.org>;tag=[pid]SIPpTag00
-        To: [peer_tag_param]
+        To: <sip:1002@ims.mnc001.mcc001.3gppnetwork.org>[peer_tag_param]
         Call-ID: [call_id]
         CSeq: 1 ACK
         Contact: <sip:1001@[local_ip]:[local_port]>
@@ -123,7 +123,7 @@ data:
         BYE sip:1002@[remote_ip]:[remote_port] SIP/2.0
         Via: SIP/2.0/UDP [local_ip]:[local_port];branch=[branch]
         From: <sip:1001@ims.mnc001.mcc001.3gppnetwork.org>;tag=[pid]SIPpTag00
-        To: [peer_tag_param]
+        To: <sip:1002@ims.mnc001.mcc001.3gppnetwork.org>[peer_tag_param]
         Call-ID: [call_id]
         CSeq: 2 BYE
         Contact: <sip:1001@[local_ip]:[local_port]>

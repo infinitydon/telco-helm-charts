@@ -60,7 +60,7 @@ ueGateway: 10.46.0.1
 ims:
   enabled: true
   # Increment after changing the embedded Kamailio configuration.
-  configRevision: "2"
+  configRevision: "6"
   domain: ims.mnc001.mcc001.3gppnetwork.org
   pcscf: 10.54.0.41
   port: 5060

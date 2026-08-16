@@ -19,6 +19,8 @@ spec:
     metadata:
       labels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: gnb }
       annotations:
+        checksum/core-config: {{ include (print $.Template.BasePath "/configs.yaml") $ | sha256sum }}
+        checksum/sipp-config: {{ include (print $.Template.BasePath "/sipp-config.yaml") $ | sha256sum }}
         k8s.v1.cni.cncf.io/networks: >-
           [{"name":"{{ include "open5gs-5g.fullname" . }}-rls","interface":"rls0","ips":["{{ .Values.addresses.gnbRls }}/28"]},{"name":"{{ include "open5gs-5g.fullname" . }}-n2","interface":"n2","ips":["{{ .Values.addresses.gnbN2 }}/28"]},{"name":"{{ include "open5gs-5g.fullname" . }}-n3","interface":"n3","ips":["{{ .Values.addresses.gnbN3 }}/28"]}]
     spec:
@@ -56,6 +58,8 @@ spec:
     metadata:
       labels: { app.kubernetes.io/instance: {{ $.Release.Name }}, app.kubernetes.io/component: {{ $ue.name }} }
       annotations:
+        checksum/core-config: {{ include (print $.Template.BasePath "/configs.yaml") $ | sha256sum }}
+        checksum/sipp-config: {{ include (print $.Template.BasePath "/sipp-config.yaml") $ | sha256sum }}
         k8s.v1.cni.cncf.io/networks: >-
           [{"name":"{{ include "open5gs-5g.fullname" $ }}-rls","interface":"rls0","ips":["{{ $ue.rlsAddress }}/28"]}]
     spec:

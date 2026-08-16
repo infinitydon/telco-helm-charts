@@ -26,6 +26,50 @@ existing lab `/24`:
 | UERANSIM radio simulation | `10.55.0.32/28` |
 | UE DNN pool | `10.46.0.0/28` |
 
+## End-to-end network flow
+
+```mermaid
+flowchart LR
+  subgraph UE1P["UE 1001 pod"]
+    U1["UERANSIM UE\nuesimtun0: 10.46.0.11"]
+    S1["SIPp caller 1001"]
+    S1 --> U1
+  end
+
+  subgraph RAN["UERANSIM RAN"]
+    GNB["gNB\nRLS 10.55.0.33/28\nN2 10.51.0.35/28\nN3 10.52.0.35/28"]
+  end
+
+  subgraph CORE["Open5GS 5GC"]
+    AMF["AMF\nN2 10.51.0.34/28"]
+    SMF["SMF\nN4 10.53.0.34/28"]
+    UPF["UPF\nN3 10.52.0.34/28\nN4 10.53.0.35/28\nN6 10.54.0.34/28"]
+    AMF -. "session control" .-> SMF
+    SMF -. "PFCP / N4" .-> UPF
+  end
+
+  PCSCF["P-CSCF / Kamailio\n10.54.0.41:5060\nSIP registration and routing"]
+
+  subgraph UE2P["UE 1002 pod"]
+    U2["UERANSIM UE\nuesimtun0: 10.46.0.12"]
+    S2["SIPp callee 1002"]
+    U2 --> S2
+  end
+
+  U1 == "simulated radio / RLS" ==> GNB
+  GNB -. "NGAP / N2" .-> AMF
+  GNB == "GTP-U / N3" ==> UPF
+  UPF == "N6: SIP REGISTER and INVITE" ==> PCSCF
+  PCSCF == "routed to registered UE 1002" ==> UPF
+  UPF == "GTP-U / N3" ==> GNB
+  GNB == "simulated radio / RLS" ==> U2
+```
+
+The dashed links are control-plane signaling. The solid links show the user-
+plane SIP path exercised by the acceptance call. SIPp shares each UE pod's
+network namespace, so its packets enter and leave through `uesimtun0` rather
+than bypassing the simulated 5G PDU session.
+
 All container images have explicit, immutable version tags; `latest` is not
 used. The GHCR images are private, so create the referenced pull secret before
 installing (never commit the token):
@@ -103,3 +147,32 @@ Together these lines demonstrate 5G registration and PDU-session setup for
 both UEs, SIP registration through the N6 proxy, and successful establishment
 and teardown of the simulated voice dialog. They do not demonstrate RTP packet
 generation; the test negotiates PCMU in SDP but validates signaling only.
+
+### P-CSCF / Kamailio logs
+
+The P-CSCF in this chart is the Kamailio container built from the pinned
+`docker_open5gs` source. It listens on the N6 attachment and logs SIP routing
+events. The same successful acceptance run produced:
+
+```text
+Listening on
+             udp: 10.54.0.41:5060
+Aliases:
+             *: ims.mnc001.mcc001.3gppnetwork.org:*
+
+VoNR P-CSCF received REGISTER
+VoNR P-CSCF stored registered contact and returned 200
+VoNR P-CSCF received REGISTER
+VoNR P-CSCF stored registered contact and returned 200
+VoNR P-CSCF received INVITE and selected registered callee
+VoNR P-CSCF relaying request to registered contact
+VoNR P-CSCF relaying request to registered contact
+VoNR P-CSCF relaying request to registered contact
+```
+
+Retrieve the live evidence with:
+
+```bash
+kubectl -n vonr logs deploy/vonr-open5gs-vonr-pcscf -c pcscf | \
+  grep -E 'Listening on|udp:|Aliases:|VoNR P-CSCF'
+```

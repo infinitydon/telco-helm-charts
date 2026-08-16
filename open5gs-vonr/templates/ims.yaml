@@ -27,18 +27,25 @@ data:
         exit;
       }
       if (is_method("REGISTER")) {
+        xlog("L_WARN", "VoNR P-CSCF received REGISTER\n");
         if (!save("location")) sl_reply_error();
+        xlog("L_WARN", "VoNR P-CSCF stored registered contact and returned 200\n");
         exit;
       }
       if (loose_route()) {
+        xlog("L_WARN", "VoNR P-CSCF relaying in-dialog ACK or BYE\n");
         if (!t_relay()) sl_reply_error();
         exit;
       }
-      if (is_method("INVITE")) record_route();
+      if (is_method("INVITE")) {
+        xlog("L_WARN", "VoNR P-CSCF received INVITE and selected registered callee\n");
+        record_route();
+      }
       if (!lookup("location")) {
         sl_send_reply("404", "IMS subscriber not registered");
         exit;
       }
+      xlog("L_WARN", "VoNR P-CSCF relaying request to registered contact\n");
       if (!t_relay()) sl_reply_error();
     }
 ---
