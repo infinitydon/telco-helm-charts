@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-gnb
+spec:
+  selector: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: gnb }
+  ports: [{ name: radio, port: 4997, targetPort: 4997, protocol: UDP }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-gnb
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: gnb }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: gnb }
+      annotations:
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-5g.fullname" . }}-rls","interface":"rls0","ips":["{{ .Values.addresses.gnbRls }}/28"]},{"name":"{{ include "open5gs-5g.fullname" . }}-n2","interface":"n2","ips":["{{ .Values.addresses.gnbN2 }}/28"]},{"name":"{{ include "open5gs-5g.fullname" . }}-n3","interface":"n3","ips":["{{ .Values.addresses.gnbN3 }}/28"]}]
+    spec:
+      nodeSelector: {{ toYaml .Values.nodeSelector | nindent 8 }}
+      initContainers:
+        - name: wait-for-amf
+          image: {{ .Values.image.toolbox }}
+          command: ["/bin/sh", "-ec"]
+          args: ["until ping -c1 -W1 {{ .Values.addresses.amfN2 }} >/dev/null 2>&1; do sleep 2; done"]
+      containers:
+        - name: gnb
+          image: {{ .Values.image.ueransim }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - { name: N2_BIND_IP, value: {{ .Values.addresses.gnbN2 | quote }} }
+            - { name: N3_BIND_IP, value: {{ .Values.addresses.gnbN3 | quote }} }
+            - { name: N3_ADVERTISE_IP, value: {{ .Values.addresses.gnbN3 | quote }} }
+            - { name: RADIO_BIND_IP, value: {{ .Values.addresses.gnbRls | quote }} }
+            - { name: AMF_IP, value: {{ .Values.addresses.amfN2 | quote }} }
+          args: ["gnb"]
+          volumeMounts: [{ name: config, mountPath: /etc/ueransim/gnb.yaml, subPath: gnb.yaml }]
+      volumes: [{ name: config, configMap: { name: {{ include "open5gs-5g.fullname" . }}-configs } }]
+{{- range $ue := .Values.subscribers }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open5gs-5g.fullname" $ }}-{{ $ue.name }}
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app.kubernetes.io/instance: {{ $.Release.Name }}, app.kubernetes.io/component: {{ $ue.name }} }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/instance: {{ $.Release.Name }}, app.kubernetes.io/component: {{ $ue.name }} }
+      annotations:
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-5g.fullname" $ }}-rls","interface":"rls0","ips":["{{ $ue.rlsAddress }}/28"]}]
+    spec:
+      automountServiceAccountToken: false
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      nodeSelector: {{ toYaml $.Values.nodeSelector | nindent 8 }}
+      initContainers:
+        - name: provision-open5gs
+          image: {{ $.Values.image.dbctl }}
+          env: [{ name: DB_URI, value: mongodb://{{ include "open5gs-5g.fullname" $ }}-mongodb/open5gs }]
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until open5gs-dbctl showall >/dev/null 2>&1; do sleep 2; done;
+              open5gs-dbctl remove {{ $ue.imsi }} || true;
+              open5gs-dbctl add_ue_with_slice {{ $ue.imsi }} {{ $ue.key }} {{ $ue.opc }}
+              {{ $.Values.dnn }} {{ $.Values.slice.sst }} {{ trimPrefix "0x" $.Values.slice.sd }}
+        - name: wait-for-gnb
+          image: {{ $.Values.image.toolbox }}
+          command: ["/bin/sh", "-ec"]
+          args: ["until nc -zu -w1 {{ $.Values.addresses.gnbRls }} 4997; do sleep 2; done"]
+      containers:
+        - name: ue
+          image: {{ $.Values.image.ueransim }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          args: ["ue"]
+          securityContext: { privileged: true, runAsUser: 0, capabilities: { add: ["NET_ADMIN"] } }
+          volumeMounts: [{ name: config, mountPath: /etc/ueransim/ue.yaml, subPath: {{ $ue.name }}.yaml }]
+        - name: sipp
+          image: {{ $.Values.image.sipp }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args: ["trap : TERM INT; sleep infinity & wait"]
+          securityContext: { runAsUser: 0, capabilities: { add: ["NET_ADMIN", "NET_RAW"] } }
+          env:
+            - { name: IMSI, value: {{ $ue.imsi | quote }} }
+            - { name: MSISDN, value: {{ $ue.msisdn | quote }} }
+            - { name: KI, value: {{ $ue.key | quote }} }
+            - { name: OPC, value: {{ $ue.opc | quote }} }
+            - { name: AMF, value: {{ $ue.amf | quote }} }
+            - { name: IMS_DOMAIN, value: {{ $.Values.ims.domain | quote }} }
+            - { name: PCSCF_IP, value: {{ $.Values.ims.pcscf | quote }} }
+          volumeMounts: [{ name: scenarios, mountPath: /scenarios }]
+      volumes:
+        - { name: config, configMap: { name: {{ include "open5gs-5g.fullname" $ }}-configs } }
+        - { name: scenarios, configMap: { name: {{ include "open5gs-5g.fullname" $ }}-sipp } }
+{{- end }}

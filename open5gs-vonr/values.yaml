@@ -1,0 +1,68 @@
+image:
+  open5gs: gradiant/open5gs:2.7.5
+  mongodb: mongo:6.0
+  dbctl: gradiant/open5gs-dbctl:0.10.3
+  ueransim: gradiant/ueransim:3.2.6
+  toolbox: alpine:3.21.3
+  sipp: ghcr.io/infinitydon/vonr-sipp:0.1.0
+  kamailio: ghcr.io/infinitydon/docker-open5gs-kamailio:7464234
+  pullPolicy: IfNotPresent
+
+nodeSelector:
+  node.kubernetes.io/microk8s-worker: microk8s-worker
+imagePullSecrets: []
+
+plmn: { mcc: "001", mnc: "01", tac: 1 }
+slice: { sst: 1, sd: "0x111111" }
+dnn: ims
+gnb: { nci: "0x000000010" }
+
+subscribers:
+  - name: ue1
+    imsi: "001010000000001"
+    msisdn: "1001"
+    key: "465B5CE8B199B49FAA5F0A2EE238A6BC"
+    opc: "E8ED289DEBA952E4283B54E88E6183CA"
+    amf: "8000"
+    imei: "356938035643801"
+    rlsAddress: 10.55.0.34
+  - name: ue2
+    imsi: "001010000000002"
+    msisdn: "1002"
+    key: "465B5CE8B199B49FAA5F0A2EE238A6BC"
+    opc: "E8ED289DEBA952E4283B54E88E6183CA"
+    amf: "8000"
+    imei: "356938035643802"
+    rlsAddress: 10.55.0.35
+
+# Every network consumes one /28 carved from the former /24 lab blocks.
+multusDefaults: { type: macvlan, master: enp6s19, mode: bridge, ipam: { type: static } }
+multus:
+  n2: { subnet: 10.51.0.32/28 }
+  n3: { subnet: 10.52.0.32/28 }
+  n4: { subnet: 10.53.0.32/28 }
+  n6: { subnet: 10.54.0.32/28 }
+  rls: { subnet: 10.55.0.32/28 }
+
+addresses:
+  amfN2: 10.51.0.34
+  gnbN2: 10.51.0.35
+  upfN3: 10.52.0.34
+  gnbN3: 10.52.0.35
+  smfN4: 10.53.0.34
+  upfN4: 10.53.0.35
+  upfN6: 10.54.0.34
+  gnbRls: 10.55.0.33
+
+ueSubnet: 10.46.0.0/28
+ueGateway: 10.46.0.1
+
+ims:
+  enabled: true
+  # Increment after changing the embedded Kamailio configuration.
+  configRevision: "2"
+  domain: ims.mnc001.mcc001.3gppnetwork.org
+  pcscf: 10.54.0.41
+  port: 5060
+
+resources: {}

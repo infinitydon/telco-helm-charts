@@ -1,0 +1,6 @@
+apiVersion: v2
+name: open5gs-vonr
+description: Two-UE simulated VoNR lab using Open5GS, UERANSIM, docker_open5gs IMS and SIPp
+type: application
+version: 0.1.0
+appVersion: "2.7.5"

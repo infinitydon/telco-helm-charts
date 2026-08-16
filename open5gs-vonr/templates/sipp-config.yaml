@@ -1,0 +1,136 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-sipp
+data:
+  README: |
+    SIPp runs in each UE pod network namespace. The test script discovers the
+    uesimtun interface so SIP signaling and RTP traverse the Open5GS user plane.
+    ue2 is the answering endpoint (1002); ue1 is the caller (1001).
+  register.xml: |
+    <?xml version="1.0" encoding="ISO-8859-1" ?>
+    <!DOCTYPE scenario SYSTEM "sipp.dtd">
+    <scenario name="IMS contact registration">
+      <send retrans="500"><![CDATA[
+        REGISTER sip:ims.mnc001.mcc001.3gppnetwork.org SIP/2.0
+        Via: SIP/2.0/UDP [local_ip]:[local_port];branch=[branch]
+        From: <sip:[service]@ims.mnc001.mcc001.3gppnetwork.org>;tag=[pid]reg
+        To: <sip:[service]@ims.mnc001.mcc001.3gppnetwork.org>
+        Call-ID: [call_id]
+        CSeq: 1 REGISTER
+        Contact: <sip:[service]@[local_ip]:[local_port]>;expires=3600
+        Max-Forwards: 70
+        Expires: 3600
+        Content-Length: 0
+
+      ]]></send>
+      <recv response="200" rtd="true"/>
+    </scenario>
+  uas.xml: |
+    <?xml version="1.0" encoding="ISO-8859-1" ?>
+    <!DOCTYPE scenario SYSTEM "sipp.dtd">
+    <scenario name="VoNR answering UE">
+      <recv request="INVITE" crlf="true"/>
+      <send><![CDATA[
+        SIP/2.0 180 Ringing
+        [last_Via:]
+        [last_From:]
+        [last_To:];tag=[pid]SIPpTag01
+        [last_Call-ID:]
+        [last_CSeq:]
+        Contact: <sip:1002@[local_ip]:[local_port]>
+        Content-Length: 0
+
+      ]]></send>
+      <send retrans="500"><![CDATA[
+        SIP/2.0 200 OK
+        [last_Via:]
+        [last_From:]
+        [last_To:];tag=[pid]SIPpTag01
+        [last_Call-ID:]
+        [last_CSeq:]
+        Contact: <sip:1002@[local_ip]:[local_port]>
+        Content-Type: application/sdp
+        Content-Length: [len]
+
+        v=0
+        o=ue2 53655765 2353687637 IN IP4 [local_ip]
+        s=VoNR simulation
+        c=IN IP4 [local_ip]
+        t=0 0
+        m=audio 6000 RTP/AVP 0
+        a=rtpmap:0 PCMU/8000
+        a=sendrecv
+      ]]></send>
+      <recv request="ACK" rtd="true"/>
+      <pause milliseconds="5000"/>
+      <recv request="BYE"/>
+      <send><![CDATA[
+        SIP/2.0 200 OK
+        [last_Via:]
+        [last_From:]
+        [last_To:]
+        [last_Call-ID:]
+        [last_CSeq:]
+        Content-Length: 0
+
+      ]]></send>
+    </scenario>
+  uac.xml: |
+    <?xml version="1.0" encoding="ISO-8859-1" ?>
+    <!DOCTYPE scenario SYSTEM "sipp.dtd">
+    <scenario name="VoNR calling UE">
+      <send retrans="500"><![CDATA[
+        INVITE sip:1002@[remote_ip]:[remote_port] SIP/2.0
+        Via: SIP/2.0/UDP [local_ip]:[local_port];branch=[branch]
+        From: <sip:1001@ims.mnc001.mcc001.3gppnetwork.org>;tag=[pid]SIPpTag00
+        To: <sip:1002@ims.mnc001.mcc001.3gppnetwork.org>
+        Call-ID: [call_id]
+        CSeq: 1 INVITE
+        Contact: <sip:1001@[local_ip]:[local_port]>
+        Max-Forwards: 70
+        Subject: VoNR two-UE validation
+        Content-Type: application/sdp
+        Content-Length: [len]
+
+        v=0
+        o=ue1 53655765 2353687637 IN IP4 [local_ip]
+        s=VoNR simulation
+        c=IN IP4 [local_ip]
+        t=0 0
+        m=audio 6002 RTP/AVP 0
+        a=rtpmap:0 PCMU/8000
+        a=sendrecv
+      ]]></send>
+      <recv response="100" optional="true"/>
+      <recv response="180" optional="true"/>
+      <recv response="200" rtd="true"/>
+      <send><![CDATA[
+        ACK sip:1002@[remote_ip]:[remote_port] SIP/2.0
+        Via: SIP/2.0/UDP [local_ip]:[local_port];branch=[branch]
+        [routes]
+        From: <sip:1001@ims.mnc001.mcc001.3gppnetwork.org>;tag=[pid]SIPpTag00
+        To: [peer_tag_param]
+        Call-ID: [call_id]
+        CSeq: 1 ACK
+        Contact: <sip:1001@[local_ip]:[local_port]>
+        Max-Forwards: 70
+        Content-Length: 0
+
+      ]]></send>
+      <pause milliseconds="5000"/>
+      <send retrans="500"><![CDATA[
+        BYE sip:1002@[remote_ip]:[remote_port] SIP/2.0
+        Via: SIP/2.0/UDP [local_ip]:[local_port];branch=[branch]
+        From: <sip:1001@ims.mnc001.mcc001.3gppnetwork.org>;tag=[pid]SIPpTag00
+        To: [peer_tag_param]
+        Call-ID: [call_id]
+        CSeq: 2 BYE
+        Contact: <sip:1001@[local_ip]:[local_port]>
+        Max-Forwards: 70
+        Content-Length: 0
+
+      ]]></send>
+      <recv response="200" crlf="true"/>
+      <ResponseTimeRepartition value="10,20,30,40,50,100,150,500,1000"/>
+    </scenario>

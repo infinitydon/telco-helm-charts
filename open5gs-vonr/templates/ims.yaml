@@ -1,0 +1,82 @@
+{{- if .Values.ims.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-pcscf
+data:
+  kamailio.cfg: |
+    # Minimal stateful IMS access proxy for the two-UE VoNR simulation.
+    # Runtime is built from docker_open5gs commit 7464234.
+    debug=2
+    log_stderror=yes
+    children=2
+    listen=udp:{{ .Values.ims.pcscf }}:{{ .Values.ims.port }}
+    alias={{ .Values.ims.domain }}
+    loadmodule "tm.so"
+    loadmodule "sl.so"
+    loadmodule "rr.so"
+    loadmodule "textops.so"
+    loadmodule "maxfwd.so"
+    loadmodule "usrloc.so"
+    loadmodule "registrar.so"
+    loadmodule "xlog.so"
+    modparam("usrloc", "db_mode", 0)
+    request_route {
+      if (!mf_process_maxfwd_header("10")) {
+        sl_send_reply("483", "Too Many Hops");
+        exit;
+      }
+      if (is_method("REGISTER")) {
+        if (!save("location")) sl_reply_error();
+        exit;
+      }
+      if (loose_route()) {
+        if (!t_relay()) sl_reply_error();
+        exit;
+      }
+      if (is_method("INVITE")) record_route();
+      if (!lookup("location")) {
+        sl_send_reply("404", "IMS subscriber not registered");
+        exit;
+      }
+      if (!t_relay()) sl_reply_error();
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open5gs-5g.fullname" . }}-pcscf
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: pcscf }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: pcscf }
+      annotations:
+        checksum/config: {{ printf "%s-%s" (toJson .Values.ims) .Values.ims.configRevision | sha256sum }}
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "open5gs-5g.fullname" . }}-n6","interface":"n6","ips":["{{ .Values.ims.pcscf }}/28"]}]
+    spec:
+      nodeSelector: {{ toYaml .Values.nodeSelector | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: route-to-ue-pool
+          image: {{ .Values.image.toolbox }}
+          command: ["/bin/sh", "-ec"]
+          args: ["ip route replace {{ .Values.ueSubnet }} via {{ .Values.addresses.upfN6 }} dev n6"]
+          securityContext: { runAsUser: 0, capabilities: { add: ["NET_ADMIN"] } }
+      containers:
+        - name: pcscf
+          image: {{ .Values.image.kamailio }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/usr/local/sbin/kamailio"]
+          args: ["-DD", "-E", "-f", "/etc/kamailio/kamailio.cfg"]
+          ports: [{ name: sip, containerPort: 5060, protocol: UDP }]
+          volumeMounts: [{ name: config, mountPath: /etc/kamailio/kamailio.cfg, subPath: kamailio.cfg }]
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+      volumes: [{ name: config, configMap: { name: {{ include "open5gs-5g.fullname" . }}-pcscf } }]
+{{- end }}
