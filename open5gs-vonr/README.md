@@ -52,3 +52,54 @@ The workloads are pinned to MicroK8s workers because the Multus macvlan
 master (`enp6s19`) exists there. The acceptance script also rejects omitted
 image tags and `latest`, waits for the deployments, confirms both PDU sessions,
 registers both SIP users, and places one call from `1001` to `1002`.
+
+## Validated call evidence
+
+The following excerpt was captured by `scripts/test.sh` from release `vonr`,
+revision 5, on 2026-08-16. The UE tunnel addresses are assigned dynamically and
+may differ on a later deployment.
+
+```text
+deployment "vonr-open5gs-vonr-ue1" successfully rolled out
+deployment "vonr-open5gs-vonr-ue2" successfully rolled out
+deployment "vonr-open5gs-vonr-pcscf" successfully rolled out
+UE 1001 tunnel: 10.46.0.5; UE 1002 tunnel: 10.46.0.4; P-CSCF: 10.54.0.41
+
+REGISTER ---------->  1
+     200 <----------  1
+Successful call       1
+Failed call           0
+
+REGISTER ---------->  1
+     200 <----------  1
+Successful call       1
+Failed call           0
+
+  INVITE ---------->  1
+     100 <----------  1
+     180 <----------  1
+     200 <----------  1
+     ACK ---------->  1
+   Pause [5000ms]     1
+     BYE ---------->  1
+     200 <----------  1
+Successful call       1
+Failed call           0
+
+PASS: 1001 completed the simulated VoNR SIP dialog with 1002 through both 5G PDU sessions.
+```
+
+The UERANSIM containers also reported the prerequisite 5G session state for
+both subscribers:
+
+```text
+[ue1] Registration is successful
+[ue1] PDU Session establishment is successful
+[ue2] Registration is successful
+[ue2] PDU Session establishment is successful
+```
+
+Together these lines demonstrate 5G registration and PDU-session setup for
+both UEs, SIP registration through the N6 proxy, and successful establishment
+and teardown of the simulated voice dialog. They do not demonstrate RTP packet
+generation; the test negotiates PCMU in SDP but validates signaling only.
