@@ -74,6 +74,10 @@ All container images have explicit, immutable version tags; `latest` is not
 used. The GHCR images are private, so create the referenced pull secret before
 installing (never commit the token):
 
+Dockerfiles and OAM build commands for the two custom images are kept in
+`container-images/`. Helm ignores that directory through `.helmignore`, so the
+Docker build contexts are versioned in Git but omitted from chart packages.
+
 ```bash
 kubectl create namespace vonr
 kubectl -n vonr create secret docker-registry ghcr \

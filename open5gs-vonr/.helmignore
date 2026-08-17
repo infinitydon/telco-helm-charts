@@ -1,2 +1,4 @@
 .git/
 *.tgz
+# Image build contexts are versioned beside the chart but are not chart assets.
+container-images/
