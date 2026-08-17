@@ -35,7 +35,7 @@ subscribers:
     imei: "356938035643802"
     rlsAddress: 10.55.0.35
 
-# Every network consumes one /28 carved from the former /24 lab blocks.
+# Every Multus network consumes one /28 carved from the former /24 lab blocks.
 multusDefaults: { type: macvlan, master: enp6s19, mode: bridge, ipam: { type: static } }
 multus:
   n2: { subnet: 10.51.0.32/28 }
@@ -54,8 +54,9 @@ addresses:
   upfN6: 10.54.0.34
   gnbRls: 10.55.0.33
 
-ueSubnet: 10.46.0.0/28
+ueSubnet: 10.46.0.0/16
 ueGateway: 10.46.0.1
+uePrefixLength: 16
 
 ims:
   enabled: true

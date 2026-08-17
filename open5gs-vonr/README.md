@@ -14,8 +14,8 @@ offers PCMU, but the acceptance test does not generate or measure RTP media.
 
 ## Address plan
 
-Every data-plane network consumes a non-overlapping `/28` carved from an
-existing lab `/24`:
+Every Multus network consumes a non-overlapping `/28` carved from an existing
+lab `/24`. The UE DNN address pool remains a `/16`:
 
 | Network | Subnet |
 | --- | --- |
@@ -24,14 +24,14 @@ existing lab `/24`:
 | N4 | `10.53.0.32/28` |
 | N6 / SIP proxy | `10.54.0.32/28` |
 | UERANSIM radio simulation | `10.55.0.32/28` |
-| UE DNN pool | `10.46.0.0/28` |
+| UE DNN pool | `10.46.0.0/16` |
 
 ## End-to-end network flow
 
 ```mermaid
 flowchart LR
   subgraph UE1P["UE 1001 pod"]
-    U1["UERANSIM UE\nuesimtun0: 10.46.0.11"]
+    U1["UERANSIM UE\nuesimtun0: dynamic from 10.46.0.0/16"]
     S1["SIPp caller 1001"]
     S1 --> U1
   end
@@ -51,7 +51,7 @@ flowchart LR
   PCSCF["P-CSCF / Kamailio\n10.54.0.41:5060\nSIP registration and routing"]
 
   subgraph UE2P["UE 1002 pod"]
-    U2["UERANSIM UE\nuesimtun0: 10.46.0.12"]
+    U2["UERANSIM UE\nuesimtun0: dynamic from 10.46.0.0/16"]
     S2["SIPp callee 1002"]
     U2 --> S2
   end
@@ -100,14 +100,14 @@ registers both SIP users, and places one call from `1001` to `1002`.
 ## Validated call evidence
 
 The following excerpt was captured by `scripts/test.sh` from release `vonr`,
-revision 5, on 2026-08-16. The UE tunnel addresses are assigned dynamically and
+revision 15, on 2026-08-17. The UE tunnel addresses are assigned dynamically and
 may differ on a later deployment.
 
 ```text
 deployment "vonr-open5gs-vonr-ue1" successfully rolled out
 deployment "vonr-open5gs-vonr-ue2" successfully rolled out
 deployment "vonr-open5gs-vonr-pcscf" successfully rolled out
-UE 1001 tunnel: 10.46.0.5; UE 1002 tunnel: 10.46.0.4; P-CSCF: 10.54.0.41
+UE 1001 tunnel: 10.46.0.2; UE 1002 tunnel: 10.46.0.3; P-CSCF: 10.54.0.41
 
 REGISTER ---------->  1
      200 <----------  1

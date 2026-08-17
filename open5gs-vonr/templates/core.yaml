@@ -87,7 +87,7 @@ spec:
           args:
             - >-
               ip link show ogstun >/dev/null 2>&1 || ip tuntap add name ogstun mode tun;
-              ip addr replace {{ $root.Values.ueGateway }}/28 dev ogstun;
+              ip addr replace {{ $root.Values.ueGateway }}/{{ $root.Values.uePrefixLength }} dev ogstun;
               ip link set ogstun up;
               sysctl -w net.ipv4.ip_forward=1;
               sysctl -w net.ipv4.conf.all.rp_filter=0;
