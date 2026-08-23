@@ -12,11 +12,25 @@ not a Multus network.
 
 The acceptance test requires evidence for RFsim connectivity, NGAP, RACH/RRC,
 NAS registration, PDU-session establishment, an OAI tunnel interface, and IP
-connectivity. Pod readiness alone is not accepted.
+session creation in the UPF. Pod readiness alone is not accepted.
+
+The UE identity is configured once under `subscriber` in `values.yaml`. Helm
+renders those values into `ue.conf` and uses the same values when provisioning
+Open5GS, so IMSI, key, OPC, DNN, and SST cannot drift between the UE and core.
 
 ```bash
 helm upgrade --install ntn-geo . -n ntn-geo --create-namespace --wait --timeout 15m
 ./scripts/test.sh
+```
+
+Example output from the validated GEO deployment:
+
+```text
+[NR_MAC] 4-Step RA procedure succeeded. CBRA: Contention Resolution is successful.
+[NAS] Registration Accept received
+[NAS] Received PDU Session Establishment Accept, UE IPv4: 10.46.0.2
+[OIP] TUN Interface oaitun_ue1 successfully configured, IPv4 10.46.0.2
+PASS: ntn-geo gNB/UE RFsim, RACH, registration, PDU session, UE tunnel, and UPF session succeeded.
 ```
 
 The ignored `container-images/oai/` directory contains the reproducible runtime
