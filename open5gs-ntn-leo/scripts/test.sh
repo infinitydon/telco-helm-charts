@@ -34,4 +34,5 @@ done
 kubectl -n "$NAMESPACE" exec "deployment/$PREFIX-ue" -c ue -- sh -ec \
   'ip -4 addr show oaitun_ue1'
 kubectl -n "$NAMESPACE" logs "deployment/$PREFIX-upf" -c upf --tail=300 | grep -q 'UE F-SEID.*IPv4\[10\.46\.0\.'
+kubectl -n "$NAMESPACE" logs "deployment/$PREFIX-ue" -c ue --tail=1000 | grep -qE 'timing_advance_ntn:.*DL Doppler shift:'
 echo "PASS: $RELEASE gNB/UE RFsim, RACH, registration, PDU session, UE tunnel, and UPF session succeeded."
