@@ -1,0 +1,6 @@
+apiVersion: v2
+name: open5gs-ntn-geo
+description: Open5GS and patched OAI Release-17 GEO NTN RFsimulator testbed
+type: application
+version: 0.1.0
+appVersion: "2026.w16"

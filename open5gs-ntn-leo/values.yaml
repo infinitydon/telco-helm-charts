@@ -1,0 +1,56 @@
+image:
+  open5gs: gradiant/open5gs:2.7.5
+  mongodb: mongo:6.0
+  dbctl: gradiant/open5gs-dbctl:0.10.3
+  oai: ghcr.io/infinitydon/oai-ntn:2026.w16-ntn1
+  toolbox: alpine:3.21
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nodeSelector:
+  kubernetes.io/hostname: microk8s-general-02
+
+plmn: { mcc: "001", mnc: "01", tac: 7 }
+subscriber:
+  imsi: "001010000000001"
+  key: "fec86ba6eb707ed08905757b1bb44b8f"
+  opc: "c42449363bbad02b66d16bc975d77cc1"
+  dnn: internet
+  sst: 1
+  sd: "0x111111"
+
+ueSubnet: 10.46.0.0/16
+ueGateway: 10.46.0.1
+uePrefixLength: 16
+
+multusDefaults: { type: macvlan, master: enp6s19, mode: bridge, ipam: { type: static } }
+# Every Multus network below is a /28 carved from the single 10.62.0.0/24 parent.
+multus:
+  n2: { subnet: 10.62.0.80/28 }
+  n3: { subnet: 10.62.0.96/28 }
+  rfsim: { subnet: 10.62.0.112/28 }
+  n4: { subnet: 10.62.0.128/28 }
+  n6: { subnet: 10.62.0.144/28 }
+prefixLength: 28
+addresses:
+  amfN2: 10.62.0.82
+  gnbN2: 10.62.0.83
+  upfN3: 10.62.0.98
+  gnbN3: 10.62.0.99
+  gnbRf: 10.62.0.114
+  ueRf: 10.62.0.115
+  smfN4: 10.62.0.130
+  upfN4: 10.62.0.131
+  upfN6: 10.62.0.146
+  dataN6: 10.62.0.147
+
+oai:
+  scenario: leo
+  gnbArgs: "--rfsim --gNBs.[0].min_rxtxtime 6"
+  ueArgs: "--band 254 -C 2488400000 --CO -873500000 -r 25 --numerology 0 --ssb 60 --rfsim --time-sync-I 0.1 --ntn-initial-time-drift -46 --initial-fo 57340 --cont-fo-comp 2"
+  resources:
+    requests: { cpu: "2", memory: 2Gi }
+    limits: { cpu: "6", memory: 5Gi }
+coreResources:
+  requests: { cpu: 25m, memory: 32Mi }
+  limits: { cpu: "1", memory: 512Mi }

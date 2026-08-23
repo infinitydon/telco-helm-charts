@@ -1,0 +1,18 @@
+{{- range $name, $network := .Values.multus }}
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: {{ include "ntn.fullname" $ }}-{{ $name }}
+  labels: {{- include "ntn.labels" $ | nindent 4 }}
+spec:
+  config: |-
+    {
+      "cniVersion": "0.3.1",
+      "name": "{{ include "ntn.fullname" $ }}-{{ $name }}",
+      "type": "{{ $.Values.multusDefaults.type }}",
+      "master": "{{ $.Values.multusDefaults.master }}",
+      "mode": "{{ $.Values.multusDefaults.mode }}",
+      "ipam": { "type": "static" }
+    }
+{{- end }}

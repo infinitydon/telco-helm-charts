@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ntn.fullname" . }}-gnb
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: gnb }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: gnb }
+      annotations:
+        checksum/oai: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "ntn.fullname" . }}-n2","interface":"n2","ips":["{{ .Values.addresses.gnbN2 }}/{{ .Values.prefixLength }}"]},{"name":"{{ include "ntn.fullname" . }}-n3","interface":"n3","ips":["{{ .Values.addresses.gnbN3 }}/{{ .Values.prefixLength }}"]},{"name":"{{ include "ntn.fullname" . }}-rfsim","interface":"rfsim0","ips":["{{ .Values.addresses.gnbRf }}/{{ .Values.prefixLength }}"]}]
+    spec:
+      imagePullSecrets: {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+      nodeSelector: {{- toYaml .Values.nodeSelector | nindent 8 }}
+      initContainers:
+        - name: wait-for-amf
+          image: {{ .Values.image.toolbox }}
+          command: ["/bin/sh", "-ec"]
+          args: ["until ping -c 1 -W 1 {{ .Values.addresses.amfN2 }} >/dev/null 2>&1; do sleep 2; done; sleep 15"]
+      containers:
+        - name: gnb
+          image: {{ .Values.image.oai }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env: [{ name: RFSIMULATOR, value: server }]
+          securityContext: { privileged: true, capabilities: { add: [SYS_NICE, IPC_LOCK, NET_ADMIN] } }
+          command: ["/bin/bash", "-lc"]
+          args: ["exec chrt -f 80 nr-softmodem -O /etc/oai/gnb.conf {{ .Values.oai.gnbArgs }}"]
+          ports: [{ name: rfsim, containerPort: 4043, protocol: TCP }]
+          volumeMounts: [{ name: oai, mountPath: /etc/oai }]
+          resources: {{- toYaml .Values.oai.resources | nindent 12 }}
+      volumes: [{ name: oai, configMap: { name: {{ include "ntn.fullname" . }}-oai } }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ntn.fullname" . }}-ue
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: ue }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: ue }
+      annotations:
+        checksum/oai: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
+        k8s.v1.cni.cncf.io/networks: >-
+          [{"name":"{{ include "ntn.fullname" . }}-rfsim","interface":"rfsim0","ips":["{{ .Values.addresses.ueRf }}/{{ .Values.prefixLength }}"]}]
+    spec:
+      imagePullSecrets: {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+      nodeSelector: {{- toYaml .Values.nodeSelector | nindent 8 }}
+      initContainers:
+        - name: provision-subscriber
+          image: {{ .Values.image.dbctl }}
+          env: [{ name: DB_URI, value: mongodb://{{ include "ntn.fullname" . }}-mongodb/open5gs }]
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              until open5gs-dbctl showall >/dev/null 2>&1; do sleep 2; done;
+              open5gs-dbctl remove {{ .Values.subscriber.imsi }} || true;
+              open5gs-dbctl add {{ .Values.subscriber.imsi }} {{ .Values.subscriber.key }} {{ .Values.subscriber.opc }}
+        - name: wait-for-gnb
+          image: {{ .Values.image.toolbox }}
+          command: ["/bin/sh", "-ec"]
+          args: ["until nc -z {{ .Values.addresses.gnbRf }} 4043 >/dev/null 2>&1; do sleep 1; done"]
+      containers:
+        - name: ue
+          image: {{ .Values.image.oai }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env: [{ name: RFSIMULATOR, value: {{ .Values.addresses.gnbRf | quote }} }]
+          securityContext: { privileged: true, capabilities: { add: [SYS_NICE, IPC_LOCK, NET_ADMIN] } }
+          command: ["/bin/bash", "-lc"]
+          args: ["exec chrt -f 80 nr-uesoftmodem -O /etc/oai/ue.conf {{ .Values.oai.ueArgs }}"]
+          volumeMounts: [{ name: oai, mountPath: /etc/oai }]
+          resources: {{- toYaml .Values.oai.resources | nindent 12 }}
+      volumes: [{ name: oai, configMap: { name: {{ include "ntn.fullname" . }}-oai } }]
