@@ -21,14 +21,31 @@ The UE identity is configured once under `subscriber` in `values.yaml`. Helm
 renders it into `ue.conf` and uses the same values for Open5GS subscriber
 provisioning.
 
-Example output from the validated LEO deployment:
+### Successful LEO gNB log
 
 ```text
+[NR_MAC] UE RA-RNTI 003b TC-RNTI 0b96: initiating RA procedure
+[NR_RRC] (cellID ..., UE ID 1 RNTI 0b96) Send RRC Setup
+[NR_RRC] (cellID ..., UE ID 1 RNTI 0b96) Received RRCSetupComplete (RRC_CONNECTED reached)
+[NR_RRC] (cellID ..., UE ID 1 RNTI 0b96) Received Security Mode Complete
+[NR_RRC] (cellID ..., UE ID 1 RNTI 0b96) Received UE capabilities
+```
+
+### Successful LEO UE log
+
+```text
+[NR_MAC] [UE 0][517.7][RAPROC] 4-Step RA procedure succeeded. CBRA: Contention Resolution is successful.
+[NAS] Received Registration Accept with result 3GPP
 [NAS] Received PDU Session Establishment Accept, UE IPv4: 10.46.0.2
 [OIP] TUN Interface oaitun_ue1 successfully configured, IPv4 10.46.0.2
 [HW] Downlink delay 18.729825 ms, Doppler shift SAT->UE 57.341074 kHz
 [NR_MAC] NTN Config Rxd. ... N_Common_Ta: 18.705848ms, drift: -46.086000us/s
 [PHY] timing_advance_ntn: 287290 samples, DL Doppler shift: 57.340709kHz, UL Doppler shift: 37.211613kHz
+```
+
+### Acceptance-test result
+
+```text
 PASS: ntn-leo gNB/UE RFsim, RACH, registration, PDU session, UE tunnel, and UPF session succeeded.
 ```
 

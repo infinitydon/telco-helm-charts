@@ -23,13 +23,28 @@ helm upgrade --install ntn-geo . -n ntn-geo --create-namespace --wait --timeout 
 ./scripts/test.sh
 ```
 
-Example output from the validated GEO deployment:
+### Successful GEO gNB log
 
 ```text
-[NR_MAC] 4-Step RA procedure succeeded. CBRA: Contention Resolution is successful.
-[NAS] Registration Accept received
+[NR_RRC] [DL] (cellID ..., UE ID 1 RNTI c582) Send RRC Setup
+[NR_RRC] [UL] (cellID ..., UE ID 1 RNTI c582) Received RRCSetupComplete (RRC_CONNECTED reached)
+[NR_RRC] [UL] (cellID ..., UE ID 1 RNTI c582) Received Security Mode Complete
+UE RNTI c582 CU-UE-ID 1 in-sync PH 45 dB PCMAX 20 dBm, average SINR 40.0 (32 meas)
+```
+
+### Successful GEO UE log
+
+```text
+[NR_MAC] [UE 0][...][RAPROC] 4-Step RA procedure succeeded. CBRA: Contention Resolution is successful.
+[NAS] Received Registration Accept with result 3GPP
 [NAS] Received PDU Session Establishment Accept, UE IPv4: 10.46.0.2
 [OIP] TUN Interface oaitun_ue1 successfully configured, IPv4 10.46.0.2
+[PHY] k_offset: 478ms, N_Common_Ta: 238.740000ms, drift: 0.000000us/s, timing_advance_ntn: 3667039 samples, DL Doppler shift: 0.000000kHz
+```
+
+### Acceptance-test result
+
+```text
 PASS: ntn-geo gNB/UE RFsim, RACH, registration, PDU session, UE tunnel, and UPF session succeeded.
 ```
 
