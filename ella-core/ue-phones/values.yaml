@@ -1,0 +1,19 @@
+image:
+  repository: localhost/ella-ue-phones
+  tag: 0.1.0
+  pullPolicy: Never
+# Must be a routable Core NGAP address with its SCTP port.
+coreN2: 10.1.21.22:38412
+networkAttachment: ella-ran
+n3Interface: net1
+nodeSelector:
+  kubernetes.io/hostname: ebpf-bng-node-01
+service:
+  type: ClusterIP
+  port: 8080
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 1Gi

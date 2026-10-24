@@ -1,0 +1,89 @@
+{{- define "phones.metadata" -}}
+labels:
+  app.kubernetes.io/name: ue-phones
+  app.kubernetes.io/instance: {{ .Release.Name }}
+annotations:
+  k8s.v1.cni.cncf.io/networks: {{ .Values.networkAttachment | quote }}
+{{- end -}}
+{{- define "phones.spec" -}}
+
+
+automountServiceAccountToken: false
+nodeSelector:
+  {{- toYaml .Values.nodeSelector | nindent 2 }}
+containers:
+  - name: phones
+    image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+    imagePullPolicy: {{ .Values.image.pullPolicy }}
+    securityContext:
+      privileged: true
+    env:
+      - name: POD_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      - name: CORE_N2
+        value: {{ required "coreN2 is required" .Values.coreN2 | quote }}
+      - name: N3_INTERFACE
+        value: {{ .Values.n3Interface | quote }}
+    ports:
+      - name: http
+        containerPort: 8080
+    startupProbe:
+      httpGet:
+        path: /healthz
+        port: http
+      failureThreshold: 30
+      periodSeconds: 2
+    readinessProbe:
+      httpGet:
+        path: /healthz
+        port: http
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: http
+    resources:
+      {{- toYaml .Values.resources | nindent 6 }}
+    volumeMounts:
+      - name: tun
+        mountPath: /dev/net/tun
+volumes:
+  - name: tun
+    hostPath:
+      path: /dev/net/tun
+      type: CharDevice
+
+{{- end }}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-phones
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ue-phones
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      {{- include "phones.metadata" . | nindent 6 }}
+    spec:
+      {{- include "phones.spec" . | nindent 6 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-phones
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app.kubernetes.io/name: ue-phones
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
