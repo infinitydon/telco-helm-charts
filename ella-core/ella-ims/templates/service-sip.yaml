@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ella.name" . }}-sip
+  labels:
+    {{- include "ella.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    {{- include "ella.selector" . | nindent 4 }}
+  ports:
+    {{- range $name, $port := dict "pcscf" .Values.pcscf.port "icscf" .Values.icscf.port "scscf" .Values.scscf.port }}
+    - name: {{ $name }}-udp
+      port: {{ $port }}
+      targetPort: {{ $port }}
+      protocol: UDP
+    - name: {{ $name }}-tcp
+      port: {{ $port }}
+      targetPort: {{ $port }}
+      protocol: TCP
+    {{- end }}

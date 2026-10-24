@@ -1,0 +1,9 @@
+FROM docker.io/library/golang:1.27.3 AS build
+RUN apt-get update && apt-get install -y --no-install-recommends libpcap-dev && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY . .
+RUN go build -o /core-tester ./cmd/core-tester
+FROM docker.io/library/debian:trixie-slim
+RUN apt-get update && apt-get install -y --no-install-recommends libpcap0.8t64 iproute2 ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=build /core-tester /usr/local/bin/core-tester
+CMD ["sleep", "infinity"]

@@ -1,0 +1,35 @@
+image:
+  repository: ghcr.io/ellanetworks/ella-smsc
+  tag: sha-6e7a275024fb
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+initImage: busybox:1.37.0
+# Empty address resolves to the pod IP; an explicit address must exist on the pod.
+diameter:
+  address: ""
+  port: 3868
+api:
+  port: 5010
+logging:
+  level: info
+persistence:
+  enabled: true
+  existingClaim: ""
+  storageClass: ""
+  size: 1Gi
+service:
+  type: ClusterIP
+hostNetwork: false
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+extraVolumes: []
+extraVolumeMounts: []
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+extraInitContainers: []

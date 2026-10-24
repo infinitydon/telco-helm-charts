@@ -1,0 +1,14 @@
+nodeSelector:
+  kubernetes.io/hostname: ebpf-bng-node-01
+podAnnotations:
+  k8s.v1.cni.cncf.io/networks: ella-n6-ims
+sip:
+  addresses: [10.6.0.5]
+extraInitContainers:
+  - name: ue-route
+    image: ghcr.io/ellanetworks/ubuntu-router:0.1
+    command: [/bin/bash, -ec]
+    args: ["ip route replace 10.60.0.0/16 via 10.6.0.2; ethtool -K net1 tx off"]
+    securityContext:
+      capabilities:
+        add: [NET_ADMIN]

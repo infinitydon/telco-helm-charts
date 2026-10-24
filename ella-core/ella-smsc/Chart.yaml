@@ -1,0 +1,7 @@
+apiVersion: v2
+name: ella-smsc
+description: Ella SMSC with persistent SQLite storage
+type: application
+version: 0.1.0
+appVersion: sha-6e7a275024fb
+home: https://github.com/ellanetworks/smsc

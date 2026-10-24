@@ -1,0 +1,48 @@
+image:
+  repository: ghcr.io/ellanetworks/ella-ims
+  tag: sha-2c8873dc8744
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+initImage: busybox:1.37.0
+# Empty address resolves to the pod IP; an explicit address must exist on the pod.
+diameter:
+  address: ""
+  port: 3868
+api:
+  port: 5020
+logging:
+  level: info
+persistence:
+  enabled: true
+  existingClaim: ""
+  storageClass: ""
+  size: 1Gi
+service:
+  type: ClusterIP
+hostNetwork: false
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+extraVolumes: []
+extraVolumeMounts: []
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+sip:
+  addresses: []
+  trustedNetworks: []
+pcscf:
+  port: 5060
+  ipsec:
+    serverPort: 5063
+    clientPorts: [5064, 5065]
+icscf:
+  port: 5070
+scscf:
+  port: 5080
+n5: {}
+extraInitContainers: []
