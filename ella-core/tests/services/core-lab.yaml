@@ -66,6 +66,17 @@ spec:
             - {name: config, mountPath: /config}
             - {name: data, mountPath: /data}
             - {name: bpf, mountPath: /sys/fs/bpf}
+        # Route UE internet traffic through the optional ue-phones N6 gateway.
+        # Source routing leaves Core API/Diameter pod-network traffic unchanged.
+        - name: ue-internet-route
+          image: ghcr.io/ellanetworks/ubuntu-router:0.1
+          securityContext: {privileged: true}
+          command: [/bin/bash, -ec]
+          args:
+            - |
+              ip route replace default via 10.6.0.1 dev net2 table 200
+              ip rule show | grep -Fq 'from 10.45.0.0/16 lookup 200' || ip rule add priority 1200 from 10.45.0.0/16 table 200
+              exec sleep infinity
       volumes:
         - name: input
           configMap: {name: ella-core-lab}

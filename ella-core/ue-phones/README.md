@@ -4,6 +4,8 @@ Two phone-like panels control persistent simulated 5G UEs on the Ella Core integ
 
 Each phone supports IMS register/unregister, dial, incoming-call indication, answer, reject/cancel/hang-up, synthetic RTP counters, and a NAS SMS composer/inbox. Sent messages distinguish SMSC acceptance from actual receipt by the other simulated UE. Accented text is supported. The event feed shows registration, SMS and call events.
 
+Incoming calls now show a prominent page-level ringing banner, a pulsing phone border, and large Answer/Decline controls inside the receiving phone. The alert stays visible when a different phone or its Browser tab is on screen. New SMS shows a preview alert, an unread badge and an inbox banner; Open message clears the unread indication. Read/unread tracking is local to the current page session. Click **Enable alert sounds** for a synthesized ringtone and message chime; browser sound requires that user gesture. These are in-page alerts, not OS push notifications when the dashboard is closed.
+
 Calls exchange synthetic test packets on the dedicated voice QFI. Browser microphone/speaker audio is not connected. The UI is intended for protocol testing, not as a browser softphone. History is bounded to 100 messages per phone and 100 events, held in memory and cleared on simulator restart.
 
 ## Prerequisites
@@ -24,8 +26,8 @@ The simulator pod is privileged for TUN, IPsec/XFRM and network configuration. I
 From this directory on the selected Linux node:
 
 ```sh
-sudo buildah bud --layers -t localhost/ella-ue-phones:0.1.1 .
-sudo buildah push localhost/ella-ue-phones:0.1.1 docker-archive:/tmp/ella-ue-phones.tar:localhost/ella-ue-phones:0.1.1
+sudo buildah bud --layers -t localhost/ella-ue-phones:0.2.2 .
+sudo buildah push localhost/ella-ue-phones:0.2.2 docker-archive:/tmp/ella-ue-phones.tar:localhost/ella-ue-phones:0.2.2
 sudo microk8s ctr images import /tmp/ella-ue-phones.tar
 ```
 
@@ -56,12 +58,29 @@ Set image.repository/tag/pullPolicy for a registry-hosted image, nodeSelector fo
 
 The backend starts its HTTP server before attaching UEs. `/healthz` reports HTTP process health; `/api/state` reports actual UE readiness and startup failures. A green process probe does not imply a successful network attach. After changing Core's pod IP, update coreN2 and restart this release.
 
+## Browsing through the UE data connection
+
+Each phone's **Browser** tab fetches public HTTP/HTTPS pages through that subscriber's separate internet PDU session. DNS and TCP sockets bind to its assigned internet UE IP, a source policy route sends them into its internet TUN, and traffic traverses N3/GTP-U, Ella Core and the N6 internet gateway. The UI displays that UE IP, HTTP status, response size and request duration. Links load through the same UE path. There is no fallback to fetching pages through the dashboard pod's ordinary default route.
+
+This is a **reader view**: page text and links, not a full JavaScript browser. Scripts, logins, forms, images and downloads are not loaded. IPv4 HTTP/HTTPS on ports 80/443 is supported, with verified TLS, bounded redirects, a 25-second request timeout and a 1 MiB page limit. Private/special-use destinations and embedded URL credentials are rejected. Returned page content is displayed as text and cannot execute in the dashboard origin.
+
+The chart deploys an optional N6 gateway using the same image and routing tools. Defaults are bridge ella-test-n6, gateway 10.6.0.1/24, Core N6 address 10.6.0.2 and UE pool 10.45.0.0/16. It NATs both original UE sources and Core's already-translated N6 source onto its pod-network egress. Configure internetGateway values for a different topology, or disable it when using your own gateway. It must share the node-local bridge with Core/IMS. Gateway replacement can briefly interrupt browsing while neighbor entries refresh.
+
+The current core-lab.yaml fixture includes a source-route helper: only packets from the internet UE pool use table 200's default route through 10.6.0.1. Core's API/Diameter routes remain on the pod network, and IMS traffic remains separate. To enable that route in an existing lab without restarting Core or losing its ephemeral database:
+
+```powershell
+./ue-phones/tests/enable-internet.ps1
+```
+
+That script adds a privileged debug network helper to the existing Core pod when necessary. Its route lasts for that pod's lifetime; newly deployed Core lab pods obtain the equivalent persistent sidecar from the fixture manifest.
+
 ## Validate
 
 With the NodePort Service reachable:
 
 ```powershell
 ./ue-phones/tests/smoke.ps1 -BaseUrl http://192.168.88.165:30880 -ResultsFile ./phone-results.json
+./ue-phones/tests/web-smoke.ps1 -BaseUrl http://192.168.88.165:30880 -ResultsFile ./web-results.json
 ```
 
 This checks both NAS attachments and IMS registrations, bidirectional SMS including accented text and actual UE receipt, calls in both directions with manual-answer API controls, bidirectional voice-QFI packet counters, hang-up and deregistration/reregistration. It leaves both phones registered and ready for use.

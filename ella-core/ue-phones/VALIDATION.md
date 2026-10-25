@@ -5,12 +5,29 @@
 ## Tested deployment
 
 - Namespace: ella-services-test; release: ue; Deployment/Service: ue-phones.
-- Chart: 0.1.2; application: 0.1.1; image: localhost/ella-ue-phones:0.1.1, imported on ebpf-bng-node-01.
-- Image manifest digest: sha256:13962e685f1e1f2ba75389114a683b6b30820d5591fe9a6d50ac2f5584d5d4ed.
+- Chart/application: 0.2.2; image: localhost/ella-ue-phones:0.2.2, imported on ebpf-bng-node-01.
+- Image manifest digest: sha256:5a84a20096fd55bc9fd95a9ecf7fc52ecb4122f6a0bd116870dd202128a0d27e.
 - Core source pinned by the Dockerfile: c7cf03530e52a2d353d9d1cd6159943319075bf0.
 - The earlier temporary application in ella-services-tester was stopped. The dedicated pod owns the two subscriber identities.
 
 The backend reuses upstream RAN/UE and IMS libraries and exercises real NAS SMS CP/RP/TPDU handling, IMS AKA/IPsec and the Ella Core GTP-U path. No mocked network responses were used.
+
+## Ringing, SMS alerts and UE web browsing (0.2.2)
+
+The original 12 functional checks passed again through NodePort after adding the internet data tunnels. Three additional web checks passed: Phone A HTTPS browsing from UE IP 10.45.0.1, Phone B HTTPS browsing from UE IP 10.45.0.2, and rejection of a private loopback destination. See tests/web-results.json. Both public page fetches returned HTTP 200 with non-empty reader text and the corresponding PDU-session TEIDs. HTTPS browsing was also checked while both IMS call legs remained confirmed.
+
+Browser click-through verified:
+
+- A fixed page-level ringing banner and pulsing incoming-phone frame remain visible while that phone is using its Browser tab.
+- The larger Answer control connects the call; the ringing alert disappears after answer.
+- A newly received SMS creates a preview alert, an unread tab badge, an inbox banner and a browser-title indication while the recipient is browsing.
+- Open message switches to that inbox and clears the unread indication.
+- The optional alert-sound control toggles on successfully; it defaults off until the user enables it.
+- The Browser tab fetched and rendered Example Domain with UE IP, HTTP 200, byte count and duration displayed.
+
+DNS and web sockets bind to the internet UE address and traverse its TUN, N3/GTP-U, Core and the N6 NAT gateway. Core's source policy route was added using a network helper without restarting its ephemeral database. The fixture manifest now carries the equivalent sidecar for fresh deployments. The gateway translates both untranslated UE addresses and Core's built-in N6 NAT source. Neighbor entries were refreshed after replacing the gateway during validation.
+
+Browsing is an IPv4 HTTP/HTTPS reader view. Page scripts, logins, forms, images and downloads are not executed or fetched by the user's browser. TLS verification, public-destination restrictions, redirect limits and request/body limits remain enabled. This is not full interactive browser emulation.
 
 ## Functional checks
 

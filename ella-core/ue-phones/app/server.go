@@ -24,6 +24,9 @@ import (
 //go:embed phones.html
 var phoneHTML string
 
+//go:embed enhancements.js
+var enhancementsJS string
+
 type phoneMessage struct {
 	ID        uint64    `json:"id"`
 	Direction string    `json:"direction"`
@@ -38,21 +41,24 @@ type phoneEvent struct {
 	Text  string    `json:"text"`
 }
 type dashboardPhone struct {
-	mu        sync.Mutex
-	op        sync.Mutex
-	id, name  string
-	endpoint  scenarios.IMSEndpoint
-	access    imsCallUE
-	ims       *testue.UE
-	closeIMS  func()
-	call      *testue.Call
-	peer      string
-	incoming  bool
-	messages  []phoneMessage
-	tx        atomic.Uint64
-	rxBase    int
-	rx        int
-	errorText string
+	mu              sync.Mutex
+	op              sync.Mutex
+	id, name        string
+	endpoint        scenarios.IMSEndpoint
+	access          imsCallUE
+	ims             *testue.UE
+	closeIMS        func()
+	call            *testue.Call
+	peer            string
+	incoming        bool
+	messages        []phoneMessage
+	tx              atomic.Uint64
+	rxBase          int
+	rx              int
+	errorText       string
+	webMu           sync.Mutex
+	internetIP      string
+	internetSession internetSessionInfo
 }
 type phoneDashboard struct {
 	mu      sync.Mutex
@@ -96,6 +102,10 @@ func (d *phoneDashboard) initialize() {
 			return
 		}
 		p := &dashboardPhone{id: fmt.Sprint(i + 1), name: fmt.Sprintf("Phone %c", 'A'+i), endpoint: e, access: ues[i], ims: u, closeIMS: cleanup, messages: []phoneMessage{}}
+		if err := attachInternet(p, i); err != nil {
+			d.fail(fmt.Errorf("internet session for %s: %w", p.name, err))
+			return
+		}
 		p.access.leg.gnb.WatchTEID(p.access.leg.session.DLTEID)
 		d.mu.Lock()
 		d.phones = append(d.phones, p)
@@ -254,7 +264,7 @@ func (d *phoneDashboard) state() any {
 		for i, flow := range flows {
 			qfis[i] = int(flow)
 		}
-		out = append(out, map[string]any{"id": p.id, "name": p.name, "imsi": p.endpoint.Subscriber.IMSI, "number": p.endpoint.Subscriber.MSISDN, "ip": p.endpoint.Local.String(), "nas": p.access.ue.SMSAllowed(), "registered": p.ims.State().Registered, "call": callState, "ended": ended, "incoming": p.incoming, "peer": p.peer, "messages": append([]phoneMessage{}, p.messages...), "tx": p.tx.Load(), "rx": rx, "qfi": qfis, "error": p.errorText})
+		out = append(out, map[string]any{"id": p.id, "name": p.name, "imsi": p.endpoint.Subscriber.IMSI, "number": p.endpoint.Subscriber.MSISDN, "ip": p.endpoint.Local.String(), "internetIp": p.internetIP, "nas": p.access.ue.SMSAllowed(), "registered": p.ims.State().Registered, "call": callState, "ended": ended, "incoming": p.incoming, "peer": p.peer, "messages": append([]phoneMessage{}, p.messages...), "tx": p.tx.Load(), "rx": rx, "qfi": qfis, "error": p.errorText})
 		p.mu.Unlock()
 	}
 	return map[string]any{"ready": ready, "problem": problem, "phones": out, "events": events, "time": time.Now().UTC()}
@@ -425,6 +435,12 @@ func ServePhones(address string) error {
 	mux.HandleFunc("POST /api/action", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		d.action(w, r)
+	})
+	mux.HandleFunc("POST /api/browse", d.browse)
+	mux.HandleFunc("GET /enhancements.js", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-cache")
+		io.WriteString(w, enhancementsJS)
 	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok") })
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {

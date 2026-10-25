@@ -1,6 +1,6 @@
 image:
   repository: localhost/ella-ue-phones
-  tag: 0.1.1
+  tag: 0.2.2
   pullPolicy: Never
 # Must be a routable Core NGAP address with its SCTP port.
 coreN2: 10.1.21.22:38412
@@ -22,3 +22,11 @@ resources:
     memory: 256Mi
   limits:
     memory: 1Gi
+internetGateway:
+  enabled: true
+  # Empty reuses the dashboard image, which includes routing/NAT tools.
+  image: ""
+  bridge: ella-test-n6
+  address: 10.6.0.1/24
+  coreAddress: 10.6.0.2
+  uePool: 10.45.0.0/16
