@@ -1,6 +1,6 @@
 image:
   repository: localhost/ella-ue-phones
-  tag: 0.1.0
+  tag: 0.1.1
   pullPolicy: Never
 # Must be a routable Core NGAP address with its SCTP port.
 coreN2: 10.1.21.22:38412

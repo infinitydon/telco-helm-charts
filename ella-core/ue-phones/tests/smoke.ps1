@@ -26,7 +26,7 @@ try {
   Act $from call @{to=$direction[2]}
   Await "IMS incoming call $label" {param($s) $p=$s.phones|Where-Object id -eq $to;$p.incoming -and $p.call -eq 'early'}
   Act $to answer
-  Await "IMS call $label confirmed, bidirectional voice QFI media" {param($s) @($s.phones|Where-Object {$_.call -eq 'confirmed' -and $_.tx -gt 5 -and $_.rx -gt 5 -and $_.qfi.Count -gt 0}).Count -eq 2}
+  Await "IMS call $label confirmed, bidirectional voice QFI media" {param($s) @($s.phones|Where-Object {$_.call -eq 'confirmed' -and $_.tx -gt 5 -and $_.rx -gt 5 -and $_.qfi -is [array] -and $_.qfi.Count -gt 0}).Count -eq 2}
   Act $from hangup
   Await "IMS call $label released" {param($s) @($s.phones|Where-Object call -eq terminated).Count -eq 2}
  }

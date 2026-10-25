@@ -250,7 +250,11 @@ func (d *phoneDashboard) state() any {
 		}
 		flows := p.access.leg.flows()
 		rx := p.rx
-		out = append(out, map[string]any{"id": p.id, "name": p.name, "imsi": p.endpoint.Subscriber.IMSI, "number": p.endpoint.Subscriber.MSISDN, "ip": p.endpoint.Local.String(), "nas": p.access.ue.SMSAllowed(), "registered": p.ims.State().Registered, "call": callState, "ended": ended, "incoming": p.incoming, "peer": p.peer, "messages": append([]phoneMessage{}, p.messages...), "tx": p.tx.Load(), "rx": rx, "qfi": flows, "error": p.errorText})
+		qfis := make([]int, len(flows))
+		for i, flow := range flows {
+			qfis[i] = int(flow)
+		}
+		out = append(out, map[string]any{"id": p.id, "name": p.name, "imsi": p.endpoint.Subscriber.IMSI, "number": p.endpoint.Subscriber.MSISDN, "ip": p.endpoint.Local.String(), "nas": p.access.ue.SMSAllowed(), "registered": p.ims.State().Registered, "call": callState, "ended": ended, "incoming": p.incoming, "peer": p.peer, "messages": append([]phoneMessage{}, p.messages...), "tx": p.tx.Load(), "rx": rx, "qfi": qfis, "error": p.errorText})
 		p.mu.Unlock()
 	}
 	return map[string]any{"ready": ready, "problem": problem, "phones": out, "events": events, "time": time.Now().UTC()}

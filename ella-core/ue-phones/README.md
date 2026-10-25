@@ -24,8 +24,8 @@ The simulator pod is privileged for TUN, IPsec/XFRM and network configuration. I
 From this directory on the selected Linux node:
 
 ```sh
-sudo buildah bud --layers -t localhost/ella-ue-phones:0.1.0 .
-sudo buildah push localhost/ella-ue-phones:0.1.0 docker-archive:/tmp/ella-ue-phones.tar:localhost/ella-ue-phones:0.1.0
+sudo buildah bud --layers -t localhost/ella-ue-phones:0.1.1 .
+sudo buildah push localhost/ella-ue-phones:0.1.1 docker-archive:/tmp/ella-ue-phones.tar:localhost/ella-ue-phones:0.1.1
 sudo microk8s ctr images import /tmp/ella-ue-phones.tar
 ```
 
