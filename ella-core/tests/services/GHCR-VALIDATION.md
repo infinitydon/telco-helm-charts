@@ -16,16 +16,9 @@ All three images include ip/ss, ping/arping, tracepath/traceroute, dig/nslookup,
 
 The new GHCR names were absent from the worker's MicroK8s image store before rollout. No archive import was performed. Kubelet events recorded successful registry pulls for all three names; running imageIDs match the manifest digests above. See [ghcr-images.json](ghcr-images.json). Phone, browser, gateway and tester containers are ready.
 
-Packages currently have private visibility. The lab uses the existing Kubernetes Secret ella-ghcr-pull through Helm values; credentials are outside Git. Public anonymous pulls have not been verified because GitHub browser sign-in is required to change package visibility. For another private installation, provide an existing pull Secret:
+All three packages are public. Anonymous containerd pulls succeeded for every image without registry credentials. The lab pull Secret was deleted, and both Helm releases now have empty imagePullSecrets. The integration tester was recreated with imagePullPolicy Always and successfully pulled/started without credentials. Default chart installs require no registry login, node image import or installation script. Private-registry overrides remain supported through tester.imagePullSecrets (Core lab) and imagePullSecrets (UE chart).
 
-~~~sh
-helm upgrade --install core ./ella-core-lab -n ella-services-test --create-namespace \
-  --set 'tester.imagePullSecrets[0].name=your-pull-secret' --wait
-helm upgrade --install ue ./ue-phones -n ella-services-test \
-  --set 'imagePullSecrets[0].name=your-pull-secret' --wait
-~~~
-
-Apply the complete Core/IMS/SMSC bootstrap installation order documented in ella-core-lab/README.md; these commands illustrate registry overrides only. With public packages the default empty imagePullSecrets is sufficient. No Windows or host installation script is required.
+The complete installation order remains in ella-core-lab/README.md. Following removal of registry credentials, all 22 phone/data-path smoke checks passed again. See [public-pull phone results](../../ue-phones/tests/ghcr-public-results.json).
 
 ## Results
 
