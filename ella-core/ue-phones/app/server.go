@@ -12,6 +12,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -80,7 +81,7 @@ func (d *phoneDashboard) event(id, text string) {
 }
 func (d *phoneDashboard) initialize() {
 	env := scenarios.Env{CoreN2Addresses: []string{os.Getenv("CORE_N2")}, GNBs: []scenarios.GNB{{Name: "phones", N2Address: os.Getenv("POD_IP"), N3Address: os.Getenv("N3_ADDRESS")}}}
-	g, err := startGNB(env)
+	g, err := startPhoneGNB(env)
 	if err != nil {
 		d.fail(err)
 		return
@@ -88,6 +89,11 @@ func (d *phoneDashboard) initialize() {
 	subs := []scenarios.SubscriberSpec{
 		scenarios.IMSSubscriber("001018400000003", "+15558400003"),
 		scenarios.IMSSubscriber("001018400000004", "+15558400004"),
+	}
+	if os.Getenv("PHONE_ID") == "1" {
+		subs = subs[:1]
+	} else if os.Getenv("PHONE_ID") == "2" {
+		subs = subs[1:]
 	}
 	endpoints, ues, _, err := attachIMSCallUEs(env, g, subs...)
 	if err != nil {
@@ -101,7 +107,12 @@ func (d *phoneDashboard) initialize() {
 			d.fail(err)
 			return
 		}
-		p := &dashboardPhone{id: fmt.Sprint(i + 1), name: fmt.Sprintf("Phone %c", 'A'+i), endpoint: e, access: ues[i], ims: u, closeIMS: cleanup, messages: []phoneMessage{}}
+		id, name := fmt.Sprint(i+1), fmt.Sprintf("Phone %c", 'A'+i)
+		if configured := os.Getenv("PHONE_ID"); configured != "" {
+			id = configured
+			name = os.Getenv("PHONE_NAME")
+		}
+		p := &dashboardPhone{id: id, name: name, endpoint: e, access: ues[i], ims: u, closeIMS: cleanup, messages: []phoneMessage{}}
 		if err := attachInternet(p, i); err != nil {
 			d.fail(fmt.Errorf("internet session for %s: %w", p.name, err))
 			return
@@ -114,10 +125,16 @@ func (d *phoneDashboard) initialize() {
 		go d.receiveSMS(p)
 		go d.receiveCalls(p)
 	}
+	if os.Getenv("BROWSER_ENABLED") == "true" {
+		if err := d.startBrowserProxy(); err != nil {
+			d.fail(err)
+			return
+		}
+	}
 	d.mu.Lock()
 	d.ready = true
 	d.mu.Unlock()
-	d.event("network", "Both UEs ready. Register IMS to make calls; NAS SMS is available immediately.")
+	d.event("network", "UE ready. Register IMS to make calls; NAS SMS is available immediately.")
 }
 func (d *phoneDashboard) fail(err error) {
 	d.mu.Lock()
@@ -349,6 +366,9 @@ func (d *phoneDashboard) action(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		p.mu.Unlock()
+		if err == nil && os.Getenv("PEER_URL") != "" {
+			go d.trackDelivery(p, messageID, req.Text, req.To)
+		}
 	case "call":
 		if call != nil && call.State() != testue.CallTerminated {
 			err = fmt.Errorf("a call is already active")
@@ -437,10 +457,11 @@ func ServePhones(address string) error {
 		d.action(w, r)
 	})
 	mux.HandleFunc("POST /api/browse", d.browse)
+	d.browserRoutes(mux)
 	mux.HandleFunc("GET /enhancements.js", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-cache")
-		io.WriteString(w, enhancementsJS)
+		io.WriteString(w, strings.ReplaceAll(enhancementsJS, "['1','2']", phoneIDs()))
 	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok") })
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
@@ -451,7 +472,18 @@ func ServePhones(address string) error {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'")
-		io.WriteString(w, phoneHTML)
+		page := strings.ReplaceAll(phoneHTML, "['1','2']", phoneIDs())
+		if id := os.Getenv("PHONE_ID"); id != "" {
+			other := "B"
+			if id == "2" {
+				other = "A"
+			}
+			page = strings.Replace(page, "phoneMarkup('1','Phone A','B')+phoneMarkup('2','Phone B','A')", fmt.Sprintf("phoneMarkup(%q,%q,%q)", id, os.Getenv("PHONE_NAME"), other), 1)
+			page = strings.ReplaceAll(page, "Register both phones", "Register phone")
+			page = strings.ReplaceAll(page, "Two subscribers. One private network.", "One subscriber. Your private network.")
+			page = strings.Replace(page, "</style>", ".phones{grid-template-columns:minmax(270px,390px);justify-content:center}.sidebar{display:none}.shell{grid-template-columns:1fr}.main{max-width:900px;width:100%;margin:auto}</style>", 1)
+		}
+		io.WriteString(w, page)
 	})
 	go d.initialize()
 	server := &http.Server{Addr: address, Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 40 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}

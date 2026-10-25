@@ -15,6 +15,7 @@ import (
 	radio "github.com/ellanetworks/core/internal/tester/gnb"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/net/html"
+	"golang.org/x/sys/unix"
 )
 
 type internetSessionInfo = radio.PDUSessionResult
@@ -42,6 +43,15 @@ func attachInternet(p *dashboardPhone, index int) error {
 	rule.Priority = 1200 + index
 	rule.Src = &net.IPNet{IP: net.ParseIP(session.UEIPv4), Mask: net.CIDRMask(32, 32)}
 	if err = netlink.RuleAdd(rule); err != nil {
+		return err
+	}
+	// If a tunnel disappears, do not fall through to the pod's main table.
+	if err = netlink.RouteReplace(&netlink.Route{Dst: all, Table: 400 + index, Type: unix.RTN_UNREACHABLE}); err != nil {
+		return err
+	}
+	fallback := netlink.NewRule()
+	fallback.Table, fallback.Priority, fallback.Src = 400+index, 1300+index, rule.Src
+	if err = netlink.RuleAdd(fallback); err != nil {
 		return err
 	}
 	p.internetIP = session.UEIPv4

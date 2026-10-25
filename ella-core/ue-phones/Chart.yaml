@@ -1,6 +1,6 @@
 apiVersion: v2
 name: ue-phones
-description: Two persistent simulated 5G phones with live IMS calling and NAS SMS
+description: Dedicated simulated 5G phones with IMS, NAS SMS and Chromium/noVNC
 type: application
-version: 0.2.3
-appVersion: 0.2.3
+version: 0.3.0
+appVersion: 0.3.0

@@ -1,26 +1,26 @@
 [
   {
     "check": "HTTPS through UE internet PDU session",
-    "downlinkTeid": 1,
     "passed": true,
-    "bytes": 577,
-    "status": 200,
+    "phone": "1",
     "ueIp": "10.45.0.1",
-    "uplinkTeid": 101,
-    "phone": "1"
+    "uplinkTeid": 115,
+    "status": 200,
+    "downlinkTeid": 1,
+    "bytes": 577
   },
   {
     "check": "HTTPS through UE internet PDU session",
-    "downlinkTeid": 3,
     "passed": true,
-    "bytes": 577,
-    "status": 200,
+    "phone": "2",
     "ueIp": "10.45.0.2",
-    "uplinkTeid": 103,
-    "phone": "2"
+    "uplinkTeid": 113,
+    "status": 200,
+    "downlinkTeid": 1,
+    "bytes": 577
   },
   {
-    "check": "Private web destination rejected",
-    "passed": true
+    "passed": true,
+    "check": "Private web destination rejected"
   }
 ]

@@ -1,16 +1,29 @@
-# UE phone dashboard validation
+# UE phone validation
 
-24 October 2026. The dedicated Helm Deployment is running. All 12 functional checks passed against it, and a browser click-through confirmed calling, answering, live packet counters, hang-up and NAS SMS delivery.
+25 October 2026. Two independent UE Deployments and UI Services are running, with a Chromium/noVNC sidecar and separate browser profile for each subscriber.
 
 ## Tested deployment
 
-- Namespace: ella-services-test; release: ue; Deployment/Service: ue-phones.
-- Chart/application: 0.2.3; image: localhost/ella-ue-phones:0.2.3, imported on ebpf-bng-node-01.
-- Image manifest digest: sha256:5a84a20096fd55bc9fd95a9ecf7fc52ecb4122f6a0bd116870dd202128a0d27e.
-- Core source pinned by the Dockerfile: c7cf03530e52a2d353d9d1cd6159943319075bf0.
-- The earlier temporary application in ella-services-tester was stopped. The dedicated pod owns the two subscriber identities.
+- Namespace ella-services-test; Helm release ue, revision 10; chart/application 0.3.0.
+- Phone A: Deployment ue-ue-a, Service ue-ue-a-ui, http://192.168.88.165:30880/.
+- Phone B: Deployment ue-ue-b, Service ue-ue-b-ui, http://192.168.88.165:30881/.
+- Simulator image localhost/ella-ue-phones:0.3.0, manifest sha256:fe74def8d3b7a833fc98c9c6542f4c859ab5a58051d0437cf5b25b205894e52f.
+- Browser image localhost/ella-ue-browser:0.3.0, manifest sha256:69947db3269199a505283619ac798d6f43d789166a03d85056c019e803cc4907.
+- Browser packages: Debian Chromium 156.0.8078.47 and noVNC 1.6.0. Chromium runs as UID 1000 with dropped container capabilities; no --no-sandbox flag is used.
+- Core source remains pinned to c7cf03530e52a2d353d9d1cd6159943319075bf0. The shared legacy ue-phones Deployment and Service have been removed.
+- The existing N6 gateway remains on image 0.2.3; it is unchanged by this application/browser update.
 
-The backend reuses upstream RAN/UE and IMS libraries and exercises real NAS SMS CP/RP/TPDU handling, IMS AKA/IPsec and the Ella Core GTP-U path. No mocked network responses were used.
+## Chromium and dedicated UEs (0.3.0)
+
+- 12/12 split-smoke checks passed: independent NAS attachment and IMS registration; SMS both directions with matching received text, including accents and euro, and delivery status derived from the other UE's actual receipt; calls both directions with confirmed voice-QFI media; hang-up; deregistration/reregistration. See tests/split-results.json.
+- 7/7 browser-network checks passed: HTTPS via each UE-bound SOCKS proxy; direct browser-UID egress rejected with firewall counters; Phone A cannot fetch with its TUN down; Phone B continues; Phone A recovers after restoring its TUN and source route. See tests/browser-network-results.json. Bringing a TUN down removes its source route, so the fault-injection script restores both in its finally block.
+- 3/3 reader checks passed through the two dedicated Services, including private destination rejection. See tests/web-results.json.
+- Browser click-through loaded Wikipedia with its original CSS, globe image and JavaScript-generated fundraising UI through Phone A, then collapsed the banner through noVNC input. Phone B independently loaded Example Domain. Both UIs showed their respective UE data IPs; the browser logs recorded the corresponding website connections. Mobile emulation and the virtual display use 500×900 portrait dimensions to avoid Chromium's minimum-window clipping.
+- TestMobileReader and TestBrowserRoutes passed during the image build. The latter checks route registration and rejection of cross-origin noVNC requests. JavaScript syntax, Helm lint, and rendering both dedicated Services as ClusterIP/NodePort/LoadBalancer passed.
+
+Browser DNS and TCP sockets bind to the UE internet address. A second source policy rule points to an unreachable route if the tunnel route disappears, preventing fallthrough to the pod's main route. IPv4 and IPv6 owner rules block new direct egress from browser UID 1000. SOCKS supports public IPv4 TCP ports 80/443; QUIC is disabled. noVNC, VNC and CDP listen on loopback only. Browser profiles and message history are ephemeral. IMS calls still use synthetic RTP rather than browser microphone/speaker audio.
+
+## Earlier validation
 
 ## Ringing, SMS alerts and UE web browsing (0.2.2)
 

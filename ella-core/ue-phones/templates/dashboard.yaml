@@ -1,97 +1,85 @@
-{{- define "phones.metadata" -}}
-labels:
-  app.kubernetes.io/name: ue-phones
-  app.kubernetes.io/instance: {{ .Release.Name }}
-annotations:
-  k8s.v1.cni.cncf.io/networks: {{ .Values.networkAttachment | quote }}
-{{- end -}}
-{{- define "phones.spec" -}}
-
-
-automountServiceAccountToken: false
-nodeSelector:
-  {{- toYaml .Values.nodeSelector | nindent 2 }}
-containers:
-  - name: phones
-    image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-    imagePullPolicy: {{ .Values.image.pullPolicy }}
-    securityContext:
-      privileged: true
-    env:
-      - name: POD_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      - name: CORE_N2
-        value: {{ required "coreN2 is required" .Values.coreN2 | quote }}
-      - name: N3_INTERFACE
-        value: {{ .Values.n3Interface | quote }}
-    ports:
-      - name: http
-        containerPort: 8080
-    startupProbe:
-      httpGet:
-        path: /healthz
-        port: http
-      failureThreshold: 30
-      periodSeconds: 2
-    readinessProbe:
-      httpGet:
-        path: /healthz
-        port: http
-    livenessProbe:
-      httpGet:
-        path: /healthz
-        port: http
-    resources:
-      {{- toYaml .Values.resources | nindent 6 }}
-    volumeMounts:
-      - name: tun
-        mountPath: /dev/net/tun
-volumes:
-  - name: tun
-    hostPath:
-      path: /dev/net/tun
-      type: CharDevice
-
-{{- end }}
-
+{{- range $phone := .Values.phones }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-phones
+  name: {{ $.Release.Name }}-{{ $phone.name }}
 spec:
   replicas: 1
-  strategy:
-    type: Recreate
+  strategy: {type: Recreate}
   selector:
-    matchLabels:
-      app.kubernetes.io/name: ue-phones
-      app.kubernetes.io/instance: {{ .Release.Name }}
+    matchLabels: {app.kubernetes.io/instance: {{ $.Release.Name }}, ella-phone: {{ $phone.name }}}
   template:
     metadata:
-      {{- include "phones.metadata" . | nindent 6 }}
+      labels: {app.kubernetes.io/name: ue-phones, app.kubernetes.io/instance: {{ $.Release.Name }}, ella-phone: {{ $phone.name }}}
+      annotations:
+        k8s.v1.cni.cncf.io/networks: {{ $.Values.networkAttachment | quote }}
     spec:
-      {{- include "phones.spec" . | nindent 6 }}
+      automountServiceAccountToken: false
+      nodeSelector:
+        {{- toYaml $.Values.nodeSelector | nindent 8 }}
+      containers:
+        - name: phone
+          image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          securityContext: {privileged: true}
+          env:
+            - name: POD_IP
+              valueFrom: {fieldRef: {fieldPath: status.podIP}}
+            - {name: CORE_N2, value: {{ $.Values.coreN2 | quote }}}
+            - {name: N3_INTERFACE, value: {{ $.Values.n3Interface | quote }}}
+            - {name: PHONE_ID, value: {{ $phone.id | quote }}}
+            - {name: PHONE_NAME, value: {{ $phone.label | quote }}}
+            - {name: PEER_URL, value: {{ printf "http://%s-%s-ui:%v" $.Release.Name $phone.peer $.Values.service.port | quote }}}
+            - {name: GNB_ID, value: {{ $phone.gnbId | quote }}}
+            - {name: BROWSER_ENABLED, value: {{ $.Values.browser.enabled | quote }}}
+          ports: [{name: http, containerPort: 8080}]
+          startupProbe: {httpGet: {path: /healthz, port: http}, failureThreshold: 60, periodSeconds: 2}
+          readinessProbe: {httpGet: {path: /healthz, port: http}}
+          livenessProbe: {httpGet: {path: /healthz, port: http}}
+          resources:
+            {{- toYaml $.Values.resources | nindent 12 }}
+          volumeMounts: [{name: tun, mountPath: /dev/net/tun}]
+        {{- if $.Values.browser.enabled }}
+        - name: browser
+          image: "{{ $.Values.browser.image.repository }}:{{ $.Values.browser.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            capabilities: {drop: [ALL]}
+          startupProbe:
+            exec: {command: [curl, -fsS, "http://127.0.0.1:9222/json/version"]}
+            failureThreshold: 90
+            periodSeconds: 2
+          readinessProbe:
+            exec: {command: [curl, -fsS, "http://127.0.0.1:9222/json/version"]}
+          resources:
+            {{- toYaml $.Values.browser.resources | nindent 12 }}
+          volumeMounts: [{name: shm, mountPath: /dev/shm}]
+        {{- end }}
+      volumes:
+        - name: tun
+          hostPath: {path: /dev/net/tun, type: CharDevice}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 256Mi}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-phones
-  {{- with .Values.service.annotations }}
+  name: {{ $.Release.Name }}-{{ $phone.name }}-ui
+  {{- with $.Values.service.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  type: {{ .Values.service.type }}
-  selector:
-    app.kubernetes.io/name: ue-phones
-    app.kubernetes.io/instance: {{ .Release.Name }}
+  type: {{ $.Values.service.type }}
+  selector: {app.kubernetes.io/instance: {{ $.Release.Name }}, ella-phone: {{ $phone.name }}}
   ports:
     - name: http
-      port: {{ .Values.service.port }}
+      port: {{ $.Values.service.port }}
       targetPort: http
-      protocol: TCP
-      {{- if and (has .Values.service.type (list "NodePort" "LoadBalancer")) .Values.service.nodePort }}
-      nodePort: {{ .Values.service.nodePort }}
+      {{- if and (has $.Values.service.type (list "NodePort" "LoadBalancer")) $phone.nodePort }}
+      nodePort: {{ $phone.nodePort }}
       {{- end }}
+{{- end }}

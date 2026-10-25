@@ -1,6 +1,8 @@
 package gnb
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -18,5 +20,25 @@ func TestMobileReader(t *testing.T) {
 		if strings.Contains(got, forbidden) {
 			t.Errorf("unsafe content %q in %s", forbidden, got)
 		}
+	}
+}
+
+func TestBrowserRoutes(t *testing.T) {
+	t.Setenv("BROWSER_ENABLED", "true")
+	d := &phoneDashboard{}
+	mux := http.NewServeMux()
+	d.browserRoutes(mux)
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("phone")) })
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, httptest.NewRequest("GET", "/api/browser", nil))
+	if response.Code != 200 || !strings.Contains(response.Body.String(), "true") {
+		t.Fatal(response.Body.String())
+	}
+	response = httptest.NewRecorder()
+	request := httptest.NewRequest("GET", "/browser/websockify", nil)
+	request.Header.Set("Origin", "https://elsewhere.test")
+	mux.ServeHTTP(response, request)
+	if response.Code != 403 {
+		t.Fatal("cross-origin VNC access accepted")
 	}
 }
