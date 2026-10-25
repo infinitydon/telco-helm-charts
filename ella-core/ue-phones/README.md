@@ -26,8 +26,8 @@ The simulator pod is privileged for TUN, IPsec/XFRM and network configuration. E
 From this directory on the selected Linux node:
 
 ```sh
-sudo buildah bud --layers -t localhost/ella-ue-phones:0.3.0 .
-sudo buildah push localhost/ella-ue-phones:0.3.0 docker-archive:/tmp/ella-ue-phones.tar:localhost/ella-ue-phones:0.3.0
+sudo buildah bud --layers -t localhost/ella-ue-phones:0.3.1 .
+sudo buildah push localhost/ella-ue-phones:0.3.1 docker-archive:/tmp/ella-ue-phones.tar:localhost/ella-ue-phones:0.3.1
 sudo microk8s ctr images import /tmp/ella-ue-phones.tar
 sudo buildah bud --layers -t localhost/ella-ue-browser:0.3.0 ./browser
 sudo buildah push localhost/ella-ue-browser:0.3.0 docker-archive:/tmp/ella-ue-browser.tar:localhost/ella-ue-browser:0.3.0
@@ -68,7 +68,7 @@ The backend starts its HTTP server before attaching UEs. `/healthz` reports HTTP
 
 ## Browsing through the UE data connection
 
-Each phone has its own non-root Chromium sidecar, ephemeral browser profile, 500×900 mobile viewport, and noVNC display embedded in the Browser tab. Enter a URL and click Go; the page supports original CSS, images, JavaScript and interactive input. noVNC streams pixels and input, while website requests execute inside the UE pod. Chromium uses mobile emulation, not an Android OS emulator.
+Each phone has its own non-root Chromium sidecar, ephemeral browser profile, 500×900 mobile viewport, and noVNC display embedded in the Browser tab. Enter a website address and click Go; https:// is added automatically when omitted, and explicit http:// addresses are preserved. The page supports original CSS, images, JavaScript and interactive input. noVNC streams pixels and input, while website requests execute inside the UE pod. Chromium uses mobile emulation, not an Android OS emulator.
 
 Chromium connects to a loopback-only SOCKS5 listener in the simulator. The listener resolves DNS and opens TCP sockets bound to that subscriber's internet PDU address. An unreachable fallback route prevents source-policy lookup from falling through to the pod network if its TUN route disappears. Source routing sends traffic through the UE TUN, N3/GTP-U, Ella Core and N6. IPv4/IPv6 owner firewall rules restrict browser UID 1000 to loopback and responses to established connections; new direct egress is rejected. QUIC is disabled. Public TCP ports 80/443 are supported; private and special-use addresses are rejected. VNC, websockify and Chromium debugging bind only to loopback, and the UI reverse-proxies noVNC on the same Service.
 

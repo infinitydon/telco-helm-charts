@@ -76,3 +76,7 @@ The UI now uses a NodePort Service: open http://192.168.88.165:30880 directly. A
 The image build passes TestMobileReader, covering retained headings/lists/emphasis and rewritten relative links, plus removal of scripts, styles, images, frames and event handlers. Twelve call/SMS checks and three UE web checks passed. The final deployment also fetched the CERN World Wide Web project page through Phone B (10.45.0.2, HTTP 200), preserving its heading and inline links. Browser QA verified green Answer and red Decline during ringing, red End after answer, and gray unavailable actions.
 
 Final local image manifest: sha256:c03278e33b880e51dd6f5b0619769242449394718f680f82ed7e6cbc357cef85. Pages use a mobile User-Agent and a formatted mobile reader; original site CSS/JavaScript and images remain excluded.
+
+## Address entry (0.3.1)
+
+The address field accepts bare hostnames and paths, defaults them to HTTPS, preserves explicit HTTP/HTTPS, and handles protocol-relative addresses and host:port input. Seven normalization cases, JavaScript syntax, Helm lint and the existing image-build tests passed. Live browser verification submitted www.google.com without a scheme; the field expanded it to https://www.google.com and Chromium navigated through the UE connection. Simulator image manifest: sha256:744872ae850709e04a82a7b87a5e6da8efb55398783250690cec7f2e55f897ba. Browser image remains 0.3.0.
