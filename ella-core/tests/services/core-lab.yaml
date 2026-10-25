@@ -92,6 +92,7 @@ kind: Service
 metadata:
   name: ella-core-lab
 spec:
+  type: NodePort
   selector: {app: ella-core-lab}
   ports:
-    - {name: http, port: 5002}
+    - {name: http, port: 5002, targetPort: 5002, nodePort: 30502}

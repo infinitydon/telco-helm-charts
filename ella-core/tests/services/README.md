@@ -46,10 +46,21 @@ kubectl -n $ns wait pod/ella-services-tester --for=condition=Ready --timeout=120
 
 ## Provision
 
-In separate terminals, forward the APIs:
+Core UI/API is available through NodePort **30502**: http://<node-ip>:30502/ (current lab: http://192.168.88.165:30502/). Login uses the email and password supplied to bootstrap; credentials are kept outside Git.
+
+Change only its Service without restarting Core:
+
+~~~powershell
+./tests/services/configure-core-ui.ps1 -ServiceType NodePort -NodePort 30502
+# Alternatives: -ServiceType ClusterIP, or -ServiceType LoadBalancer
+# -NodePort 0 requests automatic allocation; ignored for ClusterIP.
+~~~
+
+The script accepts Namespace, Kubeconfig, Port and TargetPort overrides. Do not reapply the entire Core fixture just to change UI access: its database is ephemeral.
+
+In separate terminals, forward the IMS/SMSC APIs:
 
 ```powershell
-kubectl -n ella-services-test port-forward deployment/ella-core-lab 25002:5002
 kubectl -n ella-services-test port-forward deployment/ims-ella-ims 25020:5020
 kubectl -n ella-services-test port-forward deployment/smsc-ella-smsc 15010:5010
 ```
@@ -57,7 +68,7 @@ kubectl -n ella-services-test port-forward deployment/smsc-ella-smsc 15010:5010
 Find current Core/SMSC pod IPs with `kubectl -n ella-services-test get pods -o wide`. Choose a private password and keep it outside the repository:
 
 ```powershell
-./tests/services/bootstrap.ps1 -CoreApi http://127.0.0.1:25002 -ImsApi http://127.0.0.1:25020 -CoreAddress <core-pod-ip> -SmscAddress <smsc-pod-ip> -ImsAddress 10.6.0.5 -Password $env:ELLA_LAB_PASSWORD
+./tests/services/bootstrap.ps1 -CoreApi http://<node-ip>:30502 -ImsApi http://127.0.0.1:25020 -CoreAddress <core-pod-ip> -SmscAddress <smsc-pod-ip> -ImsAddress 10.6.0.5 -Password $env:ELLA_LAB_PASSWORD
 ```
 
 Bootstrap initializes or logs in to the Core, configures the operator, slice, IMS policies, Diameter peers and SMSC settings, and provisions subscribers. Registration tests intentionally delete their registration subscriber at the end; rerun bootstrap before repeating those tests. Rerun bootstrap with updated IPs after a Core/SMSC pod address changes. Existing chart SQLite settings survive pod replacement.

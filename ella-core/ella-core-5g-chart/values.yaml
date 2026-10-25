@@ -59,10 +59,12 @@ perNodeConfig:
       routerId: ""
       peers: []
 
-# Kubernetes Service for API
+# Kubernetes Service for UI/API. ClusterIP, NodePort or LoadBalancer.
 service:
   type: NodePort
+  # 0 requests automatic allocation; ignored for ClusterIP.
   nodePort: 30502
+  annotations: {}
 
 # Resource limits
 resources:
@@ -82,6 +84,7 @@ persistence:
 leaderService:
   type: NodePort
   nodePort: 30503
+  annotations: {}
 
 # Leader watcher — patches the leader service selector on leader change
 leaderWatcher:

@@ -2,7 +2,7 @@ apiVersion: v2
 name: ella-core
 description: Helm chart for Ella Core 5G — a production-ready 5G core for private networks, deployed as an HA cluster on Kubernetes with Multus CNI
 type: application
-version: 1.0.0
+version: 1.0.1
 appVersion: "v1.10.1"
 keywords:
   - 5g

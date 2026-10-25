@@ -11,6 +11,10 @@ metadata:
   labels:
     {{- include "ella-core.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: leader-api
+  {{- with .Values.leaderService.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   type: {{ .Values.leaderService.type }}
   selector:
@@ -20,6 +24,6 @@ spec:
       port: {{ .Values.api.port }}
       targetPort: api
       protocol: TCP
-      {{- if eq .Values.leaderService.type "NodePort" }}
+      {{- if and (has .Values.leaderService.type (list "NodePort" "LoadBalancer")) .Values.leaderService.nodePort }}
       nodePort: {{ .Values.leaderService.nodePort }}
       {{- end }}

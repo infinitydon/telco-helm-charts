@@ -4,6 +4,10 @@ metadata:
   name: {{ include "ella-core.serviceName" . }}-api
   labels:
     {{- include "ella-core.selectorLabels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   type: {{ .Values.service.type }}
   selector:
@@ -13,7 +17,7 @@ spec:
       port: {{ .Values.api.port }}
       targetPort: api
       protocol: TCP
-      {{- if eq .Values.service.type "NodePort" }}
+      {{- if and (has .Values.service.type (list "NodePort" "LoadBalancer")) .Values.service.nodePort }}
       nodePort: {{ .Values.service.nodePort }}
       {{- end }}
     - name: n2

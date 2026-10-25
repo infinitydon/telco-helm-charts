@@ -35,8 +35,25 @@ See `values.yaml` for all options. The critical sections:
 | `multus.n2/n3/n6` | Host interface (`master`), subnet, and IP range for each plane |
 | `admin` | Admin credentials for API access |
 | `statefulset.replicas` | Cluster size (must be odd: 1, 3, or 5) |
-| `service` | API exposure (`NodePort` or `ClusterIP`) |
+| `service` | UI/API exposure (`ClusterIP`, `NodePort` or `LoadBalancer`) |
 | `ueransim.subscriber` | Test subscriber auto-provisioned by bootstrap job |
+
+### UI/API Service
+
+The UI and API share api.port (default 5002). Configure service.type and leaderService.type as ClusterIP, NodePort or LoadBalancer. Defaults expose the regular API/UI on NodePort 30502 and the leader-aware endpoint on 30503. Set either nodePort to 0 for automatic allocation; it is omitted for ClusterIP. Both sections accept provider annotations.
+
+~~~yaml
+service:
+  type: NodePort
+  nodePort: 30502
+  annotations: {}
+leaderService:
+  type: NodePort
+  nodePort: 30503
+  annotations: {}
+~~~
+
+Open http://<node-ip>:30502/ and use the initialized admin email/password. Changing values.admin after initialization does not necessarily change an existing account password. The separate integration lab account is configured by its bootstrap script, rather than this chart's defaults.
 
 ## Installation
 
