@@ -1,0 +1,44 @@
+[
+  {
+    "container": "tester",
+    "image": "ghcr.io/infinitydon/ella-services-tester:c7cf03530e52-tools1",
+    "pod": "ella-services-tester",
+    "imageID": "ghcr.io/infinitydon/ella-services-tester@sha256:bd49c0c831fd58556c979b68af826b3e3d8fa72484e672f23f9c06aad19ac5ab",
+    "ready": true
+  },
+  {
+    "container": "router",
+    "image": "ghcr.io/infinitydon/ella-ue-phones:0.3.4",
+    "pod": "ue-internet-7d988c85ff-5zvvc",
+    "imageID": "ghcr.io/infinitydon/ella-ue-phones@sha256:e4d0ab256faeead6d4596b061baf3d616ab147b2198d9f4c317a45679a48b98b",
+    "ready": true
+  },
+  {
+    "container": "browser",
+    "image": "ghcr.io/infinitydon/ella-ue-browser:0.3.4",
+    "pod": "ue-ue-a-8cc46f9cc-lh9gx",
+    "imageID": "ghcr.io/infinitydon/ella-ue-browser@sha256:7f6416fc1472b7d893b300551ffb6706d10462359f5cace3d80f806ce98362f7",
+    "ready": true
+  },
+  {
+    "container": "phone",
+    "image": "ghcr.io/infinitydon/ella-ue-phones:0.3.4",
+    "pod": "ue-ue-a-8cc46f9cc-lh9gx",
+    "imageID": "ghcr.io/infinitydon/ella-ue-phones@sha256:e4d0ab256faeead6d4596b061baf3d616ab147b2198d9f4c317a45679a48b98b",
+    "ready": true
+  },
+  {
+    "container": "browser",
+    "image": "ghcr.io/infinitydon/ella-ue-browser:0.3.4",
+    "pod": "ue-ue-b-8476cb587f-8lkgr",
+    "imageID": "ghcr.io/infinitydon/ella-ue-browser@sha256:7f6416fc1472b7d893b300551ffb6706d10462359f5cace3d80f806ce98362f7",
+    "ready": true
+  },
+  {
+    "container": "phone",
+    "image": "ghcr.io/infinitydon/ella-ue-phones:0.3.4",
+    "pod": "ue-ue-b-8476cb587f-8lkgr",
+    "imageID": "ghcr.io/infinitydon/ella-ue-phones@sha256:e4d0ab256faeead6d4596b061baf3d616ab147b2198d9f4c317a45679a48b98b",
+    "ready": true
+  }
+]

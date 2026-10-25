@@ -11,8 +11,8 @@ spec:
   restartPolicy: Never
   containers:
     - name: tester
-      image: localhost/ella-services-tester:c7cf03530e52
-      imagePullPolicy: Never
+      image: ghcr.io/infinitydon/ella-services-tester:c7cf03530e52-tools1
+      imagePullPolicy: IfNotPresent
       securityContext: {privileged: true}
       command: [sleep, infinity]
       volumeMounts:

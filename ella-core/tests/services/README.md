@@ -18,20 +18,17 @@ The `ella-ran` bridge uses 10.204.0.0/24. The N6 bridge uses Core 10.6.0.2 and I
 
 ## Build the runner
 
-Build on the selected Linux node with Buildah (or Docker), using the pinned upstream source:
+The Core lab chart pulls `ghcr.io/infinitydon/ella-services-tester:c7cf03530e52-tools1`. No local build or image import is required. The image includes `ip`, `ss`, `ping`, `dig`, `nslookup`, `curl`, `wget`, `nc`, `tcpdump`, `tracepath`, `traceroute`, `iptables`, `ethtool` and `jq`.
+
+To rebuild on Linux from this directory, the Dockerfile checks out its pinned upstream Core revision itself:
 
 ```sh
-git clone https://github.com/ellanetworks/core ella-services-core-tester
-cd ella-services-core-tester
-git checkout c7cf03530e52a2d353d9d1cd6159943319075bf0
-# Copy this directory's Dockerfile.tester into the source checkout.
-sudo buildah bud --layers -f Dockerfile.tester -t localhost/ella-services-tester:c7cf03530e52 .
-sudo buildah push localhost/ella-services-tester:c7cf03530e52 docker-archive:/tmp/ella-services-tester.tar:localhost/ella-services-tester:c7cf03530e52
-sudo microk8s ctr images import /tmp/ella-services-tester.tar
+buildah login ghcr.io
+buildah bud --layers -f Dockerfile.tester -t ghcr.io/infinitydon/ella-services-tester:c7cf03530e52-tools1 .
+buildah push ghcr.io/infinitydon/ella-services-tester:c7cf03530e52-tools1
 ```
 
-Import into the runtime used by kubelet on the selected node. For a different runtime, adjust the import command or publish to your own registry and set tester.image/pullPolicy in the Core lab chart. The chart images themselves are upstream public images; no custom IMS or SMSC build is needed.
-
+Core, IMS and SMSC use their existing upstream images. Core provides these diagnostic tools through its troubleshooting sidecar.
 
 ## UI access
 

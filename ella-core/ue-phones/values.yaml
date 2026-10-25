@@ -1,7 +1,8 @@
+imagePullSecrets: []
 image:
-  repository: localhost/ella-ue-phones
-  tag: 0.3.3
-  pullPolicy: Never
+  repository: ghcr.io/infinitydon/ella-ue-phones
+  tag: 0.3.4
+  pullPolicy: IfNotPresent
 # Must be a routable Core NGAP address with its SCTP port.
 coreN2: ella-core-lab-diameter:38412
 networkAttachment: ella-ran
@@ -35,8 +36,8 @@ phones:
 browser:
   enabled: true
   image:
-    repository: localhost/ella-ue-browser
-    tag: 0.3.3
+    repository: ghcr.io/infinitydon/ella-ue-browser
+    tag: 0.3.4
   rendererProcessLimit: 4
   resources:
     requests: {cpu: 100m, memory: 512Mi}

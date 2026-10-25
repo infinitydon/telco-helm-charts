@@ -25,6 +25,7 @@ bootstrap:
   smscAddressHost: smsc-ella-smsc-diameter
   imsAddress: 10.6.0.5
 tester:
+  imagePullSecrets: []
   enabled: true
-  image: localhost/ella-services-tester:c7cf03530e52
-  pullPolicy: Never
+  image: ghcr.io/infinitydon/ella-services-tester:c7cf03530e52-tools1
+  pullPolicy: IfNotPresent

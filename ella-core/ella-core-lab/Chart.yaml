@@ -2,5 +2,5 @@ apiVersion: v2
 name: ella-core-lab
 description: Integration lab Core with diagnostics and optional API provisioning
 type: application
-version: 0.1.0
+version: 0.1.1
 appVersion: "v1.20.0"

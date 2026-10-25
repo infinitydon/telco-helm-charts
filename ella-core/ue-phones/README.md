@@ -23,15 +23,16 @@ The simulator pod is privileged for TUN, IPsec/XFRM and network configuration. E
 
 ## Build and deploy
 
-From this directory on the selected Linux node:
+The chart pulls the published `ghcr.io/infinitydon/ella-ue-phones:0.3.4` and `ghcr.io/infinitydon/ella-ue-browser:0.3.4` images. No node-local image import or installation script is required. Both images include Linux IP, ICMP, DNS, HTTP, socket and packet-capture tools. Browser tools retain the same unprivileged UE-only network restrictions.
+
+Optional rebuild and publication from this directory on Linux:
 
 ```sh
-sudo buildah bud --layers -t localhost/ella-ue-phones:0.3.3 .
-sudo buildah push localhost/ella-ue-phones:0.3.3 docker-archive:/tmp/ella-ue-phones.tar:localhost/ella-ue-phones:0.3.3
-sudo microk8s ctr images import /tmp/ella-ue-phones.tar
-sudo buildah bud --layers -t localhost/ella-ue-browser:0.3.3 ./browser
-sudo buildah push localhost/ella-ue-browser:0.3.3 docker-archive:/tmp/ella-ue-browser.tar:localhost/ella-ue-browser:0.3.3
-sudo microk8s ctr images import /tmp/ella-ue-browser.tar
+buildah login ghcr.io
+buildah bud --layers -t ghcr.io/infinitydon/ella-ue-phones:0.3.4 .
+buildah push ghcr.io/infinitydon/ella-ue-phones:0.3.4
+buildah bud --layers -t ghcr.io/infinitydon/ella-ue-browser:0.3.4 ./browser
+buildah push ghcr.io/infinitydon/ella-ue-browser:0.3.4
 ```
 
 The Dockerfile checks out Core revision `c7cf03530e52a2d353d9d1cd6159943319075bf0`, installs the application adapters and enables NAS SMS capability in the upstream voice UE constructor. The standalone application is compiled inside that upstream module because its RAN helpers are internal Go packages. Only the application/adapters are stored here; upstream source and licensing remain in their own repository.
@@ -121,3 +122,19 @@ python3 ue-phones/tests/browser-recovery.py --component websockify --freeze --ou
 ~~~
 
 The failure tests verify restart in the same pod, profile/page recovery, and unchanged UE registration/address/restart count. The freeze case is rescued by the liveness probe. Browser reconnection itself can be observed in the already-open phone UI, without refreshing it.
+
+## Connectivity tools
+
+All three custom images (phones/gateway, Chromium and integration tester) include `ip`, `ss`, `ping`, `arping`, `tracepath`, `traceroute`, `dig`, `nslookup`, `curl`, `wget`, `nc`, `tcpdump`, `iptables`, `ethtool`, `procps`, `jq` and `openssl`.
+
+```sh
+kubectl -n ella-services-test exec deployment/ue-ue-a -c phone -- ip address
+kubectl -n ella-services-test exec deployment/ue-ue-a -c phone -- ss -lnptu
+kubectl -n ella-services-test exec deployment/ue-ue-a -c phone -- tcpdump -ni any -c 10
+kubectl -n ella-services-test exec deployment/ue-ue-a -c browser -- curl --socks5-hostname 127.0.0.1:1080 -I https://example.com
+kubectl -n ella-services-test exec ella-services-tester -- dig ella-core-lab
+```
+
+Use `ping -I <internetIp>` or `dig -b <internetIp> @8.8.8.8 example.com` in the phone container to test its current UE data address shown by `/api/state`. Browser UID 1000 remains restricted to the local SOCKS proxy; raw sockets and direct external traffic are intentionally unavailable there. Packet capture and interface changes belong in the privileged phone/tester containers or the Core diagnostic sidecar.
+
+For a private registry, create a Kubernetes pull Secret separately and set `imagePullSecrets: [{name: your-pull-secret}]` on this chart and `tester.imagePullSecrets` on the Core lab chart. Never store registry credentials in values committed to Git.

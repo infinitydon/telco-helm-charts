@@ -8,6 +8,10 @@ metadata:
 spec:
   nodeSelector:
     {{- toYaml .Values.nodeSelector | nindent 4 }}
+  {{- with .Values.tester.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   automountServiceAccountToken: false
   restartPolicy: Never
   containers:

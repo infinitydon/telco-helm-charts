@@ -2,7 +2,7 @@
 
 This chart deploys the pinned v1.20.0 Core used by the IMS/SMSC integration tests, its Multus attachments, a permanent troubleshooting sidecar and the optional tester pod. The Core database is ephemeral: uninstalling/recreating the lab resets its configuration. The full ella-core-5g-chart is a separate HA/PVC deployment; it also supports the configurable troubleshooting sidecar.
 
-From the repository's ella-core directory, with the node-local test images built/imported as documented in ue-phones/README.md and tests/services/README.md:
+From the repository's ella-core directory (custom runtime images are pulled from GHCR):
 
 ```sh
 helm upgrade --install core ./ella-core-lab -n ella-services-test --create-namespace --wait
@@ -34,7 +34,7 @@ The sidecar shares Core's network namespace and, by default, process namespace. 
 
 In this lab, the same sidecar also installs the source route from the internet UE pool to the N6 gateway. Keep it enabled when using internetRoute.enabled, or provide the route externally. The full HA chart's diagnostic sidecar only provides tools and does not install lab-specific routes.
 
-The N6 and RAN bridges are node-local, so Core, IMS and UE pods must share the selected node. tester.enabled creates the standalone integration runner; disable it when no tests are needed. The local tester image must be available on that node, or configure tester.image/pullPolicy for a registry.
+The N6 and RAN bridges are node-local, so Core, IMS and UE pods must share the selected node. tester.enabled creates the standalone integration runner; disable it when no tests are needed. The tester image is published on GHCR. Configure tester.image/pullPolicy to override it and tester.imagePullSecrets for a private registry. The UE chart accepts imagePullSecrets independently.
 
 ## Remove
 

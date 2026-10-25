@@ -1,0 +1,11 @@
+{
+  "fault": "KILL Chromium",
+  "passed": true,
+  "recoverySeconds": 22.3,
+  "browserRestartBefore": 1,
+  "browserRestartAfter": 2,
+  "ueRestartCount": 0,
+  "profilePreserved": true,
+  "restoredHost": "example.com",
+  "ueRegistered": true
+}
