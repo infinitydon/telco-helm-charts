@@ -1,0 +1,7 @@
+apiVersion: v2
+name: ella-ims
+description: Ella IMS with persistent SQLite storage
+type: application
+version: 0.1.0
+appVersion: sha-2c8873dc8744
+home: https://github.com/ellanetworks/ims

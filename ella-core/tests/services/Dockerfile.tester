@@ -1,0 +1,12 @@
+FROM docker.io/library/golang:1.27.3 AS build
+RUN apt-get update && apt-get install -y --no-install-recommends libpcap-dev && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+ARG CORE_REVISION=c7cf03530e52a2d353d9d1cd6159943319075bf0
+RUN git clone https://github.com/ellanetworks/core . && git checkout "$CORE_REVISION"
+RUN go build -o /core-tester ./cmd/core-tester
+FROM docker.io/library/debian:trixie-slim
+LABEL org.opencontainers.image.source="https://github.com/infinitydon/telco-helm-charts"
+RUN apt-get update && apt-get install -y --no-install-recommends iproute2 iputils-ping iputils-tracepath iputils-arping dnsutils curl wget netcat-openbsd tcpdump traceroute iptables ethtool procps jq openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends libpcap0.8t64 iproute2 ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=build /core-tester /usr/local/bin/core-tester
+CMD ["sleep", "infinity"]

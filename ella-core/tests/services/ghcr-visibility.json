@@ -1,0 +1,14 @@
+[
+  {
+    "name": "ella-ue-phones",
+    "visibility": "public"
+  },
+  {
+    "name": "ella-ue-browser",
+    "visibility": "public"
+  },
+  {
+    "name": "ella-services-tester",
+    "visibility": "public"
+  }
+]

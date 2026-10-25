@@ -1,0 +1,30 @@
+[
+  {
+    "passed": true,
+    "check": "ue-ue-a HTTPS through UE proxy"
+  },
+  {
+    "passed": true,
+    "check": "ue-ue-a direct browser egress blocked"
+  },
+  {
+    "passed": true,
+    "check": "ue-ue-b HTTPS through UE proxy"
+  },
+  {
+    "passed": true,
+    "check": "ue-ue-b direct browser egress blocked"
+  },
+  {
+    "passed": true,
+    "check": "UE A cannot browse with its internet tunnel down"
+  },
+  {
+    "passed": true,
+    "check": "UE B continues browsing while UE A tunnel is down"
+  },
+  {
+    "passed": true,
+    "check": "UE A browsing recovered after restoring its tunnel"
+  }
+]

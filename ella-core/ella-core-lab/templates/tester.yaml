@@ -1,0 +1,29 @@
+{{- if .Values.tester.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ella-services-tester
+  annotations:
+    k8s.v1.cni.cncf.io/networks: ella-ran
+spec:
+  nodeSelector:
+    {{- toYaml .Values.nodeSelector | nindent 4 }}
+  {{- with .Values.tester.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  automountServiceAccountToken: false
+  restartPolicy: Never
+  containers:
+    - name: tester
+      image: {{ .Values.tester.image | quote }}
+      imagePullPolicy: {{ .Values.tester.pullPolicy }}
+      securityContext: {privileged: true}
+      command: [sleep, infinity]
+      volumeMounts:
+        - {name: tun, mountPath: /dev/net/tun}
+  volumes:
+    - name: tun
+      hostPath: {path: /dev/net/tun, type: CharDevice}
+
+{{- end }}

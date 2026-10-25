@@ -1,0 +1,100 @@
+{{- range $phone := .Values.phones }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-{{ $phone.name }}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/instance: {{ $.Release.Name }}, ella-phone: {{ $phone.name }}}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: ue-phones, app.kubernetes.io/instance: {{ $.Release.Name }}, ella-phone: {{ $phone.name }}}
+      annotations:
+        k8s.v1.cni.cncf.io/networks: {{ $.Values.networkAttachment | quote }}
+    spec:
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext: {fsGroup: 1000, fsGroupChangePolicy: OnRootMismatch}
+      nodeSelector:
+        {{- toYaml $.Values.nodeSelector | nindent 8 }}
+      containers:
+        - name: phone
+          image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          securityContext: {privileged: true}
+          env:
+            - {name: UE_MODE, value: {{ $.Values.mode | quote }}}
+            - name: POD_IP
+              valueFrom: {fieldRef: {fieldPath: status.podIP}}
+            - {name: CORE_N2, value: {{ $.Values.coreN2 | quote }}}
+            - {name: N3_INTERFACE, value: {{ $.Values.n3Interface | quote }}}
+            - {name: PHONE_ID, value: {{ $phone.id | quote }}}
+            - {name: PHONE_NAME, value: {{ $phone.label | quote }}}
+            - {name: PEER_URL, value: {{ printf "http://%s-%s-ui:%v" $.Release.Name $phone.peer $.Values.service.port | quote }}}
+            - {name: GNB_ID, value: {{ $phone.gnbId | quote }}}
+            - {name: BROWSER_VIEWER_VERSION, value: {{ $.Values.browser.image.tag | quote }}}
+            - {name: BROWSER_ENABLED, value: {{ $.Values.browser.enabled | quote }}}
+          ports: [{name: http, containerPort: 8080}]
+          startupProbe: {httpGet: {path: /healthz, port: http}, failureThreshold: 60, periodSeconds: 2}
+          readinessProbe: {httpGet: {path: /healthz, port: http}}
+          livenessProbe: {httpGet: {path: /healthz, port: http}}
+          resources:
+            {{- toYaml $.Values.resources | nindent 12 }}
+          volumeMounts: [{name: tun, mountPath: /dev/net/tun}]
+        {{- if $.Values.browser.enabled }}
+        - name: browser
+          image: "{{ $.Values.browser.image.repository }}:{{ $.Values.browser.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            capabilities: {drop: [ALL]}
+          env:
+            - {name: BROWSER_RENDERER_LIMIT, value: {{ $.Values.browser.rendererProcessLimit | quote }}}
+          startupProbe:
+            exec: {command: [/usr/local/bin/browser-state]}
+            timeoutSeconds: 5
+            failureThreshold: 90
+            periodSeconds: 2
+          livenessProbe:
+            exec: {command: [/usr/local/bin/browser-state]}
+            timeoutSeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml $.Values.browser.resources | nindent 12 }}
+          volumeMounts: [{name: shm, mountPath: /dev/shm}, {name: browser-profile, mountPath: /home/browser/profile}]
+        {{- end }}
+      volumes:
+        - name: tun
+          hostPath: {path: /dev/net/tun, type: CharDevice}
+        - name: browser-profile
+          emptyDir: {}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-{{ $phone.name }}-ui
+  {{- with $.Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ $.Values.service.type }}
+  selector: {app.kubernetes.io/instance: {{ $.Release.Name }}, ella-phone: {{ $phone.name }}}
+  ports:
+    - name: http
+      port: {{ $.Values.service.port }}
+      targetPort: http
+      {{- if and (has $.Values.service.type (list "NodePort" "LoadBalancer")) $phone.nodePort }}
+      nodePort: {{ $phone.nodePort }}
+      {{- end }}
+{{- end }}

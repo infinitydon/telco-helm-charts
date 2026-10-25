@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ella-services-tester
+  annotations:
+    k8s.v1.cni.cncf.io/networks: ella-ran
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: ebpf-bng-node-01
+  automountServiceAccountToken: false
+  restartPolicy: Never
+  containers:
+    - name: tester
+      image: ghcr.io/infinitydon/ella-services-tester:c7cf03530e52-tools1
+      imagePullPolicy: IfNotPresent
+      securityContext: {privileged: true}
+      command: [sleep, infinity]
+      volumeMounts:
+        - {name: tun, mountPath: /dev/net/tun}
+  volumes:
+    - name: tun
+      hostPath: {path: /dev/net/tun, type: CharDevice}

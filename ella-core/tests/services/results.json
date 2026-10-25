@@ -1,0 +1,122 @@
+[
+  {
+    "scenario": "sms/5g_mo_mt",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "sms/4g_mo_mt",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "sms/5g_idle_recipient",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "sms/4g_idle_recipient",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "sms/5g_injected",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "sms/4g_injected",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "sms/5g_memory_full",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "sms/4g_memory_full",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "sms/5g_switched_off",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "sms/4g_switched_off",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "sms/5g_back_to_back",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "sms/4g_back_to_back",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "sms/5g_unserved_service_centre",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "sms/4g_unserved_service_centre",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "sms/5g_not_granted",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "sms/4g_not_granted",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "ims/5g_registration",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "ims/5g_call",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "ims/4g_registration",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "scenario": "ims/4g_call",
+    "passed": true,
+    "exitCode": 0
+  },
+  {
+    "exitCode": 0,
+    "scenario": "sms/5g_absent_then_alert",
+    "passed": true
+  },
+  {
+    "exitCode": 0,
+    "scenario": "sms/4g_absent_then_alert",
+    "passed": true
+  },
+  {
+    "exitCode": 0,
+    "scenario": "sms/5g_withdrawal",
+    "passed": true
+  },
+  {
+    "exitCode": 0,
+    "scenario": "sms/4g_withdrawal",
+    "passed": true
+  }
+]

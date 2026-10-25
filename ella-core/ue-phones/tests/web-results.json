@@ -1,0 +1,26 @@
+[
+  {
+    "check": "HTTPS through UE internet PDU session",
+    "passed": true,
+    "phone": "1",
+    "ueIp": "10.45.0.1",
+    "uplinkTeid": 115,
+    "status": 200,
+    "downlinkTeid": 1,
+    "bytes": 577
+  },
+  {
+    "check": "HTTPS through UE internet PDU session",
+    "passed": true,
+    "phone": "2",
+    "ueIp": "10.45.0.2",
+    "uplinkTeid": 113,
+    "status": 200,
+    "downlinkTeid": 1,
+    "bytes": 577
+  },
+  {
+    "passed": true,
+    "check": "Private web destination rejected"
+  }
+]

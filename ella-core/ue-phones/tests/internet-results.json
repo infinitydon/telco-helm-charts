@@ -1,0 +1,50 @@
+[
+  {
+    "check": "ue-ue-a internet attached without IMS/SMS",
+    "passed": true
+  },
+  {
+    "check": "ue-ue-a internet TUN only; no IMS TUN or IPsec state",
+    "passed": true
+  },
+  {
+    "check": "ue-ue-a IMS/SMS actions rejected",
+    "passed": true
+  },
+  {
+    "check": "ue-ue-a public ICMP via UE",
+    "passed": true
+  },
+  {
+    "check": "ue-ue-a public DNS via UE",
+    "passed": true
+  },
+  {
+    "check": "ue-ue-a Chromium UID HTTPS through UE proxy",
+    "passed": true
+  },
+  {
+    "check": "ue-ue-b internet attached without IMS/SMS",
+    "passed": true
+  },
+  {
+    "check": "ue-ue-b internet TUN only; no IMS TUN or IPsec state",
+    "passed": true
+  },
+  {
+    "check": "ue-ue-b IMS/SMS actions rejected",
+    "passed": true
+  },
+  {
+    "check": "ue-ue-b public ICMP via UE",
+    "passed": true
+  },
+  {
+    "check": "ue-ue-b public DNS via UE",
+    "passed": true
+  },
+  {
+    "check": "ue-ue-b Chromium UID HTTPS through UE proxy",
+    "passed": true
+  }
+]

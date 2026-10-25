@@ -1,0 +1,9 @@
+# UI/API access for the ella-core-lab Helm chart.
+service:
+  name: ella-core-lab
+  type: NodePort
+  port: 5002
+  targetPort: 5002
+  nodePort: 30502
+selector:
+  app: ella-core-lab

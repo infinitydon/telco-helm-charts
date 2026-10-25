@@ -1,0 +1,11 @@
+<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#screen{margin:0;width:100%;height:100%;overflow:hidden;background:#fff}#status{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px;background:#f5f8f1f2;text-align:center;font:14px/1.5 system-ui;color:#315841}#status[hidden]{display:none}button{padding:10px 15px;border:0;border-radius:8px;background:#266441;color:white;font:600 13px system-ui}</style></head><body><section id="status" role="status" aria-live="polite"><span id="message">Connecting to your UE browser…</span><button id="retry" hidden>Reconnect now</button></section><div id="screen"></div><script type="module">
+import RFB from './core/rfb.js';
+const {createBrowserConnection}=await import('./connection.js?v='+encodeURIComponent(new URL(location.href).searchParams.get('v')||'1'));
+const url=new URL('./websockify',location.href);url.protocol=location.protocol==='https:'?'wss:':'ws:';
+const status=document.getElementById('status'),retry=document.getElementById('retry');
+const connection=createBrowserConnection({RFB,target:document.getElementById('screen'),url:url.href,onState:(state,message)=>{document.documentElement.dataset.connection=state;status.hidden=state==='connected';document.getElementById('message').textContent=message;retry.hidden=state==='connecting'||state==='connected'}});
+connection.setOnline(navigator.onLine);connection.start();retry.onclick=()=>connection.reconnect();
+window.addEventListener('offline',()=>connection.setOnline(false));window.addEventListener('online',()=>connection.setOnline(true));
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!['connected','connecting'].includes(connection.state))connection.reconnect()});
+window.addEventListener('pagehide',()=>connection.stop());window.addEventListener('pageshow',()=>{if(connection.state==='stopped')connection.reconnect()});
+</script></body></html>

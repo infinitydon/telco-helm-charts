@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ella.name" . }}
+  labels:
+    {{- include "ella.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    logging:
+      level: {{ .Values.logging.level }}
+    db:
+      path: /data/ims.db
+    api:
+      address: 0.0.0.0
+      port: {{ .Values.api.port }}
+    diameter:
+      address: {{ default "__POD_IP__" .Values.diameter.address | quote }}
+      port: {{ .Values.diameter.port }}
+    sip:
+      addresses:
+      {{- if .Values.sip.addresses }}
+        {{- toYaml .Values.sip.addresses | nindent 8 }}
+      {{- else }}
+        - "__POD_IP__"
+      {{- end }}
+      trusted_networks: {{ .Values.sip.trustedNetworks | toJson }}
+    pcscf:
+      port: {{ .Values.pcscf.port }}
+      ipsec:
+        server_port: {{ .Values.pcscf.ipsec.serverPort }}
+        client_ports: {{ .Values.pcscf.ipsec.clientPorts | toJson }}
+    icscf:
+      port: {{ .Values.icscf.port }}
+    scscf:
+      port: {{ .Values.scscf.port }}
+    {{- with .Values.n5 }}
+    n5:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}

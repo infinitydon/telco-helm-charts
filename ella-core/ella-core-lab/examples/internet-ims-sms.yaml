@@ -1,0 +1,4 @@
+bootstrap:
+  mode: internet-ims-sms
+tester:
+  enabled: true

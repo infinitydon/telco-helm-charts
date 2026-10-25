@@ -1,0 +1,6 @@
+templates
+Chart.yaml
+values.yaml
+README.md
+VALIDATION.md
+*.png

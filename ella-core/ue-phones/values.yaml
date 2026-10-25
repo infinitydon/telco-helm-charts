@@ -1,0 +1,46 @@
+# internet or internet-ims-sms
+mode: internet-ims-sms
+imagePullSecrets: []
+image:
+  repository: ghcr.io/infinitydon/ella-ue-phones
+  tag: 0.4.1
+  pullPolicy: IfNotPresent
+# Must be a routable Core NGAP address with its SCTP port.
+coreN2: ella-core-lab-diameter:38412
+networkAttachment: ella-ran
+n3Interface: net1
+nodeSelector:
+  kubernetes.io/hostname: ebpf-bng-node-01
+service:
+  # ClusterIP, NodePort or LoadBalancer.
+  type: NodePort
+  port: 8080
+  # Per-phone ports are configured in phones[].nodePort below.
+  # Provider-specific LoadBalancer annotations can be supplied here.
+  annotations: {}
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 1Gi
+internetGateway:
+  enabled: true
+  # Empty reuses the dashboard image, which includes routing/NAT tools.
+  image: ""
+  bridge: ella-test-n6
+  address: 10.6.0.1/24
+  coreAddress: 10.6.0.2
+  uePool: 10.45.0.0/16
+phones:
+  - {name: ue-a, id: "1", label: Phone A, peer: ue-b, gnbId: "000009", nodePort: 30880}
+  - {name: ue-b, id: "2", label: Phone B, peer: ue-a, gnbId: "00000a", nodePort: 30881}
+browser:
+  enabled: true
+  image:
+    repository: ghcr.io/infinitydon/ella-ue-browser
+    tag: 0.3.4
+  rendererProcessLimit: 4
+  resources:
+    requests: {cpu: 100m, memory: 512Mi}
+    limits: {cpu: "2", memory: 2Gi}
