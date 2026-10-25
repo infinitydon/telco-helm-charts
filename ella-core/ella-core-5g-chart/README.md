@@ -239,3 +239,11 @@ Pods restart one at a time (OrderedReady). The cluster remains available as long
 **Follower can't join**: Check the init container log (`kubectl -n ella-core logs ella-core-1 -c config-gen`). Verify the join token Secret exists (`kubectl -n ella-core get secret ella-core-join-token-2`). Re-run the bootstrap job if needed.
 
 **Invalid token errors**: The pod's PVC may contain stale data. Delete the PVC and let the pod recreate it, then re-run the bootstrap job.
+
+## Troubleshooting sidecar
+
+The optional troubleshoot container provides a shell and network tools alongside the shell-less Core image. Configure troubleshooting.enabled, image, shareProcessNamespace and resources in values.yaml. It defaults to pinned netshoot v0.16 with NET_ADMIN/NET_RAW, read-only /config and shared pod networking/processes. No database volume is mounted.
+
+~~~sh
+kubectl -n ella-core exec -it ella-core-0 -c troubleshoot -- bash
+~~~

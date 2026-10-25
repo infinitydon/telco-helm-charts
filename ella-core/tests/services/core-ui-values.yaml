@@ -1,4 +1,4 @@
-# UI/API access for tests/services/core-lab.yaml.
+# UI/API access for the ella-core-lab Helm chart.
 service:
   name: ella-core-lab
   type: NodePort

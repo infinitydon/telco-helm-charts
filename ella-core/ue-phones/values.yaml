@@ -3,7 +3,7 @@ image:
   tag: 0.3.1
   pullPolicy: Never
 # Must be a routable Core NGAP address with its SCTP port.
-coreN2: 10.1.21.22:38412
+coreN2: ella-core-lab-diameter:38412
 networkAttachment: ella-ran
 n3Interface: net1
 nodeSelector:

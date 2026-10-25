@@ -1,5 +1,8 @@
 # Validation: 24 October 2026
 
+Latest clean reinstall: [25 October 2026 results](REINSTALL-VALIDATION.md). All 24 integration scenarios, both Helm API tests and 22 phone/browser checks passed after namespace/PVC recreation.
+
+
 Result: **24/24 functional scenarios passed**, plus both chart API smoke tests.
 
 Cluster: Kubernetes v1.36.2, namespace `ella-services-test`. Core, IMS and runner used `ebpf-bng-node-01` (Ubuntu 22.04, kernel 6.8); SMSC used `ebpf-bng-node-03-ubuntu-focal`. The lab remains deployed for inspection. Existing BNG releases were not changed.

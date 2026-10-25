@@ -1,0 +1,55 @@
+{{- if .Values.bootstrap.enabled }}
+{{- if not .Values.bootstrap.existingSecret }}
+apiVersion: v1
+kind: Secret
+metadata: {name: {{ .Release.Name }}-admin}
+type: Opaque
+stringData:
+  email: {{ .Values.bootstrap.email | quote }}
+  password: {{ required "Set bootstrap.password or bootstrap.existingSecret" .Values.bootstrap.password | quote }}
+---
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: {{ .Release.Name }}-bootstrap}
+data:
+  bootstrap.py: |
+    {{- .Files.Get "files/bootstrap.py" | nindent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-bootstrap
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      containers:
+        - name: bootstrap
+          image: {{ .Values.bootstrap.image | quote }}
+          command: [python, /scripts/bootstrap.py]
+          env:
+            - name: ADMIN_EMAIL
+              valueFrom: {secretKeyRef: {name: {{ default (printf "%s-admin" .Release.Name) .Values.bootstrap.existingSecret }}, key: email}}
+            - name: ADMIN_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ default (printf "%s-admin" .Release.Name) .Values.bootstrap.existingSecret }}, key: password}}
+            - {name: CORE_API, value: {{ .Values.bootstrap.coreApi | quote }}}
+            - {name: IMS_API, value: {{ .Values.bootstrap.imsApi | quote }}}
+            - {name: SMSC_API, value: {{ .Values.bootstrap.smscApi | quote }}}
+            - {name: CORE_ADDRESS_HOST, value: {{ .Values.bootstrap.coreAddressHost | quote }}}
+            - {name: SMSC_ADDRESS_HOST, value: {{ .Values.bootstrap.smscAddressHost | quote }}}
+            - {name: IMS_ADDRESS, value: {{ .Values.bootstrap.imsAddress | quote }}}
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 128Mi}
+          volumeMounts: [{name: script, mountPath: /scripts, readOnly: true}]
+      volumes:
+        - name: script
+          configMap: {name: {{ .Release.Name }}-bootstrap}
+{{- end }}

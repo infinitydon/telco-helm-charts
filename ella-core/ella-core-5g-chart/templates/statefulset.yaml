@@ -30,6 +30,7 @@ spec:
           ]
     spec:
       terminationGracePeriodSeconds: 60
+      shareProcessNamespace: {{ .Values.troubleshooting.shareProcessNamespace }}
       {{- if .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml .Values.nodeSelector | nindent 8 }}
@@ -135,6 +136,18 @@ spec:
           failureThreshold: 3
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
+      {{- if .Values.troubleshooting.enabled }}
+      - name: troubleshoot
+        image: {{ .Values.troubleshooting.image | quote }}
+        command: [sleep, infinity]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL], add: [NET_ADMIN, NET_RAW]}
+        resources:
+          {{- toYaml .Values.troubleshooting.resources | nindent 10 }}
+        volumeMounts:
+        - {name: config, mountPath: /config, readOnly: true}
+      {{- end }}
       volumes:
       - name: init-script
         configMap:

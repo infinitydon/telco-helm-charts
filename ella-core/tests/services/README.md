@@ -2,23 +2,15 @@
 
 This disposable lab validates the two independent charts against Ella Core v1.20.0. It uses Ella Core's existing `core-tester` rather than creating a new NAS SMS implementation. The upstream runner simulates real RAN/UE NAS signalling and sends IMS traffic through GTP-U and the Core user plane.
 
-Requirements: Helm 3+, kubectl, PowerShell 7, Multus with bridge/static/host-local plugins, a default RWO StorageClass, kernel SCTP, XFRM and TUN support. Run on kernel 6.6+ for TCX. The sample pins the lab Core, IMS and tester to `ebpf-bng-node-01`; change that node in all three manifests/values for another cluster. Bridge attachments are node-local, so these workloads must share a node. SMSC uses the pod network and may run elsewhere.
+Requirements: Helm 3+, kubectl, Python 3 for optional host-side tests, Multus with bridge/static/host-local plugins, a default RWO StorageClass, kernel SCTP, XFRM and TUN support. Run on kernel 6.6+ for TCX. The sample pins the lab Core, IMS and tester to `ebpf-bng-node-01`; change that node in all three manifests/values for another cluster. Bridge attachments are node-local, so these workloads must share a node. SMSC uses the pod network and may run elsewhere.
 
 The lab Core and tester require privileged pods. Their interfaces are confined to pod namespaces; the lab does not use host networking. Core mounts `/sys/fs/bpf`. Core's database is ephemeral; chart databases are persistent. Only deploy this fixture in a dedicated test namespace: bootstrap sets operator configuration and creates test subscribers with public test keys.
 
 ## Deploy
 
-From the repository's `ella-core` directory:
+Installation is Helm-only. Follow [ella-core-lab/README.md](../../ella-core-lab/README.md) for the complete install order, the in-cluster provisioning Job and the diagnostic shell. It deploys Core, its network attachments and tester pod; the independent IMS, SMSC, UI Service and UE charts complete the lab. No PowerShell setup script is required.
 
-```powershell
-$ns='ella-services-test'
-kubectl create namespace $ns
-kubectl -n $ns apply -f tests/services/n6-lab.yaml
-kubectl -n $ns apply -f tests/services/core-lab.yaml
-helm upgrade --install core-ui ./ella-core-ui -n $ns -f tests/services/core-ui-values.yaml
-helm upgrade --install ims ./ella-ims -n $ns -f tests/services/ims-values.yaml
-helm upgrade --install smsc ./ella-smsc -n $ns
-```
+The raw core-lab.yaml, n6-lab.yaml and tester-pod.yaml files are retained as legacy fixtures; do not apply them alongside the corresponding Helm resources.
 
 The `ella-ran` bridge uses 10.204.0.0/24. The N6 bridge uses Core 10.6.0.2 and IMS 10.6.0.5. UE IMS addresses use 10.60.0.0/16. Change these ranges if they overlap existing networks. Core advertises its pod IP for N2 and Diameter. Its image digest is pinned to the tested v1.20.0 build.
 
@@ -38,51 +30,23 @@ sudo buildah push localhost/ella-services-tester:c7cf03530e52 docker-archive:/tm
 sudo microk8s ctr images import /tmp/ella-services-tester.tar
 ```
 
-Import into the runtime used by kubelet on the selected node. For a different runtime, adjust the import command or publish to your own registry and change tester-pod.yaml. The chart images themselves are upstream public images; no custom IMS or SMSC build is needed.
+Import into the runtime used by kubelet on the selected node. For a different runtime, adjust the import command or publish to your own registry and set tester.image/pullPolicy in the Core lab chart. The chart images themselves are upstream public images; no custom IMS or SMSC build is needed.
 
-```powershell
-kubectl -n $ns apply -f tests/services/tester-pod.yaml
-kubectl -n $ns wait pod/ella-services-tester --for=condition=Ready --timeout=120s
-```
 
-## Provision
+## UI access
 
-Core UI/API is available through NodePort **30502**: http://<node-ip>:30502/ (current lab: http://192.168.88.165:30502/). Login uses the email and password supplied to bootstrap; credentials are kept outside Git.
-
-UI access is managed entirely by the ella-core-ui Helm chart. Set service.type to ClusterIP, NodePort or LoadBalancer, and service.nodePort to the desired port (0 allocates automatically). The lab values preserve Service name ella-core-lab and match the existing Core pod labels. This chart creates only a Service; updating it does not restart Core.
-
-~~~sh
-helm upgrade --install core-ui ./ella-core-ui -n ella-services-test -f tests/services/core-ui-values.yaml --set service.type=NodePort --set service.nodePort=30502
-~~~
-
-When migrating the existing manually created Service, add --take-ownership once. Fresh installations need no migration flag. Do not reapply the entire Core fixture just to change UI access: its database is ephemeral.
-
-In separate terminals, forward the IMS/SMSC APIs:
-
-```powershell
-kubectl -n ella-services-test port-forward deployment/ims-ella-ims 25020:5020
-kubectl -n ella-services-test port-forward deployment/smsc-ella-smsc 15010:5010
-```
-
-Find current Core/SMSC pod IPs with `kubectl -n ella-services-test get pods -o wide`. Choose a private password and keep it outside the repository:
-
-```powershell
-./tests/services/bootstrap.ps1 -CoreApi http://<node-ip>:30502 -ImsApi http://127.0.0.1:25020 -CoreAddress <core-pod-ip> -SmscAddress <smsc-pod-ip> -ImsAddress 10.6.0.5 -Password $env:ELLA_LAB_PASSWORD
-```
-
-Bootstrap initializes or logs in to the Core, configures the operator, slice, IMS policies, Diameter peers and SMSC settings, and provisions subscribers. Registration tests intentionally delete their registration subscriber at the end; rerun bootstrap before repeating those tests. Rerun bootstrap with updated IPs after a Core/SMSC pod address changes. Existing chart SQLite settings survive pod replacement.
+The Core UI is http://<node-ip>:30502/ (current lab: http://192.168.88.165:30502/). Configure the ella-core-ui chart through tests/services/core-ui-values.yaml. Login uses the initialized admin account.
 
 ## Validate
 
-```powershell
+```sh
 helm test ims -n ella-services-test
 helm test smsc -n ella-services-test
-./tests/services/run-scenarios.ps1 -Password $env:ELLA_LAB_PASSWORD -OutputDirectory ./results
-# Additional store-and-forward and service withdrawal checks:
-./tests/services/run-scenarios.ps1 -Password $env:ELLA_LAB_PASSWORD -OutputDirectory ./recovery-results -Scenarios sms/5g_absent_then_alert,sms/4g_absent_then_alert,sms/5g_withdrawal,sms/4g_withdrawal
+# Supply the initialized admin password in ELLA_LAB_PASSWORD.
+python3 tests/services/run-scenarios.py --output ./integration-results
 ```
 
-The runner discovers the Core and tester interface addresses, writes a log per scenario and machine-readable results.json, and exits nonzero if any scenario fails. Run it sequentially: scenarios bind the same simulated RAN ports. The default matrix includes 16 NAS SMS scenarios and four IMS registration/call scenarios. IMS registration covers UDP/TCP, AKA/IPsec, resynchronization and subscriber deletion; calls verify upstream's SIP/RTP/QoS assertions. This is functional testing, not a throughput or HA benchmark.
+The cross-platform Python runner discovers the Core and tester interface addresses, writes a log per scenario and machine-readable results.json, and exits nonzero if any scenario fails. Run it sequentially: scenarios bind the same simulated RAN ports. The default matrix includes 20 NAS SMS scenarios and four IMS registration/call scenarios. IMS registration covers UDP/TCP, AKA/IPsec, resynchronization and subscriber deletion; calls verify upstream's SIP/RTP/QoS assertions. This is functional testing, not a throughput or HA benchmark.
 
 See [VALIDATION.md](VALIDATION.md) for recorded results and tested versions. Smoke-test command completion was verified with MicroK8s Helm 3.20.2 on the control-plane node. Windows Helm 4.2.1 completed the hook but hung during hook deletion in this environment; use Helm 3 for the smoke-test command if that occurs.
 
@@ -92,8 +56,8 @@ See [VALIDATION.md](VALIDATION.md) for recorded results and tested versions. Smo
 
 ## Remove the lab
 
-```powershell
-helm uninstall ims smsc -n ella-services-test
+```sh
+helm uninstall ue ims smsc core-ui core -n ella-services-test
 kubectl delete namespace ella-services-test
 ```
 

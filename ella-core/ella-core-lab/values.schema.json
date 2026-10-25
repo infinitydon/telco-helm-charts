@@ -1,0 +1,45 @@
+{
+  "type": "object",
+  "properties": {
+    "troubleshooting": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "image",
+        "shareProcessNamespace"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shareProcessNamespace": {
+          "type": "boolean"
+        },
+        "resources": {
+          "type": "object"
+        }
+      }
+    },
+    "bootstrap": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "existingSecret": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

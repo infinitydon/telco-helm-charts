@@ -111,3 +111,12 @@ ueransim:
     opc: "E8ED289DEBA952E4283B54E88E6183CA"
     sequenceNumber: "000000000000"
     profileName: "default"
+
+# Optional shell and networking tools alongside Core.
+troubleshooting:
+  enabled: true
+  image: ghcr.io/nicolaka/netshoot:v0.16@sha256:b09d9b21381f47a79b3cbcb30da25266dc17186ea00ae65e99fdc51396f48e70
+  shareProcessNamespace: true
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {memory: 256Mi}

@@ -17,7 +17,7 @@ Deploy and provision the [IMS/SMSC integration lab](../tests/services/README.md)
 | A | 001018400000003 | +15558400003 |
 | B | 001018400000004 | +15558400004 |
 
-Both need the public lab test key/OPc and internet/ims policies configured by bootstrap.ps1. They remain NAS-attached when IMS is unregistered, so SMS continues to work independently of IMS. Do not run the original test scenarios concurrently against these same IMSIs; each UE must have one owner.
+Both need the public lab test key/OPc and internet/ims policies configured by the ella-core-lab Helm provisioning Job. They remain NAS-attached when IMS is unregistered, so SMS continues to work independently of IMS. Do not run the original test scenarios concurrently against these same IMSIs; each UE must have one owner.
 
 The simulator pod is privileged for TUN, IPsec/XFRM and network configuration. Each shares the existing `ella-ran` bridge attachment and must run on the same node as the lab Core/IMS. The chart defaults to dedicated NodePort Services on ports 30880 and 30881. It has no user authentication; use it on a trusted lab network.
 
@@ -39,7 +39,7 @@ The Dockerfile checks out Core revision `c7cf03530e52a2d353d9d1cd6159943319075bf
 From the repository's ella-core directory:
 
 ```sh
-helm upgrade --install ue ./ue-phones -n ella-services-test --set coreN2=<core-pod-ip>:38412
+helm upgrade --install ue ./ue-phones -n ella-services-test --wait
 kubectl -n ella-services-test rollout status deployment/ue-ue-a
 kubectl -n ella-services-test rollout status deployment/ue-ue-b
 ```
@@ -64,7 +64,7 @@ Use Helm overrides such as `--set service.type=ClusterIP` for internal-only acce
 
 Set image.repository/tag/pullPolicy for a registry-hosted image, nodeSelector for the selected node, networkAttachment for the existing Multus NAD and n3Interface for its interface name. The current chart is a two-UE lab fixture with fixed subscriber identities and 5G access, not a generic subscriber management application.
 
-The backend starts its HTTP server before attaching UEs. `/healthz` reports HTTP process health; `/api/state` reports actual UE readiness and startup failures. A green process probe does not imply a successful network attach. After changing Core's pod IP, update coreN2 and restart this release.
+The backend starts its HTTP server before attaching UEs. `/healthz` reports HTTP process health; `/api/state` reports actual UE readiness and startup failures. A green process probe does not imply a successful network attach. After replacing Core, reattach the UEs by restarting their deployments. The lab default resolves Core through its headless Service; explicit external coreN2 IP overrides must be updated if that address changes.
 
 ## Browsing through the UE data connection
 
@@ -76,26 +76,19 @@ Set browser.enabled=false for the lightweight formatted reader instead. Reader r
 
 The chart deploys an optional N6 gateway using the same image and routing tools. Defaults are bridge ella-test-n6, gateway 10.6.0.1/24, Core N6 address 10.6.0.2 and UE pool 10.45.0.0/16. It NATs both original UE sources and Core's already-translated N6 source onto its pod-network egress. Configure internetGateway values for a different topology, or disable it when using your own gateway. It must share the node-local bridge with Core/IMS. Gateway replacement can briefly interrupt browsing while neighbor entries refresh.
 
-The current core-lab.yaml fixture includes a source-route helper: only packets from the internet UE pool use table 200's default route through 10.6.0.1. Core's API/Diameter routes remain on the pod network, and IMS traffic remains separate. To enable that route in an existing lab without restarting Core or losing its ephemeral database:
-
-```powershell
-./ue-phones/tests/enable-internet.ps1
-```
-
-That script adds a privileged debug network helper to the existing Core pod when necessary. Its route lasts for that pod's lifetime; newly deployed Core lab pods obtain the equivalent persistent sidecar from the fixture manifest.
+The ella-core-lab chart installs the Core source route through its permanent troubleshoot sidecar. No debug-container injection or host-side route script is needed on a fresh install. Only internet-pool traffic uses table 200 through the N6 gateway; Core API/Diameter routes remain on the pod network. The default coreN2 uses the headless Core Service DNS name, so reinstalling Core does not require editing a pod IP.
 
 ## Validate
 
 With the NodePort Service reachable:
 
-```powershell
-./ue-phones/tests/split-smoke.ps1 -BaseUrlA http://192.168.88.165:30880 -BaseUrlB http://192.168.88.165:30881 -ResultsFile ./phone-results.json
-./ue-phones/tests/web-smoke.ps1 -BaseUrl http://192.168.88.165:30880 -PeerBaseUrl http://192.168.88.165:30881 -ResultsFile ./web-results.json
+```sh
+python3 ue-phones/tests/smoke.py --network --output phone-results.json
 ```
 
-Run ./ue-phones/tests/browser-network.ps1 to verify per-UE proxy egress, direct-egress rejection, independent tunnel failure and recovery. It briefly interrupts Phone A internet access and restores its tunnel and source route in a finally block.
+The --network option verifies per-UE proxy egress, direct-egress rejection, independent tunnel failure and recovery. It briefly interrupts Phone A internet access and restores its tunnel and source route in a finally block.
 
-The split smoke test checks both NAS attachments and IMS registrations, bidirectional SMS including accented text and actual UE receipt, calls in both directions with manual-answer API controls, bidirectional voice-QFI packet counters, hang-up and deregistration/reregistration. It leaves both phones registered and ready for use.
+The cross-platform smoke test checks both NAS attachments and IMS registrations, bidirectional SMS including accented text and actual UE receipt, calls in both directions with manual-answer API controls, bidirectional voice-QFI packet counters, hang-up and deregistration/reregistration. It leaves both phones registered and ready for use.
 
 The API accepts same-origin browser mutations only, validates action names and recipient numbers, limits request/message sizes, and serializes actions per phone. The sender label `accepted by SMSC` is not a delivery claim; it changes to `delivered to UE` only when the other persistent simulated UE receives the matching NAS SMS.
 

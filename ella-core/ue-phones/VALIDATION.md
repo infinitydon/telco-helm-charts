@@ -1,5 +1,8 @@
 # UE phone validation
 
+Latest clean reinstall: [25 October 2026 results](../tests/services/REINSTALL-VALIDATION.md). All 24 integration scenarios, both Helm API tests and 22 phone/browser checks passed after namespace/PVC recreation.
+
+
 25 October 2026. Two independent UE Deployments and UI Services are running, with a Chromium/noVNC sidecar and separate browser profile for each subscriber.
 
 ## Tested deployment

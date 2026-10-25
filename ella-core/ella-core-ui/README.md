@@ -1,6 +1,6 @@
 # Ella Core UI Service
 
-Helm-managed UI/API access for an existing Core deployment. This chart creates only a Service, so changing access does not restart Core or touch its database. The full ella-core-5g-chart already includes configurable UI/API Services; this companion chart serves the independently deployed integration-lab Core or another existing deployment.
+Helm-managed UI/API access for an existing Core deployment. This chart creates only a Service, so changing access does not restart Core or touch its database. The full ella-core-5g-chart already includes configurable UI/API Services; this companion chart serves the integration-lab Core chart or another existing deployment.
 
 From the repository's ella-core directory:
 
