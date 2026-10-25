@@ -5,7 +5,7 @@
 ## Tested deployment
 
 - Namespace: ella-services-test; release: ue; Deployment/Service: ue-phones.
-- Chart/application: 0.2.2; image: localhost/ella-ue-phones:0.2.2, imported on ebpf-bng-node-01.
+- Chart/application: 0.2.3; image: localhost/ella-ue-phones:0.2.3, imported on ebpf-bng-node-01.
 - Image manifest digest: sha256:5a84a20096fd55bc9fd95a9ecf7fc52ecb4122f6a0bd116870dd202128a0d27e.
 - Core source pinned by the Dockerfile: c7cf03530e52a2d353d9d1cd6159943319075bf0.
 - The earlier temporary application in ella-services-tester was stopped. The dedicated pod owns the two subscriber identities.
@@ -57,3 +57,9 @@ The original dedicated deployment was delayed by stale controllers/scheduler and
 The user resized the VM to approximately 20 GiB RAM. After the resize, all four nodes were Ready, controller and scheduler leases renewed normally, and the dedicated Deployment reconciled. Memory showed approximately 12 GiB available during verification. Prometheus was not deliberately paused. No experimental API-server gate change remains.
 
 The UI now uses a NodePort Service: open http://192.168.88.165:30880 directly. All 12 functional checks were rerun successfully through this NodePort, and the browser loaded both live phone panels. ClusterIP, NodePort and LoadBalancer variants rendered successfully; ClusterIP omits nodePort. LoadBalancer provisioning itself was not exercised. Do not run the original scenarios concurrently against these same subscriber identities.
+
+## Mobile reader and call action contrast (0.2.3)
+
+The image build passes TestMobileReader, covering retained headings/lists/emphasis and rewritten relative links, plus removal of scripts, styles, images, frames and event handlers. Twelve call/SMS checks and three UE web checks passed. The final deployment also fetched the CERN World Wide Web project page through Phone B (10.45.0.2, HTTP 200), preserving its heading and inline links. Browser QA verified green Answer and red Decline during ringing, red End after answer, and gray unavailable actions.
+
+Final local image manifest: sha256:c03278e33b880e51dd6f5b0619769242449394718f680f82ed7e6cbc357cef85. Pages use a mobile User-Agent and a formatted mobile reader; original site CSS/JavaScript and images remain excluded.

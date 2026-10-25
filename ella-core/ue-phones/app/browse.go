@@ -127,6 +127,58 @@ type webLink struct {
 	URL  string `json:"url"`
 }
 
+// Keep document structure without allowing remote code, styles, or resource loads.
+// Every navigable link is sent back through the selected UE by the dashboard.
+func mobileReader(body string, base *url.URL) string {
+	root, err := html.Parse(strings.NewReader(body))
+	if err != nil {
+		return ""
+	}
+	var out strings.Builder
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if out.Len() > 128000 {
+			return
+		}
+		if n.Type == html.TextNode {
+			out.WriteString(html.EscapeString(n.Data))
+			return
+		}
+		tag := ""
+		if n.Type == html.ElementNode {
+			switch n.Data {
+			case "head", "script", "style", "noscript", "svg", "iframe", "form", "nav", "footer", "template", "object", "embed":
+				return
+			case "h1", "h2", "h3", "h4", "h5", "h6", "p", "ul", "ol", "li", "blockquote", "pre", "code", "strong", "em", "b", "i", "br", "hr", "table", "thead", "tbody", "tr", "th", "td", "article", "section", "div", "figure", "figcaption":
+				tag = n.Data
+				out.WriteString("<" + tag + ">")
+			case "a":
+				for _, a := range n.Attr {
+					if a.Key == "href" {
+						u, e := url.Parse(a.Val)
+						if e == nil {
+							u = base.ResolveReference(u)
+							if _, e = publicWebURL(u.String()); e == nil {
+								tag = "a"
+								out.WriteString("<a href=\"#\" data-web-link=\"" + html.EscapeString(u.String()) + "\">")
+							}
+						}
+						break
+					}
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+		if tag != "" && tag != "br" && tag != "hr" {
+			out.WriteString("</" + tag + ">")
+		}
+	}
+	walk(root)
+	return out.String()
+}
+
 func reader(body string, base *url.URL) (string, string, []webLink) {
 	root, err := html.Parse(strings.NewReader(body))
 	if err != nil {
@@ -249,7 +301,7 @@ func (d *phoneDashboard) browse(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
 	defer cancel()
 	request, _ := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	request.Header.Set("User-Agent", "Ella-UE-Lab/0.2 reader")
+	request.Header.Set("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36 Ella-UE-Lab/0.2")
 	request.Header.Set("Accept", "text/html,text/plain;q=0.9")
 	client := ueWebClient(p.internetIP)
 	response, err := client.Do(request)
@@ -273,10 +325,12 @@ func (d *phoneDashboard) browse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	title, text, links := reader(string(body), response.Request.URL)
+	markup := mobileReader(string(body), response.Request.URL)
 	if strings.Contains(kind, "text/plain") {
 		text = string(body)
 		title = response.Request.URL.Hostname()
+		markup = "<pre>" + html.EscapeString(text) + "</pre>"
 	}
 	d.event(p.id, fmt.Sprintf("UE internet: %s returned HTTP %d (%d bytes)", response.Request.URL.Hostname(), response.StatusCode, len(body)))
-	json.NewEncoder(w).Encode(map[string]any{"url": response.Request.URL.String(), "title": title, "text": text, "links": links, "status": response.StatusCode, "bytes": len(body), "durationMs": time.Since(started).Milliseconds(), "ueIp": p.internetIP, "uplinkTeid": p.internetSession.ULTEID, "downlinkTeid": p.internetSession.DLTEID})
+	json.NewEncoder(w).Encode(map[string]any{"url": response.Request.URL.String(), "title": title, "text": text, "html": markup, "links": links, "status": response.StatusCode, "bytes": len(body), "durationMs": time.Since(started).Milliseconds(), "ueIp": p.internetIP, "uplinkTeid": p.internetSession.ULTEID, "downlinkTeid": p.internetSession.DLTEID})
 }

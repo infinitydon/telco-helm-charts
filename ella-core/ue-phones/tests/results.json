@@ -1,50 +1,50 @@
 [
   {
-    "check": "Both UEs attached with NAS SMS",
-    "passed": true
+    "passed": true,
+    "check": "Both UEs attached with NAS SMS"
   },
   {
-    "check": "Both UEs IMS registered",
-    "passed": true
+    "passed": true,
+    "check": "Both UEs IMS registered"
   },
   {
-    "check": "NAS SMS A to B received and delivered",
-    "passed": true
+    "passed": true,
+    "check": "NAS SMS A to B received and delivered"
   },
   {
-    "check": "NAS SMS B to A, accented text intact",
-    "passed": true
+    "passed": true,
+    "check": "NAS SMS B to A, accented text intact"
   },
   {
-    "check": "IMS incoming call 1 to 2",
-    "passed": true
+    "passed": true,
+    "check": "IMS incoming call 1 to 2"
   },
   {
-    "check": "IMS call 1 to 2 confirmed, bidirectional voice QFI media",
-    "passed": true
+    "passed": true,
+    "check": "IMS call 1 to 2 confirmed, bidirectional voice QFI media"
   },
   {
-    "check": "IMS call 1 to 2 released",
-    "passed": true
+    "passed": true,
+    "check": "IMS call 1 to 2 released"
   },
   {
-    "check": "IMS incoming call 2 to 1",
-    "passed": true
+    "passed": true,
+    "check": "IMS incoming call 2 to 1"
   },
   {
-    "check": "IMS call 2 to 1 confirmed, bidirectional voice QFI media",
-    "passed": true
+    "passed": true,
+    "check": "IMS call 2 to 1 confirmed, bidirectional voice QFI media"
   },
   {
-    "check": "IMS call 2 to 1 released",
-    "passed": true
+    "passed": true,
+    "check": "IMS call 2 to 1 released"
   },
   {
-    "check": "Phone A IMS deregistration",
-    "passed": true
+    "passed": true,
+    "check": "Phone A IMS deregistration"
   },
   {
-    "check": "Phone A IMS reregistration",
-    "passed": true
+    "passed": true,
+    "check": "Phone A IMS reregistration"
   }
 ]

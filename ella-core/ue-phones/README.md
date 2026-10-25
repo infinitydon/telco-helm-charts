@@ -26,8 +26,8 @@ The simulator pod is privileged for TUN, IPsec/XFRM and network configuration. I
 From this directory on the selected Linux node:
 
 ```sh
-sudo buildah bud --layers -t localhost/ella-ue-phones:0.2.2 .
-sudo buildah push localhost/ella-ue-phones:0.2.2 docker-archive:/tmp/ella-ue-phones.tar:localhost/ella-ue-phones:0.2.2
+sudo buildah bud --layers -t localhost/ella-ue-phones:0.2.3 .
+sudo buildah push localhost/ella-ue-phones:0.2.3 docker-archive:/tmp/ella-ue-phones.tar:localhost/ella-ue-phones:0.2.3
 sudo microk8s ctr images import /tmp/ella-ue-phones.tar
 ```
 
@@ -62,7 +62,7 @@ The backend starts its HTTP server before attaching UEs. `/healthz` reports HTTP
 
 Each phone's **Browser** tab fetches public HTTP/HTTPS pages through that subscriber's separate internet PDU session. DNS and TCP sockets bind to its assigned internet UE IP, a source policy route sends them into its internet TUN, and traffic traverses N3/GTP-U, Ella Core and the N6 internet gateway. The UI displays that UE IP, HTTP status, response size and request duration. Links load through the same UE path. There is no fallback to fetching pages through the dashboard pod's ordinary default route.
 
-This is a **reader view**: page text and links, not a full JavaScript browser. Scripts, logins, forms, images and downloads are not loaded. IPv4 HTTP/HTTPS on ports 80/443 is supported, with verified TLS, bounded redirects, a 25-second request timeout and a 1 MiB page limit. Private/special-use destinations and embedded URL credentials are rejected. Returned page content is displayed as text and cannot execute in the dashboard origin.
+This is a **reader view**: formatted page text and links, not a full JavaScript browser. Scripts, logins, forms, images and downloads are not loaded. IPv4 HTTP/HTTPS on ports 80/443 is supported, with verified TLS, bounded redirects, a 25-second request timeout and a 1 MiB page limit. Private/special-use destinations and embedded URL credentials are rejected. Mobile requests use a mobile User-Agent. The phone preserves headings, paragraphs, lists, tables, emphasis and inline links in a responsive reader layout. Remote scripts, styles, resource URLs and event handlers are stripped; link navigation always fetches through the same UE.
 
 The chart deploys an optional N6 gateway using the same image and routing tools. Defaults are bridge ella-test-n6, gateway 10.6.0.1/24, Core N6 address 10.6.0.2 and UE pool 10.45.0.0/16. It NATs both original UE sources and Core's already-translated N6 source onto its pod-network egress. Configure internetGateway values for a different topology, or disable it when using your own gateway. It must share the node-local bridge with Core/IMS. Gateway replacement can briefly interrupt browsing while neighbor entries refresh.
 
@@ -94,3 +94,5 @@ helm uninstall ue -n ella-services-test
 ```
 
 The IMS/SMSC releases and their databases remain separate.
+
+Available Call/Answer buttons are solid green; End/Decline is solid red. Unavailable actions are gray and carry explicit availability labels.

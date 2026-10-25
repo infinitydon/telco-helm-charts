@@ -6,13 +6,14 @@ RUN git clone https://github.com/ellanetworks/core . && git checkout "$CORE_REVI
 COPY app/ims_bridge.go internal/tester/scenarios/dashboard_ims.go
 COPY app/server.go internal/tester/scenarios/gnb/dashboard_server.go
 COPY app/browse.go internal/tester/scenarios/gnb/dashboard_browse.go
+COPY app/browse_test.go internal/tester/scenarios/gnb/dashboard_browse_test.go
 COPY app/ran_bridge.go internal/tester/gnb/dashboard_internet.go
 COPY app/phones.html internal/tester/scenarios/gnb/phones.html
 COPY app/enhancements.js internal/tester/scenarios/gnb/enhancements.js
 COPY app/main.go cmd/ue-phones/main.go
 # The stock voice scenario omits SMS capability. These persistent UEs need both.
 RUN sed -i '/func newSubscriberUE/,/^}/s/PDUSessionID: /RequestSMS: true,\n\t\tPDUSessionID: /' internal/tester/scenarios/gnb/common.go
-RUN gofmt -w internal/tester/scenarios/dashboard_ims.go internal/tester/scenarios/gnb/dashboard_server.go internal/tester/scenarios/gnb/dashboard_browse.go internal/tester/gnb/dashboard_internet.go cmd/ue-phones/main.go && go build -o /ue-phones ./cmd/ue-phones
+RUN gofmt -w internal/tester/scenarios/dashboard_ims.go internal/tester/scenarios/gnb/dashboard_server.go internal/tester/scenarios/gnb/dashboard_browse*.go internal/tester/gnb/dashboard_internet.go cmd/ue-phones/main.go && go test ./internal/tester/scenarios/gnb -run '^TestMobileReader$' && go build -o /ue-phones ./cmd/ue-phones
 FROM docker.io/library/debian:trixie-slim
 RUN apt-get update && apt-get install -y --no-install-recommends libpcap0.8t64 iproute2 iptables ethtool procps ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=build /ue-phones /usr/local/bin/ue-phones

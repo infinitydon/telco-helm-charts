@@ -2,5 +2,5 @@ apiVersion: v2
 name: ue-phones
 description: Two persistent simulated 5G phones with live IMS calling and NAS SMS
 type: application
-version: 0.2.2
-appVersion: 0.2.2
+version: 0.2.3
+appVersion: 0.2.3
