@@ -15,6 +15,7 @@ $ns='ella-services-test'
 kubectl create namespace $ns
 kubectl -n $ns apply -f tests/services/n6-lab.yaml
 kubectl -n $ns apply -f tests/services/core-lab.yaml
+helm upgrade --install core-ui ./ella-core-ui -n $ns -f tests/services/core-ui-values.yaml
 helm upgrade --install ims ./ella-ims -n $ns -f tests/services/ims-values.yaml
 helm upgrade --install smsc ./ella-smsc -n $ns
 ```
@@ -48,15 +49,13 @@ kubectl -n $ns wait pod/ella-services-tester --for=condition=Ready --timeout=120
 
 Core UI/API is available through NodePort **30502**: http://<node-ip>:30502/ (current lab: http://192.168.88.165:30502/). Login uses the email and password supplied to bootstrap; credentials are kept outside Git.
 
-Change only its Service without restarting Core:
+UI access is managed entirely by the ella-core-ui Helm chart. Set service.type to ClusterIP, NodePort or LoadBalancer, and service.nodePort to the desired port (0 allocates automatically). The lab values preserve Service name ella-core-lab and match the existing Core pod labels. This chart creates only a Service; updating it does not restart Core.
 
-~~~powershell
-./tests/services/configure-core-ui.ps1 -ServiceType NodePort -NodePort 30502
-# Alternatives: -ServiceType ClusterIP, or -ServiceType LoadBalancer
-# -NodePort 0 requests automatic allocation; ignored for ClusterIP.
+~~~sh
+helm upgrade --install core-ui ./ella-core-ui -n ella-services-test -f tests/services/core-ui-values.yaml --set service.type=NodePort --set service.nodePort=30502
 ~~~
 
-The script accepts Namespace, Kubeconfig, Port and TargetPort overrides. Do not reapply the entire Core fixture just to change UI access: its database is ephemeral.
+When migrating the existing manually created Service, add --take-ownership once. Fresh installations need no migration flag. Do not reapply the entire Core fixture just to change UI access: its database is ephemeral.
 
 In separate terminals, forward the IMS/SMSC APIs:
 

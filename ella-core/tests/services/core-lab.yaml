@@ -86,13 +86,3 @@ spec:
           emptyDir: {}
         - name: bpf
           hostPath: {path: /sys/fs/bpf, type: Directory}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ella-core-lab
-spec:
-  type: NodePort
-  selector: {app: ella-core-lab}
-  ports:
-    - {name: http, port: 5002, targetPort: 5002, nodePort: 30502}
