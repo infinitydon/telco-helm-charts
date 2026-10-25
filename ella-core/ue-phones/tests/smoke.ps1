@@ -1,4 +1,4 @@
-param([string]$BaseUrl='http://127.0.0.1:18080',[string]$ResultsFile='./phone-results.json')
+param([string]$BaseUrl='http://192.168.88.165:30880',[string]$ResultsFile='./phone-results.json')
 $ErrorActionPreference='Stop'
 $checks=[Collections.Generic.List[object]]::new()
 function State {Invoke-RestMethod "$BaseUrl/api/state"}

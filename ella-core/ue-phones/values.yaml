@@ -9,8 +9,13 @@ n3Interface: net1
 nodeSelector:
   kubernetes.io/hostname: ebpf-bng-node-01
 service:
-  type: ClusterIP
+  # ClusterIP, NodePort or LoadBalancer.
+  type: NodePort
   port: 8080
+  # 0 lets Kubernetes allocate a port. Ignored for ClusterIP.
+  nodePort: 30880
+  # Provider-specific LoadBalancer annotations can be supplied here.
+  annotations: {}
 resources:
   requests:
     cpu: 100m

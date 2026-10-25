@@ -17,7 +17,7 @@ Deploy and provision the [IMS/SMSC integration lab](../tests/services/README.md)
 
 Both need the public lab test key/OPc and internet/ims policies configured by bootstrap.ps1. They remain NAS-attached when IMS is unregistered, so SMS continues to work independently of IMS. Do not run the original test scenarios concurrently against these same IMSIs; each UE must have one owner.
 
-The simulator pod is privileged for TUN, IPsec/XFRM and network configuration. It shares the existing `ella-ran` bridge attachment and must run on the same node as the lab Core/IMS. The chart exposes a ClusterIP Service for local port forwarding. It has no user authentication; do not expose it to untrusted networks.
+The simulator pod is privileged for TUN, IPsec/XFRM and network configuration. It shares the existing `ella-ran` bridge attachment and must run on the same node as the lab Core/IMS. The chart defaults to a NodePort Service on port 30880. It has no user authentication; use it on a trusted lab network.
 
 ## Build and deploy
 
@@ -36,10 +36,21 @@ From the repository's ella-core directory:
 ```sh
 helm upgrade --install ue ./ue-phones -n ella-services-test --set coreN2=<core-pod-ip>:38412
 kubectl -n ella-services-test rollout status deployment/ue-phones
-kubectl -n ella-services-test port-forward service/ue-phones 18080:8080
 ```
 
-Open **http://127.0.0.1:18080**. Click **Register both phones**, then call the other phone and answer in its panel. The Messages tab works once NAS SMS is ready, without an IMS registration. The default recipient is the other phone.
+Open **http://<node-ip>:30880**; the current lab is **http://192.168.88.165:30880**. No port forwarding is required. Click **Register both phones**, then call the other phone and answer in its panel. The Messages tab works once NAS SMS is ready, without an IMS registration. The default recipient is the other phone.
+
+### Select the Service type
+
+```yaml
+service:
+  type: NodePort # ClusterIP, NodePort or LoadBalancer
+  port: 8080
+  nodePort: 30880 # 0 requests automatic allocation; ignored for ClusterIP
+  annotations: {}
+```
+
+Use Helm overrides such as `--set service.type=ClusterIP` for internal-only access, or `--set service.type=LoadBalancer --set service.nodePort=0` with a cluster load-balancer implementation. Supply provider settings through service.annotations. For NodePort, choose a free port in the cluster's configured range (normally 30000–32767).
 
 Set image.repository/tag/pullPolicy for a registry-hosted image, nodeSelector for the selected node, networkAttachment for the existing Multus NAD and n3Interface for its interface name. The current chart is a two-UE lab fixture with fixed subscriber identities and 5G access, not a generic subscriber management application.
 
@@ -47,10 +58,10 @@ The backend starts its HTTP server before attaching UEs. `/healthz` reports HTTP
 
 ## Validate
 
-With the UI port forward running:
+With the NodePort Service reachable:
 
 ```powershell
-./ue-phones/tests/smoke.ps1 -ResultsFile ./phone-results.json
+./ue-phones/tests/smoke.ps1 -BaseUrl http://192.168.88.165:30880 -ResultsFile ./phone-results.json
 ```
 
 This checks both NAS attachments and IMS registrations, bidirectional SMS including accented text and actual UE receipt, calls in both directions with manual-answer API controls, bidirectional voice-QFI packet counters, hang-up and deregistration/reregistration. It leaves both phones registered and ready for use.

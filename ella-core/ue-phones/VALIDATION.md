@@ -5,7 +5,7 @@
 ## Tested deployment
 
 - Namespace: ella-services-test; release: ue; Deployment/Service: ue-phones.
-- Chart/application: 0.1.1; image: localhost/ella-ue-phones:0.1.1, imported on ebpf-bng-node-01.
+- Chart: 0.1.2; application: 0.1.1; image: localhost/ella-ue-phones:0.1.1, imported on ebpf-bng-node-01.
 - Image manifest digest: sha256:13962e685f1e1f2ba75389114a683b6b30820d5591fe9a6d50ac2f5584d5d4ed.
 - Core source pinned by the Dockerfile: c7cf03530e52a2d353d9d1cd6159943319075bf0.
 - The earlier temporary application in ella-services-tester was stopped. The dedicated pod owns the two subscriber identities.
@@ -39,4 +39,4 @@ The original dedicated deployment was delayed by stale controllers/scheduler and
 
 The user resized the VM to approximately 20 GiB RAM. After the resize, all four nodes were Ready, controller and scheduler leases renewed normally, and the dedicated Deployment reconciled. Memory showed approximately 12 GiB available during verification. Prometheus was not deliberately paused. No experimental API-server gate change remains.
 
-To reopen the UI, run kubectl -n ella-services-test port-forward service/ue-phones 18080:8080 and visit http://127.0.0.1:18080. Do not run the original scenarios concurrently against these same subscriber identities.
+The UI now uses a NodePort Service: open http://192.168.88.165:30880 directly. All 12 functional checks were rerun successfully through this NodePort, and the browser loaded both live phone panels. ClusterIP, NodePort and LoadBalancer variants rendered successfully; ClusterIP omits nodePort. LoadBalancer provisioning itself was not exercised. Do not run the original scenarios concurrently against these same subscriber identities.
