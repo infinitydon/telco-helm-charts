@@ -13,6 +13,7 @@ internetRoute:
   gateway: 10.6.0.1
   uePool: 10.45.0.0/16
 bootstrap:
+  mode: internet-ims-sms
   enabled: false
   image: python:3.13-alpine
   email: lab@example.com

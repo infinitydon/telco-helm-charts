@@ -95,14 +95,24 @@ func (d *phoneDashboard) initialize() {
 	} else if os.Getenv("PHONE_ID") == "2" {
 		subs = subs[1:]
 	}
-	endpoints, ues, _, err := attachIMSCallUEs(env, g, subs...)
+	var endpoints []scenarios.IMSEndpoint
+	var ues []imsCallUE
+	if servicesEnabled() {
+		endpoints, ues, _, err = attachIMSCallUEs(env, g, subs...)
+	} else {
+		endpoints, ues, err = attachInternetUEs(env, g, subs...)
+	}
 	if err != nil {
 		g.Close()
 		d.fail(err)
 		return
 	}
 	for i, e := range endpoints {
-		u, cleanup, err := scenarios.DashboardIMS(e)
+		var u *testue.UE
+		var cleanup func()
+		if servicesEnabled() {
+			u, cleanup, err = scenarios.DashboardIMS(e)
+		}
 		if err != nil {
 			d.fail(err)
 			return
@@ -121,9 +131,13 @@ func (d *phoneDashboard) initialize() {
 		d.mu.Lock()
 		d.phones = append(d.phones, p)
 		d.mu.Unlock()
-		d.event(p.id, "5G attached; IMS PDU session established")
-		go d.receiveSMS(p)
-		go d.receiveCalls(p)
+		if servicesEnabled() {
+			d.event(p.id, "5G attached; internet and IMS PDU sessions established")
+			go d.receiveSMS(p)
+			go d.receiveCalls(p)
+		} else {
+			d.event(p.id, "5G attached; internet-only PDU session established")
+		}
 	}
 	if os.Getenv("BROWSER_ENABLED") == "true" {
 		if err := d.startBrowserProxy(); err != nil {
@@ -134,7 +148,11 @@ func (d *phoneDashboard) initialize() {
 	d.mu.Lock()
 	d.ready = true
 	d.mu.Unlock()
-	d.event("network", "UE ready. Register IMS to make calls; NAS SMS is available immediately.")
+	if servicesEnabled() {
+		d.event("network", "UE ready. Register IMS to make calls; NAS SMS is available immediately.")
+	} else {
+		d.event("network", "Internet-only UE ready; IMS and SMS disabled.")
+	}
 }
 func (d *phoneDashboard) fail(err error) {
 	d.mu.Lock()
@@ -275,16 +293,25 @@ func (d *phoneDashboard) state() any {
 				ended = p.call.End().String()
 			}
 		}
-		flows := p.access.leg.flows()
+		var flows []uint8
+		if servicesEnabled() {
+			flows = p.access.leg.flows()
+		}
+		registered := false
+		imsIP := ""
+		if p.ims != nil {
+			registered = p.ims.State().Registered
+			imsIP = p.endpoint.Local.String()
+		}
 		rx := p.rx
 		qfis := make([]int, len(flows))
 		for i, flow := range flows {
 			qfis[i] = int(flow)
 		}
-		out = append(out, map[string]any{"id": p.id, "name": p.name, "imsi": p.endpoint.Subscriber.IMSI, "number": p.endpoint.Subscriber.MSISDN, "ip": p.endpoint.Local.String(), "internetIp": p.internetIP, "nas": p.access.ue.SMSAllowed(), "registered": p.ims.State().Registered, "call": callState, "ended": ended, "incoming": p.incoming, "peer": p.peer, "messages": append([]phoneMessage{}, p.messages...), "tx": p.tx.Load(), "rx": rx, "qfi": qfis, "error": p.errorText})
+		out = append(out, map[string]any{"id": p.id, "name": p.name, "imsi": p.endpoint.Subscriber.IMSI, "number": p.endpoint.Subscriber.MSISDN, "ip": imsIP, "internetIp": p.internetIP, "nas": p.access.ue.SMSAllowed(), "registered": registered, "call": callState, "ended": ended, "incoming": p.incoming, "peer": p.peer, "messages": append([]phoneMessage{}, p.messages...), "tx": p.tx.Load(), "rx": rx, "qfi": qfis, "error": p.errorText})
 		p.mu.Unlock()
 	}
-	return map[string]any{"ready": ready, "problem": problem, "phones": out, "events": events, "time": time.Now().UTC()}
+	return map[string]any{"mode": phoneMode(), "ready": ready, "problem": problem, "phones": out, "events": events, "time": time.Now().UTC()}
 }
 func (d *phoneDashboard) action(w http.ResponseWriter, r *http.Request) {
 	if origin := r.Header.Get("Origin"); origin != "" {
@@ -317,6 +344,11 @@ func (d *phoneDashboard) action(w http.ResponseWriter, r *http.Request) {
 	d.mu.Unlock()
 	if p == nil || !ready {
 		http.Error(w, "UE not ready", 409)
+		return
+	}
+	if !servicesEnabled() {
+		w.WriteHeader(http.StatusForbidden)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "IMS and SMS are disabled in internet mode"})
 		return
 	}
 	p.op.Lock()
@@ -445,6 +477,9 @@ func ServePhones(address string) error {
 	if os.Getenv("CORE_N2") == "" || os.Getenv("N3_ADDRESS") == "" || os.Getenv("POD_IP") == "" {
 		return fmt.Errorf("CORE_N2, N3_ADDRESS and POD_IP are required")
 	}
+	if phoneMode() != "internet" && phoneMode() != "internet-ims-sms" {
+		return fmt.Errorf("invalid UE_MODE: %s", phoneMode())
+	}
 	d := &phoneDashboard{phones: []*dashboardPhone{}, events: []phoneEvent{}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/state", func(w http.ResponseWriter, r *http.Request) {
@@ -482,6 +517,12 @@ func ServePhones(address string) error {
 			page = strings.ReplaceAll(page, "Register both phones", "Register phone")
 			page = strings.ReplaceAll(page, "Two subscribers. One private network.", "One subscriber. Your private network.")
 			page = strings.Replace(page, "</style>", ".phones{grid-template-columns:minmax(270px,390px);justify-content:center}.sidebar{display:none}.shell{grid-template-columns:1fr}.main{max-width:900px;width:100%;margin:auto}</style>", 1)
+		}
+		if !servicesEnabled() {
+			page = strings.Replace(page, "<body>", "<body class=\"internet-only\">", 1)
+			page = strings.ReplaceAll(page, "Your network, in your hands.", "Your mobile data connection.")
+			page = strings.ReplaceAll(page, "Register your phones, make an IMS call, or send a message.<br>Every action travels through your live Ella Core.", "Browse and test connectivity through your UE’s internet PDU session.")
+			page = strings.ReplaceAll(page, "Lab simulator · Calls use synthetic RTP test packets; browser microphone and speaker audio are not connected. Messages are real NAS SMS through Ella SMSC. Session history resets when this simulator restarts.", "Internet-only simulator · Website traffic and DNS use this UE’s data session. IMS and SMS are disabled.")
 		}
 		io.WriteString(w, page)
 	})

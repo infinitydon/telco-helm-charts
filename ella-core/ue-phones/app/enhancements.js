@@ -30,7 +30,19 @@ function updateAttention(){const ringing=state.phones.filter(p=>p.incoming&&!['i
  attention.hidden=!markup;if(attention.dataset.content!==markup){attention.innerHTML=markup;attention.dataset.content=markup}
  const unread=state.phones.reduce((count,p)=>count+p.messages.filter(m=>m.direction==='received'&&m.id>(seenMessages[p.id]||0)).length,0);document.title=ringing.length?'☎ Ringing — Ella phones':unread?'('+unread+') New SMS — Ella phones':'Ella · UE phones';
 }
-function enhance(){for(const p of state.phones){const received=p.messages.filter(m=>m.direction==='received');const newest=Math.max(0,...received.map(m=>m.id));if(!(p.id in observedMessages)){observedMessages[p.id]=newest;seenMessages[p.id]=newest}
+function enhance(){
+ if(state.mode==='internet') {
+  document.body.classList.add('internet-only');
+  document.querySelector('.hero h1')?.replaceChildren('Your mobile data connection.');
+  for(const p of state.phones) {
+   $('nas-'+p.id).textContent='INTERNET READY';
+   $('ip-'+p.id).textContent='Internet IP · '+p.internetIp;
+   $('ims-status-'+p.id).textContent='Internet only';
+   const tab=document.querySelector('[data-tab="browser"][data-phone="'+p.id+'"]');
+   if(tab&&!tab.dataset.internetSelected){tab.dataset.internetSelected='true';tab.click();}
+  }
+ }
+ for(const p of state.phones){const received=p.messages.filter(m=>m.direction==='received');const newest=Math.max(0,...received.map(m=>m.id));if(!(p.id in observedMessages)){observedMessages[p.id]=newest;seenMessages[p.id]=newest}
  const fresh=received.filter(m=>m.id>observedMessages[p.id]);if(fresh.length){const latest=fresh[fresh.length-1];messageNotice={id:p.id,name:p.name,text:latest.text};notify('New SMS for '+p.name);tone();observedMessages[p.id]=newest}
  if(currentTab(p.id)==='messages')markRead(p);
  const unread=received.filter(m=>m.id>(seenMessages[p.id]||0)).length;
@@ -40,7 +52,11 @@ function enhance(){for(const p of state.phones){const received=p.messages.filter
  const ringing=p.incoming&&!['idle','terminated','confirmed'].includes(p.call);$('ring-'+p.id).hidden=!ringing;document.querySelector('[aria-label="'+p.name+'"]').querySelector('.phone').classList.toggle('is-ringing',ringing);if(ringing)$('call-status-'+p.id).textContent='INCOMING CALL · RINGING';
  if(!$('web-meta-'+p.id).dataset.loaded)$('web-meta-'+p.id).textContent=p.internetIp?'Internet UE IP · '+p.internetIp+' · via N3 / GTP-U':'Internet session unavailable';}
  updateAttention();}
-const originalRender=render;render=function(){originalRender();enhance()};
+let displayedMode=null;
+const originalRender=render;render=function(){
+ if(state.mode&&displayedMode&&state.mode!==displayedMode){location.reload();return;}
+ displayedMode=state.mode||displayedMode;originalRender();enhance();
+};
 document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');if(tab){$('browser-'+tab.dataset.phone).hidden=tab.dataset.tab!=='browser';if(tab.dataset.tab==='messages'){const p=state.phones.find(p=>p.id===tab.dataset.phone);if(p)markRead(p)}enhance()}
  const open=e.target.closest('[data-open-message]');if(open)selectPhoneTab(open.dataset.openMessage,'messages');if(e.target.closest('[data-dismiss-message]')){messageNotice=null;updateAttention()}
  const link=e.target.closest('[data-web-link]');if(link){e.preventDefault();const id=link.closest('[id^="web-page-"]').id.replace('web-page-','');$('web-url-'+id).value=link.dataset.webLink;browsePhone(id)}});
@@ -52,3 +68,5 @@ async function browsePhone(id){const field=$('web-url-'+id);field.value=normaliz
  try{const r=await fetch('/api/browse',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:id,url:$('web-url-'+id).value.trim()})});const result=await r.json();if(!r.ok)throw Error(result.error||'Page could not be loaded');$('web-url-'+id).value=result.url;meta.textContent='UE '+result.ueIp+' · HTTP '+result.status+' · '+result.bytes+' bytes · '+result.durationMs+' ms';page.innerHTML=result.html||'<h3>'+esc(result.title||result.url)+'</h3><pre>'+esc(result.text)+'</pre>';page.scrollTop=0}
  catch(e){meta.textContent='UE browsing failed';page.innerHTML='<p class="web-error">'+esc(e.message)+'</p>'}finally{button.disabled=false;button.textContent='Go'}}
 enhance();
+
+extraStyle.textContent+='body.internet-only #register-all,body.internet-only .sound-toggle,body.internet-only [id^="register-"],body.internet-only [data-tab="calls"],body.internet-only [data-tab="messages"]{display:none!important}';

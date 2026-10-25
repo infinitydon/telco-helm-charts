@@ -113,6 +113,13 @@
         "enabled",
         "image"
       ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "internet",
+        "internet-ims-sms"
+      ]
     }
   }
 }

@@ -10,7 +10,7 @@ Calls exchange synthetic test packets on the dedicated voice QFI. Browser microp
 
 ## Prerequisites
 
-Deploy and provision the [IMS/SMSC integration lab](../tests/services/README.md) first. This application uses its two voice subscribers:
+Deploy and provision the [Core lab](../ella-core-lab/README.md) first with the matching mode. IMS/SMSC are needed only for internet-ims-sms mode. This application uses its two voice subscribers:
 
 | Phone | IMSI | Number |
 | --- | --- | --- |
@@ -23,14 +23,14 @@ The simulator pod is privileged for TUN, IPsec/XFRM and network configuration. E
 
 ## Build and deploy
 
-The chart pulls the published `ghcr.io/infinitydon/ella-ue-phones:0.3.4` and `ghcr.io/infinitydon/ella-ue-browser:0.3.4` images. No node-local image import or installation script is required. Both images include Linux IP, ICMP, DNS, HTTP, socket and packet-capture tools. Browser tools retain the same unprivileged UE-only network restrictions.
+The chart pulls the published `ghcr.io/infinitydon/ella-ue-phones:0.4.1` and `ghcr.io/infinitydon/ella-ue-browser:0.3.4` images. No node-local image import or installation script is required. Both images include Linux IP, ICMP, DNS, HTTP, socket and packet-capture tools. Browser tools retain the same unprivileged UE-only network restrictions.
 
 Optional rebuild and publication from this directory on Linux:
 
 ```sh
 buildah login ghcr.io
-buildah bud --layers -t ghcr.io/infinitydon/ella-ue-phones:0.3.4 .
-buildah push ghcr.io/infinitydon/ella-ue-phones:0.3.4
+buildah bud --layers -t ghcr.io/infinitydon/ella-ue-phones:0.4.1 .
+buildah push ghcr.io/infinitydon/ella-ue-phones:0.4.1
 buildah bud --layers -t ghcr.io/infinitydon/ella-ue-browser:0.3.4 ./browser
 buildah push ghcr.io/infinitydon/ella-ue-browser:0.3.4
 ```
@@ -138,3 +138,7 @@ kubectl -n ella-services-test exec ella-services-tester -- dig ella-core-lab
 Use `ping -I <internetIp>` or `dig -b <internetIp> @8.8.8.8 example.com` in the phone container to test its current UE data address shown by `/api/state`. Browser UID 1000 remains restricted to the local SOCKS proxy; raw sockets and direct external traffic are intentionally unavailable there. Packet capture and interface changes belong in the privileged phone/tester containers or the Core diagnostic sidecar.
 
 For a private registry, create a Kubernetes pull Secret separately and set `imagePullSecrets: [{name: your-pull-secret}]` on this chart and `tester.imagePullSecrets` on the Core lab chart. Never store registry credentials in values committed to Git.
+
+## Modes
+
+Set `mode: internet` for browsing/connectivity only, or `mode: internet-ims-sms` (default) for internet, calls and NAS SMS. Set the matching `bootstrap.mode` on ella-core-lab. Use the supplied examples/internet.yaml and examples/internet-ims-sms.yaml; the complete Linux Helm install sequences are in [the Core lab guide](../ella-core-lab/README.md#select-a-deployment-mode-linux). Internet-only mode does not require IMS or SMSC services. Subscriber credentials and PLMN remain the fixed lab identities in either mode.

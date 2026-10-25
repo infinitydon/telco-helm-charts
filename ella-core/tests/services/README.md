@@ -8,7 +8,7 @@ The lab Core and tester require privileged pods. Their interfaces are confined t
 
 ## Deploy
 
-Installation is Helm-only. Follow [ella-core-lab/README.md](../../ella-core-lab/README.md) for the complete install order, the in-cluster provisioning Job and the diagnostic shell. It deploys Core, its network attachments and tester pod; the independent IMS, SMSC, UI Service and UE charts complete the lab. No PowerShell setup script is required.
+Installation is Helm-only. Follow [ella-core-lab/README.md](../../ella-core-lab/README.md) for the complete install order, the in-cluster provisioning Job and the diagnostic shell. It deploys Core, its network attachments and tester pod; the independent IMS, SMSC, UI Service and UE charts complete the lab. No host setup script is required.
 
 The raw core-lab.yaml, n6-lab.yaml and tester-pod.yaml files are retained as legacy fixtures; do not apply them alongside the corresponding Helm resources.
 

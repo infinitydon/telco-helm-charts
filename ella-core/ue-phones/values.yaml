@@ -1,7 +1,9 @@
+# internet or internet-ims-sms
+mode: internet-ims-sms
 imagePullSecrets: []
 image:
   repository: ghcr.io/infinitydon/ella-ue-phones
-  tag: 0.3.4
+  tag: 0.4.1
   pullPolicy: IfNotPresent
 # Must be a routable Core NGAP address with its SCTP port.
 coreN2: ella-core-lab-diameter:38412

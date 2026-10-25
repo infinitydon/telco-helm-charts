@@ -39,6 +39,7 @@ spec:
               valueFrom: {secretKeyRef: {name: {{ default (printf "%s-admin" .Release.Name) .Values.bootstrap.existingSecret }}, key: email}}
             - name: ADMIN_PASSWORD
               valueFrom: {secretKeyRef: {name: {{ default (printf "%s-admin" .Release.Name) .Values.bootstrap.existingSecret }}, key: password}}
+            - {name: UE_MODE, value: {{ .Values.bootstrap.mode | quote }}}
             - {name: CORE_API, value: {{ .Values.bootstrap.coreApi | quote }}}
             - {name: IMS_API, value: {{ .Values.bootstrap.imsApi | quote }}}
             - {name: SMSC_API, value: {{ .Values.bootstrap.smscApi | quote }}}

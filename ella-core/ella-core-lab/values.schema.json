@@ -38,6 +38,13 @@
         },
         "password": {
           "type": "string"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "internet",
+            "internet-ims-sms"
+          ]
         }
       }
     }
