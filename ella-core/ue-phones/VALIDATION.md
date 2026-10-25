@@ -1,5 +1,7 @@
 # UE phone validation
 
+Browser recovery update: [0.3.3 validation](BROWSER-RECOVERY-VALIDATION.md), including the OOM diagnosis and live crash/hang recovery results.
+
 Latest clean reinstall: [25 October 2026 results](../tests/services/REINSTALL-VALIDATION.md). All 24 integration scenarios, both Helm API tests and 22 phone/browser checks passed after namespace/PVC recreation.
 
 

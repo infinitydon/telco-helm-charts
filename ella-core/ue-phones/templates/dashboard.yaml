@@ -16,6 +16,7 @@ spec:
         k8s.v1.cni.cncf.io/networks: {{ $.Values.networkAttachment | quote }}
     spec:
       automountServiceAccountToken: false
+      securityContext: {fsGroup: 1000, fsGroupChangePolicy: OnRootMismatch}
       nodeSelector:
         {{- toYaml $.Values.nodeSelector | nindent 8 }}
       containers:
@@ -32,6 +33,7 @@ spec:
             - {name: PHONE_NAME, value: {{ $phone.label | quote }}}
             - {name: PEER_URL, value: {{ printf "http://%s-%s-ui:%v" $.Release.Name $phone.peer $.Values.service.port | quote }}}
             - {name: GNB_ID, value: {{ $phone.gnbId | quote }}}
+            - {name: BROWSER_VIEWER_VERSION, value: {{ $.Values.browser.image.tag | quote }}}
             - {name: BROWSER_ENABLED, value: {{ $.Values.browser.enabled | quote }}}
           ports: [{name: http, containerPort: 8080}]
           startupProbe: {httpGet: {path: /healthz, port: http}, failureThreshold: 60, periodSeconds: 2}
@@ -48,19 +50,27 @@ spec:
             runAsUser: 1000
             runAsGroup: 1000
             capabilities: {drop: [ALL]}
+          env:
+            - {name: BROWSER_RENDERER_LIMIT, value: {{ $.Values.browser.rendererProcessLimit | quote }}}
           startupProbe:
-            exec: {command: [curl, -fsS, "http://127.0.0.1:9222/json/version"]}
+            exec: {command: [/usr/local/bin/browser-state]}
+            timeoutSeconds: 5
             failureThreshold: 90
             periodSeconds: 2
-          readinessProbe:
-            exec: {command: [curl, -fsS, "http://127.0.0.1:9222/json/version"]}
+          livenessProbe:
+            exec: {command: [/usr/local/bin/browser-state]}
+            timeoutSeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
           resources:
             {{- toYaml $.Values.browser.resources | nindent 12 }}
-          volumeMounts: [{name: shm, mountPath: /dev/shm}]
+          volumeMounts: [{name: shm, mountPath: /dev/shm}, {name: browser-profile, mountPath: /home/browser/profile}]
         {{- end }}
       volumes:
         - name: tun
           hostPath: {path: /dev/net/tun, type: CharDevice}
+        - name: browser-profile
+          emptyDir: {}
         - name: shm
           emptyDir: {medium: Memory, sizeLimit: 256Mi}
 ---

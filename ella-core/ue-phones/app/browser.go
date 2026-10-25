@@ -143,10 +143,17 @@ func (d *phoneDashboard) socks(c net.Conn, p *dashboardPhone) {
 func (d *phoneDashboard) browserRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/browser", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"enabled": os.Getenv("BROWSER_ENABLED") == "true"})
+		w.Header().Set("Cache-Control", "no-store")
+		json.NewEncoder(w).Encode(map[string]any{"enabled": os.Getenv("BROWSER_ENABLED") == "true", "version": os.Getenv("BROWSER_VIEWER_VERSION")})
 	})
 	target, _ := url.Parse("http://127.0.0.1:6080")
 	proxy := httputil.NewSingleHostReverseProxy(target)
+	proxy.ModifyResponse = func(response *http.Response) error {
+		response.Header.Set("Cache-Control", "no-store")
+		response.Header.Del("Last-Modified")
+		response.Header.Del("ETag")
+		return nil
+	}
 	mux.Handle("GET /browser/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if origin := r.Header.Get("Origin"); origin != "" {
 			u, e := url.Parse(origin)
@@ -155,6 +162,8 @@ func (d *phoneDashboard) browserRoutes(mux *http.ServeMux) {
 				return
 			}
 		}
+		r.Header.Del("If-Modified-Since")
+		r.Header.Del("If-None-Match")
 		http.StripPrefix("/browser", proxy).ServeHTTP(w, r)
 	}))
 	mux.HandleFunc("POST /api/browser/navigate", func(w http.ResponseWriter, r *http.Request) {

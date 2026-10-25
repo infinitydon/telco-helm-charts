@@ -26,11 +26,11 @@ The simulator pod is privileged for TUN, IPsec/XFRM and network configuration. E
 From this directory on the selected Linux node:
 
 ```sh
-sudo buildah bud --layers -t localhost/ella-ue-phones:0.3.1 .
-sudo buildah push localhost/ella-ue-phones:0.3.1 docker-archive:/tmp/ella-ue-phones.tar:localhost/ella-ue-phones:0.3.1
+sudo buildah bud --layers -t localhost/ella-ue-phones:0.3.3 .
+sudo buildah push localhost/ella-ue-phones:0.3.3 docker-archive:/tmp/ella-ue-phones.tar:localhost/ella-ue-phones:0.3.3
 sudo microk8s ctr images import /tmp/ella-ue-phones.tar
-sudo buildah bud --layers -t localhost/ella-ue-browser:0.3.0 ./browser
-sudo buildah push localhost/ella-ue-browser:0.3.0 docker-archive:/tmp/ella-ue-browser.tar:localhost/ella-ue-browser:0.3.0
+sudo buildah bud --layers -t localhost/ella-ue-browser:0.3.3 ./browser
+sudo buildah push localhost/ella-ue-browser:0.3.3 docker-archive:/tmp/ella-ue-browser.tar:localhost/ella-ue-browser:0.3.3
 sudo microk8s ctr images import /tmp/ella-ue-browser.tar
 ```
 
@@ -101,3 +101,23 @@ helm uninstall ue -n ella-services-test
 The IMS/SMSC releases and their databases remain separate.
 
 Available Call/Answer buttons are solid green; End/Decline is solid red. Unavailable actions are gray and carry explicit availability labels.
+
+## Browser recovery
+
+The noVNC viewer reconnects automatically with bounded exponential backoff and a manual Reconnect now action. It pauses retries while offline, retries when connectivity returns, and replaces connections that fail to complete their handshake. Viewer HTML/JavaScript is served without caching and is versioned so an older disconnected viewer is not reused after upgrades.
+
+The browser container supervises Chromium, Xvfb, Openbox, x11vnc and websockify under tini. If a component exits, the stack restarts; Kubernetes startup/liveness checks also verify the X display, VNC handshake, web viewer and Chromium API, allowing hung services to recover. The UE container remains separate from browser restart handling.
+
+The profile and last observed HTTP/HTTPS page are checkpointed in a pod-local emptyDir. Cookies/profile data and that page survive a browser-container restart, including a forced process kill. This is best-effort URL recovery, not restoration of unsaved form contents; pod replacement still clears the profile. The last-page checkpoint updates every few seconds.
+
+Default browser memory is now 2 GiB with a 512 MiB request. browser.resources remains configurable; browser.rendererProcessLimit defaults to 4 as an advisory Chromium process target. Heavy pages can still exceed a configured limit, so recovery handles process/container failures rather than assuming they never happen.
+
+~~~sh
+node --test ue-phones/browser/connection.test.js
+# Open a webpage and register Phone A before these deliberate failure tests:
+python3 ue-phones/tests/browser-recovery.py --component Chromium --output chromium-recovery.json
+python3 ue-phones/tests/browser-recovery.py --component websockify --output display-recovery.json
+python3 ue-phones/tests/browser-recovery.py --component websockify --freeze --output hung-display-recovery.json
+~~~
+
+The failure tests verify restart in the same pod, profile/page recovery, and unchanged UE registration/address/restart count. The freeze case is rescued by the liveness probe. Browser reconnection itself can be observed in the already-open phone UI, without refreshing it.

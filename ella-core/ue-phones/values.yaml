@@ -1,6 +1,6 @@
 image:
   repository: localhost/ella-ue-phones
-  tag: 0.3.1
+  tag: 0.3.3
   pullPolicy: Never
 # Must be a routable Core NGAP address with its SCTP port.
 coreN2: ella-core-lab-diameter:38412
@@ -36,7 +36,8 @@ browser:
   enabled: true
   image:
     repository: localhost/ella-ue-browser
-    tag: 0.3.0
+    tag: 0.3.3
+  rendererProcessLimit: 4
   resources:
-    requests: {cpu: 100m, memory: 384Mi}
-    limits: {cpu: "2", memory: 1536Mi}
+    requests: {cpu: 100m, memory: 512Mi}
+    limits: {cpu: "2", memory: 2Gi}

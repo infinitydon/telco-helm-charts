@@ -1,0 +1,35 @@
+[
+  {
+    "fault": "KILL Chromium",
+    "passed": true,
+    "recoverySeconds": 10.8,
+    "browserRestartBefore": 0,
+    "browserRestartAfter": 1,
+    "ueRestartCount": 0,
+    "profilePreserved": true,
+    "restoredHost": "www.google.com",
+    "ueRegistered": true
+  },
+  {
+    "fault": "KILL websockify",
+    "passed": true,
+    "recoverySeconds": 19.1,
+    "browserRestartBefore": 1,
+    "browserRestartAfter": 2,
+    "ueRestartCount": 0,
+    "profilePreserved": true,
+    "restoredHost": "www.google.com",
+    "ueRegistered": true
+  },
+  {
+    "fault": "STOP websockify",
+    "passed": true,
+    "recoverySeconds": 32,
+    "browserRestartBefore": 2,
+    "browserRestartAfter": 3,
+    "ueRestartCount": 0,
+    "profilePreserved": true,
+    "restoredHost": "www.google.com",
+    "ueRegistered": true
+  }
+]

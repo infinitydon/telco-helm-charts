@@ -102,6 +102,11 @@
               "minLength": 1
             }
           }
+        },
+        "rendererProcessLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
         }
       },
       "required": [
