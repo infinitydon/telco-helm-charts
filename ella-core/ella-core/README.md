@@ -2,7 +2,7 @@
 
 This is the single Core implementation used by [ella-stack](../ella-stack/README.md). Install ella-stack for the complete Core/IMS/SMSC/phone application. This base chart is also independently installable when only Core is required.
 
-It replaces the old separate IP-based HA, FQDN HA, lab Core and UI Service implementations. topology=standalone runs one StatefulSet member; topology=ha runs three members with DNS-based Raft discovery, per-node PVCs and host anti-affinity. UI/API exposure, diagnostics and optional lab routing are part of the chart. No separate UI application or UI chart is needed.
+It replaces the old IP-based and FQDN HA chart variants, the ella-core-lab chart and the UI-only chart. topology=standalone runs one StatefulSet member; topology=ha runs three members with DNS-based Raft discovery, per-node PVCs and host anti-affinity. UI/API exposure, diagnostics and optional lab routing are part of the chart. No separate UI application or UI chart is needed.
 
 Supply admin.existingSecret or admin.password before enabling bootstrap. The ordinary bootstrap Job initializes and joins Core through the v1.20 APIs; use Helm --wait --wait-for-jobs. The optional provisioning.enabled fixture creates public test subscribers and selected services, while normal deployments can provision their own users/subscribers through the Core UI/API.
 

@@ -16,9 +16,11 @@ high-availability Ella Core private 5G deployments.
 | [`magma-agw-upstream`](magma-agw-upstream/) | Magma 1.9.0 upstream containerized AGW baseline | Host-networked AGW services | Helm lint/template and server dry-run |
 | [`free5gc-charging-portal`](free5gc-charging-portal/) | Lab top-up portal for free5GC CHF charging quota | Uses existing free5GC MongoDB and CHF services | Operator and self-service fictitious credit top-up |
 | [`free5gc-charging-stack`](free5gc-charging-stack/) | free5GC v4.2.2 core with charging top-up portal | Multus N2, N3, N4, and N6 | Stack smoke test for portal health and Multus NADs |
-| [`ella-core-5g-chart`](ella-core/ella-core-5g-chart/) | HA Ella Core cluster using stable N2 addresses for Raft | N2, N3, and N6 | Bootstrap provisioning and HA failover workflow |
-| [`ella-core-5g-chart-fqdn`](ella-core/ella-core-5g-chart-fqdn/) | HA Ella Core cluster using Kubernetes pod FQDNs for Raft | N2, N3, and N6 | Bootstrap provisioning and HA failover workflow |
-| [`ueransim-5g-chart`](ella-core/ueransim-5g-chart/) | UERANSIM gNB and UE for Ella Core | gNB N2 and N3 | Dynamic Ella Core leader discovery and UE registration |
+| [`ella-stack`](ella-core/ella-stack/) | Consolidated Ella Core deployment with selectable standalone or HA, internet-only or IMS/SMS modes, phone UIs and optional simulators | N2, N3, Raft, and N6 | Four deployment presets and standalone/HA validation |
+| [`ella-core`](ella-core/ella-core/) | Reusable Ella Core base chart, also used by ella-stack | N2, N3, Raft, and N6 | Core bootstrap and HA failover |
+| [`ella-ims`](ella-core/ella-ims/) / [`ella-smsc`](ella-core/ella-smsc/) | Independently installable IMS and SMSC components | Diameter, SIP and N6 | API smoke tests and service scenarios |
+| [`ue-phones`](ella-core/ue-phones/) | Per-UE phone UI and optional Chromium/noVNC browser | UE data path | Phone, IMS, SMS, voice and browser checks |
+| [`ueransim-5g-chart`](ella-core/ueransim-5g-chart/) / [`packetrusher`](ella-core/packetrusher/) | Optional native RAN/UE simulators for Ella Core | gNB N2 and N3 | Dynamic Core leader discovery, registration, PDU session and UE data-path tests |
 
 ## Open5GS Labs
 
@@ -41,16 +43,11 @@ a lost registration or PDU session.
 
 ## Ella Core
 
-The Ella Core charts deploy an HA Raft cluster and include automatic admin,
-API-token, join-token, subscriber, and N6 configuration. Choose one core
-variant:
-
-- `ella-core-5g-chart` advertises stable Multus N2 addresses as Raft peers.
-- `ella-core-5g-chart-fqdn` advertises Kubernetes pod FQDNs as Raft peers.
-
-Deploy `ueransim-5g-chart` alongside the selected Ella Core chart for
-end-to-end gNB and UE testing. It discovers the active Ella Core leader and
-updates the gNB after failover.
-
-See each chart's README for prerequisites, address planning, installation,
-and verification commands.
+The Ella Core deployment is consolidated in `ella-stack`; `ella-core` is its
+reusable base chart. Configure `global.mode` as `internet` or
+`internet-ims-sms` and
+`core.topology` as `standalone` or `ha`. The four presets exercise those
+combinations. Optional IMS/SMSC, phone UIs, UERANSIM and PacketRusher are
+available from the same release. See the [Ella Core guide](ella-core/README.md)
+and [stack guide](ella-core/ella-stack/README.md) for installation and
+verification commands.

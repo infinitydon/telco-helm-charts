@@ -1,6 +1,6 @@
 # Mode and Linux validation — 25 October 2026
 
-Chart ue-phones 0.4.1 and ella-core-lab 0.2.0 support internet and internet-ims-sms. The default remains internet-ims-sms. Source, Helm schemas, templates, bootstrap and phone UI were reviewed together; invalid mode values are rejected by Helm.
+At the time of this historical validation, ue-phones 0.4.1 and ella-core-lab 0.2.0 supported internet and internet-ims-sms. The default remained internet-ims-sms. The current consolidated ella-stack chart supports internet-only and combined IMS/SMS modes. Source, Helm schemas, templates, bootstrap and phone UI were reviewed together; invalid mode values are rejected by Helm.
 
 The new public image ghcr.io/infinitydon/ella-ue-phones:0.4.1 was built on Linux, pushed and deployed from GHCR. Tested manifest: sha256:661ceb613a24674a8c0836bb3966ed72a0f689a289a40da90f02a52c5ae65f51. Chromium remains on the previously validated 0.3.4 image.
 

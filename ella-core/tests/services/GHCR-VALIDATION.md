@@ -18,7 +18,7 @@ The new GHCR names were absent from the worker's MicroK8s image store before rol
 
 All three packages are public. Anonymous containerd pulls succeeded for every image without registry credentials. The lab pull Secret was deleted, and both Helm releases now have empty imagePullSecrets. The integration tester was recreated with imagePullPolicy Always and successfully pulled/started without credentials. Default chart installs require no registry login, node image import or installation script. Private-registry overrides remain supported through tester.imagePullSecrets (Core lab) and imagePullSecrets (UE chart).
 
-The complete installation order remains in ella-core-lab/README.md. Following removal of registry credentials, all 22 phone/data-path smoke checks passed again. See [public-pull phone results](../../ue-phones/tests/ghcr-public-results.json).
+The consolidated installation order is documented in [ella-stack](../../ella-stack/README.md). Following removal of registry credentials, all 22 phone/data-path smoke checks passed again. See [public-pull phone results](../../ue-phones/tests/ghcr-public-results.json).
 
 ## Results
 
