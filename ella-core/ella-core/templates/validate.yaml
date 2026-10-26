@@ -1,0 +1,18 @@
+{{- $network := mergeOverwrite (deepCopy .Values.network) ((.Values.global | default dict).network | default dict) }}
+{{- if lt (len $network.coreAddresses) (include "core.count" . | int) }}
+{{- fail "network.coreAddresses must contain an address for every Core replica" }}
+{{- end }}
+{{- if and (eq .Values.topology "ha") (eq $network.type "bridge") }}
+{{- fail "HA requires a shared L2 N6 network (macvlan), not a node-local bridge" }}
+{{- end }}
+
+{{- if and (eq .Values.topology "ha") (not .Values.controller.enabled) }}
+{{- fail "HA requires the leader Service controller" }}
+{{- end }}
+{{- $existing := lookup "apps/v1" "StatefulSet" .Release.Namespace (include "core.fullname" .) }}
+{{- if $existing }}
+{{- $old := index ($existing.metadata.annotations | default dict) "ella.network/topology" }}
+{{- if and $old (ne $old .Values.topology) }}
+{{- fail "Changing Core topology requires backup, uninstall and an explicit database migration/reset; see README" }}
+{{- end }}
+{{- end }}

@@ -1,9 +1,10 @@
+{{- if ne (default "internet-ims-sms" (.Values.global | default dict).mode) "internet" }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "ella.name" . }}
+  name: {{ include "ella-smsc.name" . }}
   labels:
-    {{- include "ella.labels" . | nindent 4 }}
+    {{- include "ella-smsc.labels" . | nindent 4 }}
 data:
   config.yaml: |
     logging:
@@ -16,3 +17,5 @@ data:
     diameter:
       address: {{ default "__POD_IP__" .Values.diameter.address | quote }}
       port: {{ .Values.diameter.port }}
+
+{{- end }}

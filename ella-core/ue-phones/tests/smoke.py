@@ -1,6 +1,6 @@
 """HTTP smoke tests for dedicated UE UIs; optional kubectl network-failure tests."""
 import argparse, json, pathlib, subprocess, time, urllib.request, urllib.error
-p=argparse.ArgumentParser();p.add_argument('--phone-a',default='http://192.168.88.165:30880');p.add_argument('--phone-b',default='http://192.168.88.165:30881');p.add_argument('--output',default='phone-results.json');p.add_argument('--network',action='store_true');p.add_argument('--kubeconfig');p.add_argument('--namespace',default='ella-services-test');a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--release',default='ue');p.add_argument('--phone-a',default='http://192.168.88.165:30880');p.add_argument('--phone-b',default='http://192.168.88.165:30881');p.add_argument('--output',default='phone-results.json');p.add_argument('--network',action='store_true');p.add_argument('--kubeconfig');p.add_argument('--namespace',default='ella-services-test');a=p.parse_args()
 urls={'1':a.phone_a,'2':a.phone_b};results=[]
 def api(id,path,body=None):
     request=urllib.request.Request(urls[id]+path,data=None if body is None else json.dumps(body).encode(),headers={'Content-Type':'application/json'})
@@ -45,20 +45,20 @@ try:
     try:api('1','/api/browse',{'phone':'1','url':'http://127.0.0.1'});raise AssertionError('Private destination accepted')
     except urllib.error.HTTPError as error:assert 'private and special-use' in error.read().decode();passed('Private web destination rejected')
     if a.network:
-        for deployment in ('ue-ue-a','ue-ue-b'):
+        for deployment in (a.release+'-ue-a',a.release+'-ue-b'):
             run=curl(deployment);assert run.returncode==0 and run.stdout=='200';passed(deployment+' HTTPS through UE proxy')
             assert curl(deployment,True).returncode!=0
             rules=command(deployment,'phone','iptables','-nvL','ELLA_BROWSER').stdout
             assert any(line.split()[0]!='0' for line in rules.splitlines() if 'REJECT' in line)
             passed(deployment+' direct browser egress blocked')
         try:
-            command('ue-ue-a','phone','ip','link','set','ellaweb0','down')
-            assert curl('ue-ue-a').returncode!=0;passed('UE A cannot browse while its TUN is down')
-            run=curl('ue-ue-b');assert run.returncode==0 and run.stdout=='200';passed('UE B unaffected by UE A tunnel interruption')
+            command(a.release+'-ue-a','phone','ip','link','set','ellaweb0','down')
+            assert curl(a.release+'-ue-a').returncode!=0;passed('UE A cannot browse while its TUN is down')
+            run=curl(a.release+'-ue-b');assert run.returncode==0 and run.stdout=='200';passed('UE B unaffected by UE A tunnel interruption')
         finally:
-            command('ue-ue-a','phone','ip','link','set','ellaweb0','up')
-            command('ue-ue-a','phone','ip','route','replace','default','dev','ellaweb0','table','200')
-        run=curl('ue-ue-a');assert run.returncode==0 and run.stdout=='200';passed('UE A browsing recovered')
+            command(a.release+'-ue-a','phone','ip','link','set','ellaweb0','up')
+            command(a.release+'-ue-a','phone','ip','route','replace','default','dev','ellaweb0','table','200')
+        run=curl(a.release+'-ue-a');assert run.returncode==0 and run.stdout=='200';passed('UE A browsing recovered')
 except Exception as error:
     results.append({'check':str(error),'passed':False});raise
 finally:

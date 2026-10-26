@@ -1,0 +1,15 @@
+dependencies:
+- name: ella-core
+  repository: file://../ella-core
+  version: 2.0.0
+- name: ella-ims
+  repository: file://../ella-ims
+  version: 0.2.0
+- name: ella-smsc
+  repository: file://../ella-smsc
+  version: 0.2.0
+- name: ue-phones
+  repository: file://../ue-phones
+  version: 0.5.0
+digest: sha256:4aab714a12e14018f2103cf39e3f6192fec00ca156603f8e1be646e803613943
+generated: "2026-10-25T19:44:39.3970472-04:00"

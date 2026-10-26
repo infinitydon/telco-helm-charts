@@ -1,0 +1,90 @@
+[
+  {
+    "check": "Both UEs attached with NAS SMS",
+    "passed": true
+  },
+  {
+    "check": "Both UEs IMS registered",
+    "passed": true
+  },
+  {
+    "check": "NAS SMS 1 to 2 received and delivered",
+    "passed": true
+  },
+  {
+    "check": "NAS SMS 2 to 1 received and delivered",
+    "passed": true
+  },
+  {
+    "check": "IMS incoming 1 to 2",
+    "passed": true
+  },
+  {
+    "check": "IMS confirmed with bidirectional voice QFI 1 to 2",
+    "passed": true
+  },
+  {
+    "check": "IMS call released 1 to 2",
+    "passed": true
+  },
+  {
+    "check": "IMS incoming 2 to 1",
+    "passed": true
+  },
+  {
+    "check": "IMS confirmed with bidirectional voice QFI 2 to 1",
+    "passed": true
+  },
+  {
+    "check": "IMS call released 2 to 1",
+    "passed": true
+  },
+  {
+    "check": "Phone A deregistration",
+    "passed": true
+  },
+  {
+    "check": "Phone A reregistration",
+    "passed": true
+  },
+  {
+    "check": "HTTPS reader through UE 1",
+    "passed": true
+  },
+  {
+    "check": "HTTPS reader through UE 2",
+    "passed": true
+  },
+  {
+    "check": "Private web destination rejected",
+    "passed": true
+  },
+  {
+    "check": "ella-ue-a HTTPS through UE proxy",
+    "passed": true
+  },
+  {
+    "check": "ella-ue-a direct browser egress blocked",
+    "passed": true
+  },
+  {
+    "check": "ella-ue-b HTTPS through UE proxy",
+    "passed": true
+  },
+  {
+    "check": "ella-ue-b direct browser egress blocked",
+    "passed": true
+  },
+  {
+    "check": "UE A cannot browse while its TUN is down",
+    "passed": true
+  },
+  {
+    "check": "UE B unaffected by UE A tunnel interruption",
+    "passed": true
+  },
+  {
+    "check": "UE A browsing recovered",
+    "passed": true
+  }
+]

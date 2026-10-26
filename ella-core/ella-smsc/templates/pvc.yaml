@@ -1,10 +1,11 @@
+{{- if ne (default "internet-ims-sms" (.Values.global | default dict).mode) "internet" }}
 {{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "ella.name" . }}
+  name: {{ include "ella-smsc.name" . }}
   labels:
-    {{- include "ella.labels" . | nindent 4 }}
+    {{- include "ella-smsc.labels" . | nindent 4 }}
 spec:
   accessModes: [ReadWriteOnce]
   {{- if .Values.persistence.storageClass }}
@@ -13,4 +14,6 @@ spec:
   resources:
     requests:
       storage: {{ .Values.persistence.size }}
+{{- end }}
+
 {{- end }}

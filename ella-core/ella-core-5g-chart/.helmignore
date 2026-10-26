@@ -1,6 +1,0 @@
-.git
-.gitignore
-*.swp
-*.bak
-*.orig
-__pycache__

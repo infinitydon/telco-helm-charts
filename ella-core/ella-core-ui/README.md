@@ -1,29 +1,9 @@
-# Ella Core UI Service
+# ella-core-ui - consolidated
 
-Helm-managed UI/API access for an existing Core deployment. This chart creates only a Service, so changing access does not restart Core or touch its database. The full ella-core-5g-chart already includes configurable UI/API Services; this companion chart serves the integration-lab Core chart or another existing deployment.
+This chart implementation has been replaced by [ella-stack](../ella-stack/README.md) and the single [ella-core](../ella-core/README.md) base chart. This directory is a migration pointer, not an installable chart.
 
-From the repository's ella-core directory:
+Use one of the four ella-stack/examples presets for standalone or three-node HA, with internet-only or internet plus IMS/SMS. DNS-based Raft discovery, persistent storage, UI/API Service options, diagnostics and mode-aware provisioning are now in the unified implementation. IMS/SMSC and UE phones remain optional dependencies and independently installable charts.
 
-```sh
-helm upgrade --install core-ui ./ella-core-ui -n ella-services-test -f tests/services/core-ui-values.yaml
-```
+This is an explicit migration, not a drop-in upgrade. Back up Core and IMS/SMSC data and save existing Helm values. Uninstall old releases, then install the consolidated release using the new values schema. Do not reuse a standalone database as HA or delete PVCs without a verified backup. Old chart source remains available in Git history before the consolidation commit.
 
-The lab UI is http://192.168.88.165:30502/. Use the account initialized by the lab bootstrap; credentials are not stored in this chart.
-
-Configure access through values:
-
-```yaml
-service:
-  name: ella-core-lab
-  type: NodePort # ClusterIP, NodePort, LoadBalancer
-  port: 5002
-  targetPort: 5002
-  nodePort: 30502 # 0 requests automatic allocation; ignored for ClusterIP
-  annotations: {}
-selector:
-  app: ella-core-lab
-```
-
-For another existing Core deployment, set selector to its pod labels and targetPort to its UI/API listening port. A blank service.name defaults to RELEASE-ui. Each Service type can also be selected with --set service.type=ClusterIP or --set service.type=LoadBalancer.
-
-Migration of an existing unmanaged Service needs --take-ownership on the first install only. The running lab has already been migrated to release core-ui; subsequent changes use an ordinary helm upgrade. No configuration script is needed. Uninstalling this release removes the UI Service but leaves Core running.
+The lab migration performed for this change saved Core's API backup, IMS/SMSC archives and release values/manifests outside Git before cleaning the five old lab releases.

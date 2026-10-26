@@ -1,0 +1,22 @@
+{
+  "passed": true,
+  "oldLeader": "ella-core-0",
+  "newLeader": "ella-core-1",
+  "electionServiceSeconds": 7.3,
+  "allMembersReadySeconds": 21.0,
+  "pvcUIDsPreserved": [
+    {
+      "name": "data-ella-core-0",
+      "uid": "bc065eb0-de44-4440-ab47-3139c9b9bb84"
+    },
+    {
+      "name": "data-ella-core-1",
+      "uid": "2551b412-7e69-4119-a844-121b2ea2f352"
+    },
+    {
+      "name": "data-ella-core-2",
+      "uid": "6807242c-d64b-4e61-bace-b313cb1ce945"
+    }
+  ],
+  "replacementUID": "9fc45278-52a4-4fa6-a35a-df2c07be4210"
+}

@@ -1,0 +1,14 @@
+{{- if and (eq .Values.global.mode "internet-ims-sms") (or (not .Values.ims.enabled) (not .Values.smsc.enabled)) }}
+{{- fail "internet-ims-sms mode requires ims.enabled and smsc.enabled" }}
+{{- end }}
+{{- if and .Values.phones.enabled (not .Values.core.provisioning.enabled) }}
+{{- fail "The supplied lab phones require core.provisioning.enabled" }}
+{{- end }}
+
+{{- if .Values.core.fullnameOverride }}
+{{- fail "Use the release-derived Core name in ella-stack; fullnameOverride is only supported by the standalone base chart" }}
+{{- end }}
+
+{{- if and .Values.phones.enabled .Values.phones.waitForBootstrap.enabled (not .Values.core.bootstrap.enabled) }}
+{{- fail "Phone provisioning wait requires core.bootstrap.enabled" }}
+{{- end }}

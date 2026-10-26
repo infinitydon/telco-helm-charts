@@ -1,3 +1,6 @@
+waitForBootstrap:
+  enabled: false
+global: {}
 # internet or internet-ims-sms
 mode: internet-ims-sms
 imagePullSecrets: []
@@ -6,11 +9,11 @@ image:
   tag: 0.4.1
   pullPolicy: IfNotPresent
 # Must be a routable Core NGAP address with its SCTP port.
-coreN2: ella-core-lab-diameter:38412
-networkAttachment: ella-ran
-n3Interface: net1
+coreN2: ella-core-active:38412
+networkAttachment: ""
+n3Interface: eth0
 nodeSelector:
-  kubernetes.io/hostname: ebpf-bng-node-01
+  kubernetes.io/arch: amd64
 service:
   # ClusterIP, NodePort or LoadBalancer.
   type: NodePort
@@ -25,7 +28,7 @@ resources:
   limits:
     memory: 1Gi
 internetGateway:
-  enabled: true
+  enabled: false
   # Empty reuses the dashboard image, which includes routing/NAT tools.
   image: ""
   bridge: ella-test-n6

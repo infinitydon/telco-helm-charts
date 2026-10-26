@@ -1,0 +1,10 @@
+{{- if eq .Values.topology "ha" }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: {{ include "core.fullname" . }}}
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      {{- include "core.labels" . | nindent 6 }}
+{{- end }}

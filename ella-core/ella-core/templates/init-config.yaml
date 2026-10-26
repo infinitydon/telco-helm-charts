@@ -1,0 +1,42 @@
+{{- $network := mergeOverwrite (deepCopy .Values.network) ((.Values.global | default dict).network | default dict) }}
+{{- $name := include "core.fullname" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: {{ $name }}-init}
+data:
+  init.sh: |
+    #!/bin/sh
+    set -eu
+    ordinal=${HOSTNAME##*-}
+    n6=$(echo '{{ $network.coreAddresses | toJson }}' | jq -r ".[$ordinal]")
+    test "$n6" != null
+    ip address replace "$n6" dev net1
+    ip link set net1 up
+    # Complete checksums for same-host macvlan delivery before NIC offload.
+    ethtool -K net1 tx off || true
+    for iface in eth0 net1; do ethtool -K "$iface" gro off gso off tso off || true; done
+    tc qdisc replace dev net1 clsact
+    tc filter replace dev net1 egress protocol ip pref 10 matchall action csum ip4h and tcp and udp
+    ip route replace default via {{ $network.gateway }} dev net1 table 200
+    ip rule show | grep -Fq 'from {{ $network.internetPool }} lookup 200' || ip rule add priority 1200 from {{ $network.internetPool }} table 200
+    # Announce replacement MACs before accepting user-plane traffic.
+    arping -U -c 2 -I net1 "${n6%/*}" || true
+    cat > /config/core.yaml <<EOF
+    logging:
+      system: {level: info, output: stdout}
+      audit: {output: stdout}
+    db: {path: /data/core.db}
+    interfaces:
+      n2: {address: "$POD_IP"}
+      n3: {name: eth0}
+      n6: {name: net1}
+      api: {address: "$POD_IP", port: 5002}
+      diameter: {address: "$POD_IP"}
+    datapath: {attach-mode: tcx}
+    {{- if eq .Values.topology "ha" }}
+    cluster:
+      enabled: true
+      bind-address: "$POD_IP:7000"
+      advertise-address: "$HOSTNAME.{{ $name }}-peers.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}:7000"
+    {{- end }}
+    EOF

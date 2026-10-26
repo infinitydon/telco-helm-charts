@@ -1,3 +1,4 @@
+global: {}
 image:
   repository: ghcr.io/ellanetworks/ella-ims
   tag: sha-2c8873dc8744

@@ -1,0 +1,11 @@
+global:
+  mode: internet
+core:
+  topology: ha
+  replicaCount: 3
+  provisioning: {enabled: true}
+  controller: {gatewayEnabled: true}
+phones:
+  enabled: true
+tester:
+  enabled: false

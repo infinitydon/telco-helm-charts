@@ -1,0 +1,50 @@
+global: {}
+fullnameOverride: ""
+topology: standalone
+replicaCount: 3
+image: ghcr.io/infinitydon/ellacore@sha256:926206d7e1b4e4d64ef3f9f91211ec5630951f33ae62c33c694fbd4f83d6bf91
+pullPolicy: IfNotPresent
+imagePullSecrets: []
+initImage: ghcr.io/infinitydon/ella-ue-phones:0.4.1
+admin:
+  existingSecret: ""
+  email: lab@example.com
+  password: ""
+bootstrap:
+  enabled: true
+  image: python:3.13-alpine
+provisioning:
+  enabled: false
+persistence:
+  enabled: true
+  size: 2Gi
+  storageClass: ""
+service:
+  type: ClusterIP
+  port: 5002
+  nodePort: 0
+  annotations: {}
+clusterDomain: cluster.local
+network:
+  type: bridge
+  bridge: ella-stack-n6
+  master: eth0
+  coreAddresses: [10.6.0.2/24, 10.6.0.3/24, 10.6.0.4/24]
+  gateway: 10.6.0.1
+  imsAddress: 10.6.0.5
+  internetPool: 10.45.0.0/16
+  imsPool: 10.60.0.0/16
+controller:
+  enabled: true
+  image: ghcr.io/infinitydon/ella-ue-phones:0.4.1
+  gatewayEnabled: false
+  nodeSelector: {kubernetes.io/arch: amd64}
+nodeSelector: {kubernetes.io/arch: amd64}
+affinity: {}
+tolerations: []
+resources:
+  requests: {cpu: 100m, memory: 512Mi}
+  limits: {memory: 2Gi}
+troubleshooting:
+  enabled: true
+  image: ghcr.io/nicolaka/netshoot:v0.16@sha256:b09d9b21381f47a79b3cbcb30da25266dc17186ea00ae65e99fdc51396f48e70
