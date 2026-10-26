@@ -1,0 +1,16 @@
+{
+  "ueransim": {
+    "podUIDPreserved": true,
+    "generationBefore": 2,
+    "generationAfter": 3,
+    "coreIPBefore": "10.1.154.213",
+    "coreIPAfter": "10.1.181.52"
+  },
+  "packetrusher": {
+    "podUIDPreserved": true,
+    "generationBefore": 2,
+    "generationAfter": 3,
+    "coreIPBefore": "10.1.154.213",
+    "coreIPAfter": "10.1.181.52"
+  }
+}

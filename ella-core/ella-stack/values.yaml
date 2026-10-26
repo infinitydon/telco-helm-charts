@@ -51,3 +51,9 @@ phones:
 tester:
   enabled: false
   image: ghcr.io/infinitydon/ella-services-tester:c7cf03530e52-tools1
+ueransim:
+  enabled: false
+  core: {host: '{{ .Release.Name }}-core-active'}
+packetrusher:
+  enabled: false
+  core: {host: '{{ .Release.Name }}-core-active'}

@@ -1,0 +1,22 @@
+{
+  "passed": true,
+  "oldLeader": "simlab-core-0",
+  "newLeader": "simlab-core-1",
+  "electionServiceSeconds": 4.1,
+  "allMembersReadySeconds": 14.7,
+  "pvcUIDsPreserved": [
+    {
+      "name": "data-simlab-core-0",
+      "uid": "af7d8785-1c59-4f0c-8c7e-6d54ecacace7"
+    },
+    {
+      "name": "data-simlab-core-1",
+      "uid": "a42c9088-381d-49c7-a7c5-b7139baff236"
+    },
+    {
+      "name": "data-simlab-core-2",
+      "uid": "8da37d02-cbcb-47a0-9cbb-0f5bad6f7214"
+    }
+  ],
+  "replacementUID": "a7a31262-a7c0-476b-9a6e-4948c6bf3ef0"
+}

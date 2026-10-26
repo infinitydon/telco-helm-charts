@@ -1,0 +1,6 @@
+dependencies:
+- name: ella-simulator
+  repository: file://../ella-simulator
+  version: 0.1.0
+digest: sha256:369f1d89c7665cce2670ecaac797c176ceab6afff2126550206380348b628b8b
+generated: "2026-10-26T07:38:48.6287771-04:00"

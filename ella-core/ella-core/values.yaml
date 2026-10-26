@@ -15,6 +15,7 @@ bootstrap:
   image: python:3.13-alpine
 provisioning:
   enabled: false
+  reconcileDataNetworks: false
 persistence:
   enabled: true
   size: 2Gi

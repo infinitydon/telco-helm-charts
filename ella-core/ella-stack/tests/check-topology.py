@@ -1,6 +1,6 @@
 """Verify live Core topology, DNS identity, leader routing and persistent claims."""
 import argparse,base64,json,pathlib,subprocess,time,urllib.request
-p=argparse.ArgumentParser();p.add_argument('--admin-secret');p.add_argument('--core-api',default='http://192.168.88.165:30502');p.add_argument('--release',default='ella');p.add_argument('--namespace',default='ella-services-test');p.add_argument('--topology',choices=['standalone','ha'],required=True);p.add_argument('--output',default='topology.json');a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--admin-secret');p.add_argument('--ims-ue-address',default='10.60.0.100');p.add_argument('--core-api',default='http://192.168.88.165:30502');p.add_argument('--release',default='ella');p.add_argument('--namespace',default='ella-services-test');p.add_argument('--topology',choices=['standalone','ha'],required=True);p.add_argument('--output',default='topology.json');a=p.parse_args()
 k=['kubectl','-n',a.namespace];name=a.release+'-core'
 def get(*args):return json.loads(subprocess.check_output(k+list(args),text=True))
 def execute(pod,container,*args):return subprocess.check_output(k+['exec',pod,'-c',container,'--',*args],text=True,timeout=15)
@@ -21,8 +21,9 @@ for service in (name,name+'-active'):
  assert get('get','service',service,'-o','json')['spec']['selector']['statefulset.kubernetes.io/pod-name']==leader
 if a.topology=='ha':assert len({r['node'] for r in records})==3
 controller=get('get','pods','-l','app='+name+'-controller','-o','json')['items'][0]['metadata']['name']
-route=json.loads(execute(controller,'controller','ip','-j','route','get','10.60.0.100'))[0]
-expected='10.6.0.'+str(int(leader.rsplit('-',1)[1])+2);assert route['gateway']==expected
+route=json.loads(execute(controller,'controller','ip','-j','route','get',a.ims_ue_address))[0]
+leader_link=json.loads(execute(leader,'troubleshoot','ip','-j','-4','address','show','dev','net1'))[0]
+expected=next(x['local'] for x in leader_link['addr_info'] if x['family']=='inet');assert route['gateway']==expected
 result={'topology':a.topology,'passed':True,'leader':leader,'members':records,'claims':claims,'imsReturnGateway':expected}
 if a.admin_secret and a.topology=='ha':
  secret=get('get','secret',a.admin_secret,'-o','json')['data']

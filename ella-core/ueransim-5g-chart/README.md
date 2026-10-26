@@ -1,175 +1,43 @@
-# UERANSIM 5G — Helm Chart
+# UERANSIM for Ella Core
 
-5G UE/gNB simulator for end-to-end testing of the Ella Core private network. Deploys a separate gNB and UE with dynamic AMF leader discovery.
+This chart uses upstream [UERANSIM v3.3.0](https://github.com/aligungr/UERANSIM/releases/tag/v3.3.0), the latest stable release checked on October 26, 2026. The old free5gc image tag v4.2.2 was a different image/version line; the default now contains an unmodified build of the aligungr release at commit 6bf5a1a96aaef6ae8778b9d8b477ac6e2bbf8156.
 
-## Architecture
+One Pod runs the native gNB and UE, with N2/N3 on the Kubernetes pod network and RLS on loopback. A supervisor resolves the active Core Service, waits for Core readiness, and restarts both native processes when the active endpoint changes. This works with standalone and three-member Core HA. Readiness requires a UE tunnel address and live native processes. Recovery is reattachment, not uninterrupted sessions or a radio handover.
 
-```
-Deployment: ueransim-gnb  (1 replica)
-  ┌─────────────────────────────────────────────────────────┐
-  │ Init: config-gen (alpine, runs once)                     │
-  │   1. Reads API token from mounted Secret file            │
-  │   2. Queries /api/v1/cluster/members                    │
-  │   3. Extracts leader N2 IP from raftAddress (strips port)│
-  │   4. Reads local N2/N3 IPs from Multus interfaces        │
-  │   5. Generates gnb.yaml with leader as AMF               │
-  │   6. Writes initial leader IP to /shared/leader-ip       │
-  │                                                          │
-  │ Sidecar: leader-watch (alpine, runs continuously)        │
-  │   - Polls /api/v1/cluster/members every 10s              │
-  │   - Extracts leader N2 IP from raftAddress               │
-  │   - Writes current leader IP to /shared/leader-ip        │
-  │                                                          │
-  │ Main: gnb (bash wrapper → nr-gnb)                        │
-  │   - Wrapper monitors /shared/leader-ip for changes       │
-  │   - On leader change: sed-updates gnb.yaml + restarts    │
-  │     nr-gnb automatically (no pod restart needed)         │
-  │   - ngapIp → local N2 IP (macvlan)                       │
-  │   - gtpIp  → local N3 IP (macvlan)                       │
-  │   - AMF    → leader N2 IP:38412                          │
-  │   - RLS    → UDP 4997 (UE connection)                    │
-  └─────────────────────────────────────────────────────────┘
+## Install
 
-Deployment: ueransim-ue  (1 replica)
-  ┌────────────────────────────────────────────┐
-  │ Main: nr-ue                                 │
-  │   gnbSearchList → [ueransim-gnb]           │
-  │   Connects to gNB over RLS (UDP 4997)      │
-  │   PDU session via gNB → Ella Core          │
-  └────────────────────────────────────────────┘
+Prefer the optional component in the consolidated release:
 
-Service: ueransim-gnb (ClusterIP, UDP 4997)
-  Internal RLS link between UE → gNB
-
-Volumes (shared via emptyDir):
-  /shared       — leader-ip file (written by sidecar, read by wrapper)
-  /config       — gnb.yaml (written by init, updated by wrapper)
-  /tmp/api-token — API token (mounted from Secret)
+```sh
+helm upgrade --install ella ./ella-core/ella-stack -n ella-services-test \
+  -f ./ella-core/ella-stack/examples/standalone-internet-ims-sms.yaml \
+  --set core.admin.existingSecret=ella-lab-admin --set ueransim.enabled=true \
+  --wait --wait-for-jobs --timeout 8m
 ```
 
-**Automatic leader failover**: The sidecar polls the Ella Core API every 10 seconds. When the leader changes (HA failover), the sidecar writes the new leader's N2 IP to `/shared/leader-ip`. The gNB wrapper detects the change within 5 seconds and restarts `nr-gnb` with the updated AMF address — no pod restart or manual intervention needed. Total failover time: ~15 seconds (sidecar poll + wrapper poll + gNB restart).
+The same option works with ha-internet.yaml, ha-internet-ims-sms.yaml and standalone-internet.yaml. The Core presets provision the chart's public lab subscriber. For an independently installed chart, provision that subscriber on Core first:
 
-## Prerequisites
+```sh
+helm install ran ./ella-core/ueransim-5g-chart -n ella-services-test \
+  --set core.host=ella-core-active --wait --timeout 5m
+helm test ran -n ella-services-test
+kubectl -n ella-services-test exec deployment/ran-ueransim -- \
+  curl -fsS http://127.0.0.1:8080/healthz
+```
 
-- **Ella Core chart deployed** and healthy in the `ella-core` namespace
-- **Multus CNI** and **Whereabouts** configured (same cluster as Ella Core)
-- **Host interfaces** available for N2 and N3 macvlan attachment
-- **API token secret** created by the Ella Core bootstrap job (`ella-core-ueransim-api-token`)
-- **No RBAC required** — API token is mounted as a file, all API calls use curl directly
+Dependencies are vendored. Installation is Helm only; image building is optional. Linux nodes need SCTP and /dev/net/tun. The supplied image targets Linux/amd64 and includes Python and Linux IP, DNS, HTTP and packet-capture tools. The privileged Pod configures its own network namespace. Set nodeSelector, affinity and tolerations for your nodes.
 
 ## Configuration
 
-See `values.yaml` for all options:
+- core.host defaults to ella-core-active. A bare Service name uses core.namespace (default: the release namespace) and core.clusterDomain; a full DNS name or IPv4 address is also accepted. Use the active headless NGAP Service to follow HA leadership.
+- The default IMSI is 001018900000100, with the public fixture key/OPc in values.yaml. Set subscriber and session values to match Core. subscriber.existingSecret can reference a same-namespace Secret with key and opc fields; those values are then omitted from the ConfigMap.
+- session defaults to internet, SST 1, SD 102030. Configure gnb.nci/idLength for a different radio identity. Independent instances need unique radio and subscriber identities.
+- This is the native upstream internet UE/gNB simulator. IMS calls and NAS SMS testing continue to use the dedicated UE phone/Core tester components.
 
-| Section | Purpose |
-|----------|---------|
-| `image` | UERANSIM container image (`free5gc/ueransim:v4.2.2`) |
-| `ellaCore` | Connection to Ella Core: namespace, service name, API port, token secret |
-| `gnb` | gNB parameters: NCI, TAC, slices |
-| `subscriber` | UE credentials: SUPI, MCC/MNC, key, OPC, AMF |
-| `interfaces.n2/n3` | Host interface and IP for gNB radio/user-plane attachment |
+The runtime needs no Core admin token or Kubernetes API permissions. A ClusterIP health Service exposes status without SIM credentials. The default image is digest-pinned; its release tag is ghcr.io/infinitydon/ella-services-tester:ueransim-v3.3.0-tools1. images/Dockerfile reproduces the source build and includes the upstream AGPL license/source revision.
 
-### IP Planning
+## Tests and migration
 
-The gNB needs its own N2 and N3 IPs — these must be in the **same subnets** as the Ella Core N2/N3 networks but **different addresses** from the core nodes.
+See [native simulator validation](../tests/simulators/README.md). Essential checks verify native registration/PDU state and ICMP, DNS and HTTPS bound to the UE address. The optional core-tester protocol suite shares fixture IMSIs: pause all UE phone/native simulator deployments before running it; the runner checks for conflicting owners.
 
-Default allocation:
-```
-Ella Core:  N2 10.10.0.10-12,  N3 10.10.1.10-12
-UERANSIM:   N2 10.10.0.20,     N3 10.10.1.20
-```
-
-## Installation
-
-```bash
-# Deploy in the same namespace as Ella Core (recommended)
-helm install ueransim /home/ubuntu/ueransim-5g-chart \
-  --namespace ella-core \
-  --kubeconfig <path-to-kubeconfig>
-
-# Or in its own namespace
-helm install ueransim /home/ubuntu/ueransim-5g-chart \
-  --namespace ueransim \
-  --create-namespace \
-  --set ellaCore.namespace=ella-core
-```
-
-The chart requires cross-namespace access if deployed outside `ella-core`. The RBAC is scoped to the specific pod and secret resources it needs.
-
-## How It Connects to Ella Core
-
-1. **Init container** runs once before gNB starts:
-   - Reads API token from mounted Secret file (`/tmp/api-token/token`)
-   - Calls `GET /api/v1/cluster/members` to find the leader
-   - Extracts the leader's N2 IP from `raftAddress` (e.g. `10.10.0.10:7000` → `10.10.0.10`)
-   - Discovers local N2/N3 IPs from Multus interfaces
-   - Generates initial `/config/gnb.yaml` and writes leader IP to `/shared/leader-ip`
-
-2. **Sidecar** runs continuously alongside gNB:
-   - Polls `GET /api/v1/cluster/members` every 10 seconds
-   - Detects leader changes and updates `/shared/leader-ip`
-
-3. **gNB wrapper** manages the gNB process:
-   - Reads `/shared/leader-ip`, starts `nr-gnb` with current leader as AMF
-   - Monitors for leader IP changes every 5 seconds
-   - On change: sed-updates `/config/gnb.yaml` AMF address, kills old `nr-gnb`, starts new one
-
-4. **UE** connects to gNB over the internal RLS link (UDP 4997) with pre-configured subscriber credentials.
-
-## Handling Leader Changes
-
-Leader changes are handled **automatically** — no manual intervention needed:
-
-1. Ella Core leader changes (failover, rolling upgrade)
-2. Sidecar detects new leader within 10 seconds (next poll cycle)
-3. Wrapper detects updated `/shared/leader-ip` within 5 seconds
-4. Wrapper kills old `nr-gnb`, starts new one with updated AMF address
-5. gNB re-establishes NGAP connection to new leader
-
-Total recovery time: ~15-20 seconds.
-
-To observe the failover in action:
-
-```bash
-# Watch sidecar logs for leader detection
-kubectl -n ella-core logs deployment/ueransim-gnb -c leader-watch -f
-
-# Watch gNB wrapper for restart events
-kubectl -n ella-core logs deployment/ueransim-gnb -c gnb -f
-```
-
-## Verification
-
-```bash
-# Check deployments are running
-kubectl -n ella-core get deployments
-
-# Check gNB init logs — shows leader discovery
-kubectl -n ella-core logs deployment/ueransim-gnb -c config-gen
-
-# Check gNB connected successfully
-kubectl -n ella-core logs deployment/ueransim-gnb -c gnb | grep -i "ngsetup\|amf"
-
-# Check UE registration status via Ella Core API
-TOKEN=$(curl -s -X POST http://<node-ip>:30502/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@ellanetworks.com","password":"changeme"}' | \
-  grep -o '"token":"[^"]*"' | cut -d'"' -f4)
-
-curl -s -H "Authorization: Bearer ${TOKEN}" \
-  http://<node-ip>:30502/api/v1/subscribers/001010000000001 | python3 -m json.tool
-```
-
-A successful setup shows the subscriber with `"registered": true` and a PDU session established.
-
-## Troubleshooting
-
-**Init container can't read token**: Verify the Secret exists — `kubectl -n ella-core get secret ella-core-ueransim-api-token`. If missing, the Ella Core bootstrap job may not have run; re-install or re-run the bootstrap hook.
-
-**Sidecar can't reach API**: Check `kubectl -n ella-core logs deployment/ueransim-gnb -c leader-watch`. Verify the `ella-core-api` service exists in the target namespace.
-
-**gNB can't reach AMF**: Verify N2 IPs are in the same subnet and the host interfaces are on the same L2 domain. Check `kubectl -n ella-core logs deployment/ueransim-gnb -c gnb`.
-
-**gNB not restarting on leader change**: Check that the wrapper script is running: `kubectl -n ella-core logs deployment/ueransim-gnb -c gnb`. Verify the sidecar is updating `/shared/leader-ip`: `kubectl -n ella-core logs deployment/ueransim-gnb -c leader-watch`.
-
-**UE not registering**: Verify the subscriber credentials in `values.yaml` match what was provisioned in Ella Core. The subscriber must exist before the UE can attach.
+Chart 2.0.0 replaces the former split gNB/UE deployments, node-specific Multus interfaces, numeric-member-ID discovery and API-token sidecars. Uninstall the old UERANSIM release before installing 2.0.0 to avoid duplicate ownership of its subscriber. Core does not need to be uninstalled. Replace old ellaCore/interface values with core.host/core.namespace; image is now a full immutable image reference. Old chart sources remain in Git history.

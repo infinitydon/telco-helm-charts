@@ -40,11 +40,15 @@ A node-local bridge is available for standalone deployments through global.netwo
 
 The default Core UI/API Service is NodePort30502. Configure core.service.type as ClusterIP, NodePort or LoadBalancer, with nodePort and annotations as required. Phone A/B use ports30880/30881 and independently support the same Service types through phones.service.type. No port forwarding is needed. Lab UIs are intended for a trusted network.
 
-IMS and SMSC remain separately installable charts, but the umbrella automatically renders neither when global.mode=internet. Combined mode requires both dependencies enabled. phones.enabled toggles the simulator; phones.browser.enabled toggles Chromium/noVNC, with the lighter reader still available. UERANSIM remains a separate alternative simulator chart; it is not used by these validated UE phone presets.
+IMS and SMSC remain separately installable charts, but the umbrella automatically renders neither when global.mode=internet. Combined mode requires both dependencies enabled. phones.enabled toggles the phone simulator; phones.browser.enabled toggles Chromium/noVNC, with the lighter reader still available.
+
+Optional native simulators are included through ueransim.enabled and packetrusher.enabled (both default false). They use upstream UERANSIM v3.3.0 and PacketRusher v2.0.0, respectively, checked as latest stable releases on October 26, 2026. PacketRusher explicitly uses its eBPF backend and requires a compatible Linux 6.6+ node. Both work with the standalone/HA Core presets and use the internet DNN. They complement the phone UI; they do not replace its IMS/SMS implementation. See the [UERANSIM guide](../ueransim-5g-chart/README.md), [PacketRusher guide](../packetrusher/README.md) and [native validation](../tests/simulators/README.md).
 
 ## Bootstrap and persistence
 
 The provisioning Job is an ordinary Kubernetes Job, not a post-install hook. It initializes the first Core, joins followers through the v1.20 cluster API, waits for membership, then optionally provisions the selected services and lab subscribers. This avoids a Helm readiness/join deadlock. Always use --wait-for-jobs. Phone init containers wait for provisioning success and Core rollout readiness; their short-lived API token can list namespace Jobs and read the release's Core StatefulSet, and is not mounted in the runtime containers. Keep the current completed bootstrap Job: replacement phone Pods use it to verify provisioning.
+
+On a fresh Core, provisioning applies the requested data-network pools, including replacing Core's seeded default. Existing data networks are preserved on upgrades so UI changes are retained. Set core.provisioning.reconcileDataNetworks=true to explicitly reconcile their pools/DNS/MTU; pool changes with attached sessions are rejected. Existing IPv6 pools are preserved.
 
 Core uses StatefulSets and persistent per-node databases. IMS/SMSC use their own PVCs. Helm uninstall leaves Core StatefulSet PVCs in place; back up before any explicit PVC deletion. Local-path storage ties a member's volume to its host; the tested Pod replacement does not certify recovery from permanent host/storage loss. Do not reuse a standalone database as an HA database or vice versa without a supported migration procedure. The chart rejects in-place topology changes: back up, uninstall and explicitly migrate/reset data first.
 
@@ -76,6 +80,14 @@ python3 ella-core/tests/services/run-scenarios.py --suite extended --core-api ht
 ```
 
 The essential four protocol scenarios passed in both recorded topology runs. The extended suite is diagnostic and is not the default acceptance gate; its known HA failures remain recorded in VALIDATION.md. All commands are Linux shell/Helm or standard-library Python commands.
+
+When both native components are enabled, check their registration and UE data paths with:
+
+```sh
+python3 ella-core/tests/simulators/smoke.py
+```
+
+Use --simulator ueransim or --simulator packetrusher for a single component. Their default fixture IMSIs overlap the optional core-tester scenarios, so pause all simulated UE deployments before running that separate protocol suite; its preflight rejects conflicting active owners. The phone acceptance command above can run with the native simulators enabled.
 
 ## Core image provenance
 

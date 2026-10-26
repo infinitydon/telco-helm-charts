@@ -1,0 +1,2 @@
+{{- $lib := index .Subcharts "ella-simulator" -}}
+{{ include "ella.simulator.resources" (dict "root" . "runner" ($lib.Files.Get "files/supervisor.py")) }}

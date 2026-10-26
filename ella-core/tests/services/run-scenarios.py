@@ -10,6 +10,9 @@ p.add_argument('--suite',choices=['essential','extended'],default='essential',he
 a=p.parse_args();out=pathlib.Path(a.output);out.mkdir(parents=True,exist_ok=True)
 k=['kubectl']+(['--kubeconfig',a.kubeconfig] if a.kubeconfig else [])+['-n',a.namespace]
 def get(*args):return json.loads(subprocess.check_output(k+list(args),text=True))
+owners=get('get','pods','-l','app.kubernetes.io/name in (ue-phones,ueransim,packetrusher)','-o','json')['items']
+owners=[x['metadata']['name'] for x in owners if x.get('status',{}).get('phase') not in ('Succeeded','Failed')]
+if owners:sys.exit('Pause UE phone/UERANSIM/PacketRusher deployments and wait for their Pods to stop before protocol tests (shared test IMSIs): '+', '.join(owners))
 core=next(p for p in get('get','pods','-l',a.core_selector,'-o','json')['items'] if p.get('status',{}).get('phase')=='Running' and not p['metadata'].get('deletionTimestamp'))
 # Follow the consolidated leader Service when HA is active.
 try:

@@ -1,0 +1,34 @@
+[
+  {
+    "topology": "standalone",
+    "mode": "internet",
+    "nativeChecks": 11,
+    "passed": true,
+    "helmHooks": 3
+  },
+  {
+    "topology": "standalone",
+    "mode": "internet-ims-sms",
+    "nativeChecks": 11,
+    "passed": true,
+    "helmHooks": 5
+  },
+  {
+    "topology": "ha",
+    "mode": "internet",
+    "nativeChecks": 11,
+    "passed": true,
+    "helmHooks": 3,
+    "afterFailoverChecks": 11,
+    "podUIDsPreserved": true
+  },
+  {
+    "topology": "ha",
+    "mode": "internet-ims-sms",
+    "nativeChecks": 11,
+    "passed": true,
+    "helmHooks": 5,
+    "afterFailoverChecks": 11,
+    "podUIDsPreserved": true
+  }
+]

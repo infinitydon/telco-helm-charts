@@ -9,3 +9,5 @@ dependencies:
   - {name: ella-ims, alias: ims, version: 0.2.0, repository: "file://../ella-ims", condition: ims.enabled}
   - {name: ella-smsc, alias: smsc, version: 0.2.0, repository: "file://../ella-smsc", condition: smsc.enabled}
   - {name: ue-phones, alias: phones, version: 0.5.0, repository: "file://../ue-phones", condition: phones.enabled}
+  - {name: ueransim, version: 2.0.0, repository: "file://../ueransim-5g-chart", condition: ueransim.enabled}
+  - {name: packetrusher, version: 1.0.0, repository: "file://../packetrusher", condition: packetrusher.enabled}

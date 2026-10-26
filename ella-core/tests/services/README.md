@@ -32,17 +32,18 @@ The Core UI is http://NODE_IP:30502/. Configure core.service in ella-stack. Logi
 
 ```sh
 helm test ella -n ella-services-test
-kubectl -n ella-services-test scale deployment ella-ue-a ella-ue-b --replicas=0
+kubectl -n ella-services-test scale deployment -l 'app.kubernetes.io/name in (ue-phones,ueransim,packetrusher)' --replicas=0
+kubectl -n ella-services-test wait --for=delete pod -l 'app.kubernetes.io/name in (ue-phones,ueransim,packetrusher)' --timeout=90s
 # Supply the initialized admin password in ELLA_LAB_PASSWORD.
 python3 ella-core/tests/services/run-scenarios.py \
   --core-selector app.kubernetes.io/name=ella-core --core-service ella-core \
   --smsc-service ella-ella-smsc --core-api http://NODE_IP:30502 \
   --output ./integration-results
 # Essential tests do not delete subscribers. Restore the phones afterward:
-kubectl -n ella-services-test scale deployment ella-ue-a ella-ue-b --replicas=1
+kubectl -n ella-services-test scale deployment -l 'app.kubernetes.io/name in (ue-phones,ueransim,packetrusher)' --replicas=1
 ```
 
-The cross-platform Python runner discovers the Core and tester interface addresses, writes a log per scenario and machine-readable results.json, and exits nonzero if any scenario fails. Run it sequentially: scenarios bind the same simulated RAN ports. The default essential suite has four scenarios: bidirectional NAS SMS and IMS calls on both 5G and 4G. Add --suite extended for the original 24 scenarios (20 NAS SMS and four IMS registration/call scenarios). The extended registration tests delete a subscriber; rerun the same Helm preset before restoring phones after that suite. Extended IMS registration covers UDP/TCP, AKA/IPsec, resynchronization and subscriber deletion; calls verify upstream's SIP/RTP/QoS assertions. This is functional testing, not a throughput or HA benchmark.
+The cross-platform Python runner discovers the Core and tester interface addresses, writes a log per scenario and machine-readable results.json, and exits nonzero if any scenario fails. Run it sequentially: scenarios bind the same simulated RAN ports. The runner refuses to start while UE phones or native simulators are active in the test namespace, since they share public fixture IMSIs. The default essential suite has four scenarios: bidirectional NAS SMS and IMS calls on both 5G and 4G. Add --suite extended for the original 24 scenarios (20 NAS SMS and four IMS registration/call scenarios). The extended registration tests delete a subscriber; rerun the same Helm preset before restoring phones after that suite. Extended IMS registration covers UDP/TCP, AKA/IPsec, resynchronization and subscriber deletion; calls verify upstream's SIP/RTP/QoS assertions. This is functional testing, not a throughput or HA benchmark.
 
 See [stack validation](../../ella-stack/VALIDATION.md) for the consolidated chart results. [Earlier validation](VALIDATION.md) records the historical separate-release installation.
 

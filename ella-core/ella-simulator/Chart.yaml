@@ -1,0 +1,5 @@
+apiVersion: v2
+name: ella-simulator
+description: Shared pod-network simulator supervision for Ella Core
+type: library
+version: 0.1.0

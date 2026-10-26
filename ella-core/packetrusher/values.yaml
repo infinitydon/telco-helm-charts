@@ -1,0 +1,34 @@
+simulator: packetrusher
+image: ghcr.io/infinitydon/ella-services-tester@sha256:6b5d2402c1d6ccc0b84084c1762f4203968bf30a1cf8d4bfa0be9f8537527099
+pullPolicy: IfNotPresent
+imagePullSecrets: []
+core:
+  host: ella-core-active
+  namespace: ""
+  clusterDomain: cluster.local
+  apiPort: 5002
+subscriber:
+  imsi: "001018900000200"
+  mcc: "001"
+  mnc: "01"
+  key: "640f441067cd56f1474cbcacd7a0588f"
+  opc: "cb698a2341629c3241ae01de9d89de4f"
+  amf: "8000"
+  existingSecret: ""
+gnb:
+  id: "022"
+  nci: "0x000000022"
+  idLength: 24
+  tac: "000001"
+session:
+  dnn: internet
+  sst: 1
+  sd: "102030"
+backend: ebpf
+ueCount: 1
+nodeSelector: {kubernetes.io/os: linux, kubernetes.io/arch: amd64}
+tolerations: []
+affinity: {}
+resources:
+  requests: {cpu: 100m, memory: 128Mi}
+  limits: {memory: 1Gi}

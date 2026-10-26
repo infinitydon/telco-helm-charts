@@ -24,7 +24,8 @@ if HA and status.get('initialized'):
     for i in range(COUNT):
         candidate=until(lambda i=i:api(node(i),'GET','status'),f'node {i} status')
         if candidate.get('cluster',{}).get('isLeader'):CORE=node(i);status=candidate;break
-if not status.get('initialized'):
+FRESH=not status.get('initialized')
+if FRESH:
     auth=api(CORE,'POST','init',credentials)
 else:auth=api(CORE,'POST','auth/login',credentials)
 headers['Authorization']='Bearer '+auth['token']
@@ -56,7 +57,15 @@ ensure('profiles','default',{'name':'default','ue_ambr_uplink':'100 Mbps','ue_am
 ensure('slices','default',{'name':'default','sst':1,'sd':'102030'})
 core('PUT','slices/default',{'sst':1,'sd':'102030'})
 for dn,pool in ([('internet',os.environ.get('INTERNET_POOL','10.45.0.0/16')),('ims',os.environ.get('IMS_POOL','10.60.0.0/16'))] if SERVICES else [('internet',os.environ.get('INTERNET_POOL','10.45.0.0/16'))]):
-    ensure('networking/data-networks',dn,{'name':dn,'ipv4_pool':pool,'dns':'8.8.8.8','mtu':1500})
+    networks={x['name']:x for x in core('GET','networking/data-networks').get('items',[])}
+    desired={'ipv4_pool':pool,'dns':'8.8.8.8','mtu':1500}
+    if dn not in networks:core('POST','networking/data-networks',{'name':dn,**desired})
+    elif (FRESH or os.environ.get('RECONCILE_DATA_NETWORKS')=='true') and any(networks[dn].get(k)!=v for k,v in desired.items()):
+        current=networks[dn]
+        if current.get('ipv4_pool')!=pool and current.get('status',{}).get('sessions',0):
+            raise RuntimeError('Detach UEs before changing the '+dn+' IP pool')
+        if current.get('ipv6_pool'):desired['ipv6_pool']=current['ipv6_pool']
+        core('PUT','networking/data-networks/'+dn,desired)
     name='default' if dn=='internet' else 'ims'
     ensure('policies',name,{'name':name,'profile_name':'default','slice_name':'default','data_network_name':dn,'session_ambr_uplink':'100 Mbps','session_ambr_downlink':'100 Mbps','var5qi':9 if dn=='internet' else 5,'arp':8})
 if SERVICES:

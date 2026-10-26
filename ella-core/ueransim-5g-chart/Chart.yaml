@@ -1,6 +1,7 @@
 apiVersion: v2
 name: ueransim
-version: 1.0.0
+version: 2.0.0
+appVersion: "3.3.0"
 description: Helm chart for UERANSIM 5G UE/gNB simulator
 keywords:
   - 5g
@@ -10,3 +11,5 @@ keywords:
   - simulator
 maintainers:
   - name: ueransim-helm
+dependencies:
+  - {name: ella-simulator, version: 0.1.0, repository: "file://../ella-simulator"}

@@ -32,6 +32,14 @@ class Render(unittest.TestCase):
                           '--set', f'core.service.type={kind},phones.service.type={kind}')
             self.assertIn('type: '+kind, text)
 
+    def test_optional_native_simulators(self):
+        text = render('--set', 'ueransim.enabled=true,packetrusher.enabled=true')
+        self.assertIn('name: ella-ueransim', text)
+        self.assertIn('name: ella-packetrusher', text)
+        self.assertIn('"backend": "ebpf"', text)
+        self.assertNotIn('apiTokenSecret', text)
+        render('--set', 'packetrusher.enabled=true,packetrusher.backend=auto', valid=False)
+
     def test_invalid_combinations(self):
         for values in ('global.mode=invalid', 'core.topology=invalid',
                        'core.topology=ha,global.network.type=bridge',

@@ -4,6 +4,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $.Release.Name }}-{{ $phone.name }}
+  labels: {app.kubernetes.io/name: ue-phones, app.kubernetes.io/instance: {{ $.Release.Name }}}
 spec:
   replicas: 1
   strategy: {type: Recreate}

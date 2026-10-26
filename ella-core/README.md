@@ -14,4 +14,6 @@ The previous ella-core-5g-chart, ella-core-5g-chart-fqdn, ella-core-lab, and
 ella-core-ui directories contain migration pointers only. Back up existing
 databases and values before replacing those releases. Their source remains in
 Git history. Tests and historical fixtures live under tests/services;
-UERANSIM remains a separate optional simulator outside these presets.
+UERANSIM and PacketRusher are independently installable native simulators and
+optional ella-stack components. Enable ueransim.enabled or packetrusher.enabled
+with any of the four presets; see [native validation](tests/simulators/README.md).

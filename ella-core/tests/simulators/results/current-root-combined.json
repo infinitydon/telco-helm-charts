@@ -1,0 +1,101 @@
+[
+  {
+    "simulator": "ueransim",
+    "check": "UE address allocated",
+    "passed": true,
+    "ueIP": "10.45.0.3",
+    "coreIP": "10.1.154.249",
+    "generation": 1,
+    "podUID": "240d514f-f56e-4510-b1d8-132594aef2ca"
+  },
+  {
+    "simulator": "ueransim",
+    "check": "Stable release, registered and PDU established",
+    "passed": true,
+    "version": "v3.3.0"
+  },
+  {
+    "simulator": "ueransim",
+    "check": "ICMP through UE",
+    "passed": true
+  },
+  {
+    "simulator": "ueransim",
+    "check": "DNS through UE",
+    "passed": true
+  },
+  {
+    "simulator": "ueransim",
+    "check": "HTTPS through UE",
+    "passed": true
+  },
+  {
+    "simulator": "packetrusher",
+    "check": "UE address allocated",
+    "passed": true,
+    "ueIP": "10.45.0.4",
+    "coreIP": "10.1.154.249",
+    "generation": 1,
+    "podUID": "85a0746d-0e2a-421a-9b2b-48e20c8a01f0"
+  },
+  {
+    "simulator": "packetrusher",
+    "check": "Own eBPF programs attached (no fallback)",
+    "passed": true,
+    "programs": [
+      {
+        "id": 8718,
+        "name": "decap",
+        "type": "sched_cls"
+      },
+      {
+        "id": 8719,
+        "name": "uplink",
+        "type": "sched_cls"
+      },
+      {
+        "id": 8720,
+        "name": "encap",
+        "type": "sched_cls"
+      }
+    ],
+    "links": [
+      {
+        "id": 67,
+        "type": 11,
+        "prog_id": 8720
+      },
+      {
+        "id": 68,
+        "type": 11,
+        "prog_id": 8718
+      },
+      {
+        "id": 69,
+        "type": 11,
+        "prog_id": 8719
+      }
+    ]
+  },
+  {
+    "simulator": "packetrusher",
+    "check": "Stable release, registered and PDU established",
+    "passed": true,
+    "version": "packetrusher version v2.0.0"
+  },
+  {
+    "simulator": "packetrusher",
+    "check": "ICMP through UE",
+    "passed": true
+  },
+  {
+    "simulator": "packetrusher",
+    "check": "DNS through UE",
+    "passed": true
+  },
+  {
+    "simulator": "packetrusher",
+    "check": "HTTPS through UE",
+    "passed": true
+  }
+]
