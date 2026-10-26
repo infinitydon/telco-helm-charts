@@ -1,0 +1,62 @@
+{{- $network := mergeOverwrite (deepCopy .Values.network) ((.Values.global | default dict).network | default dict) }}
+{{- if .Values.bootstrap.enabled }}
+{{- $name := include "core.fullname" . }}
+{{- if not .Values.admin.existingSecret }}
+apiVersion: v1
+kind: Secret
+metadata: {name: {{ $name }}-admin}
+type: Opaque
+stringData:
+  email: {{ .Values.admin.email | quote }}
+  password: {{ required "Set core.admin.password or core.admin.existingSecret" .Values.admin.password | quote }}
+---
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: {{ $name }}-bootstrap}
+data:
+  bootstrap.py: |
+    {{- .Files.Get "files/bootstrap.py" | nindent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}-bootstrap-{{ .Release.Revision }}
+  labels:
+    app.kubernetes.io/name: ella-core-bootstrap
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    ella-revision: {{ .Release.Revision | quote }}
+    ella-mode: {{ default "internet" (.Values.global | default dict).mode | quote }}
+spec:
+  backoffLimit: 4
+  activeDeadlineSeconds: 900
+  template:
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      containers:
+        - name: bootstrap
+          image: {{ .Values.bootstrap.image }}
+          command: [python, /scripts/bootstrap.py]
+          env:
+            - {name: ADMIN_EMAIL, valueFrom: {secretKeyRef: {name: {{ default (printf "%s-admin" $name) .Values.admin.existingSecret }}, key: email}}}
+            - {name: ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: {{ default (printf "%s-admin" $name) .Values.admin.existingSecret }}, key: password}}}
+            - {name: CORE_NAME, value: {{ $name | quote }}}
+            - {name: NAMESPACE, value: {{ .Release.Namespace | quote }}}
+            - {name: CLUSTER_DOMAIN, value: {{ .Values.clusterDomain | quote }}}
+            - {name: REPLICAS, value: {{ include "core.count" . | quote }}}
+            - {name: TOPOLOGY, value: {{ .Values.topology | quote }}}
+            - {name: UE_MODE, value: {{ default "internet" (.Values.global | default dict).mode | quote }}}
+            - {name: PROVISION, value: {{ .Values.provisioning.enabled | quote }}}
+            - {name: RECONCILE_DATA_NETWORKS, value: {{ .Values.provisioning.reconcileDataNetworks | default false | quote }}}
+            - {name: IMS_API, value: {{ printf "http://%s-ella-ims:5020" .Release.Name | quote }}}
+            - {name: SMSC_API, value: {{ printf "http://%s-ella-smsc:5010" .Release.Name | quote }}}
+            - {name: INTERNET_POOL, value: {{ $network.internetPool | quote }}}
+            - {name: IMS_POOL, value: {{ $network.imsPool | quote }}}
+            - {name: IMS_ADDRESS, value: {{ $network.imsAddress | quote }}}
+            - {name: SMSC_ADDRESS_HOST, value: {{ printf "%s-ella-smsc-diameter" .Release.Name | quote }}}
+            - {name: CORE_ADDRESS_HOST, value: {{ printf "%s-active" $name | quote }}}
+          resources: {requests: {cpu: 10m, memory: 32Mi}, limits: {memory: 128Mi}}
+          volumeMounts: [{name: script, mountPath: /scripts, readOnly: true}]
+      volumes: [{name: script, configMap: {name: {{ $name }}-bootstrap}}]
+{{- end }}

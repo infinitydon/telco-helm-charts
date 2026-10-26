@@ -1,0 +1,103 @@
+{{- $name := include "core.fullname" . }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  annotations: {ella.network/topology: {{ .Values.topology | quote }}}
+spec:
+  serviceName: {{ $name }}-peers
+  replicas: {{ include "core.count" . }}
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "core.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "core.labels" . | nindent 8 }}
+      annotations:
+        k8s.v1.cni.cncf.io/networks: {{ printf "%s-n6" $name | quote }}
+        checksum/config: {{ include (print $.Template.BasePath "/init-config.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      shareProcessNamespace: {{ .Values.troubleshooting.enabled }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      {{- if .Values.affinity }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      {{- else if eq .Values.topology "ha" }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  {{- include "core.labels" . | nindent 18 }}
+              topologyKey: kubernetes.io/hostname
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: config
+          image: {{ .Values.initImage }}
+          command: [sh, /scripts/init.sh]
+          securityContext: {capabilities: {add: [NET_ADMIN, NET_RAW]}}
+          env:
+            - {name: POD_IP, valueFrom: {fieldRef: {fieldPath: status.podIP}}}
+            - {name: HOSTNAME, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
+          volumeMounts:
+            - {name: script, mountPath: /scripts, readOnly: true}
+            - {name: config, mountPath: /config}
+        {{- /* Keep all runtime components on the same known interface layout. */}}
+      containers:
+        - name: core
+          image: {{ .Values.image }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
+          command: [core, --config, /config/core.yaml]
+          securityContext: {privileged: true}
+          startupProbe: {httpGet: {path: /api/v1/status, port: 5002}, periodSeconds: 2, failureThreshold: 150}
+          livenessProbe: {httpGet: {path: /api/v1/status, port: 5002}, periodSeconds: 15, failureThreshold: 6}
+          readinessProbe: {httpGet: {path: /api/v1/status, port: 5002}}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - {name: config, mountPath: /config, readOnly: true}
+            - {name: data, mountPath: /data}
+            - {name: bpf, mountPath: /sys/fs/bpf}
+        {{- if .Values.troubleshooting.enabled }}
+        - name: troubleshoot
+          image: {{ .Values.troubleshooting.image }}
+          command: [sleep, infinity]
+          env: [{name: POD_IP, valueFrom: {fieldRef: {fieldPath: status.podIP}}}]
+          securityContext: {capabilities: {drop: [ALL], add: [NET_ADMIN, NET_RAW]}}
+          readinessProbe:
+            exec:
+              command: [sh, -ec, 'curl -fsS http://$POD_IP:5002/api/v1/status | jq -e .result.ready']
+            periodSeconds: 3
+            timeoutSeconds: 3
+          resources: {requests: {cpu: 10m, memory: 32Mi}, limits: {memory: 256Mi}}
+          volumeMounts: [{name: config, mountPath: /config, readOnly: true}]
+        {{- end }}
+      volumes:
+        - {name: script, configMap: {name: {{ $name }}-init}}
+        - {name: config, emptyDir: {}}
+        - {name: bpf, hostPath: {path: /sys/fs/bpf, type: Directory}}
+        {{- if not .Values.persistence.enabled }}
+        - {name: data, emptyDir: {}}
+        {{- end }}
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- if .Values.persistence.storageClass }}
+        storageClassName: {{ .Values.persistence.storageClass | quote }}
+        {{- end }}
+        resources: {requests: {storage: {{ .Values.persistence.size }}}}
+  {{- end }}

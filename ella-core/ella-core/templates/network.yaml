@@ -1,0 +1,6 @@
+{{- $network := mergeOverwrite (deepCopy .Values.network) ((.Values.global | default dict).network | default dict) }}
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata: {name: {{ include "core.fullname" . }}-n6}
+spec:
+  config: {{ if eq $network.type "macvlan" }}{{ dict "cniVersion" "0.3.1" "type" "macvlan" "master" $network.master "mode" "bridge" | toJson | quote }}{{ else }}{{ dict "cniVersion" "0.3.1" "type" "bridge" "bridge" $network.bridge | toJson | quote }}{{ end }}

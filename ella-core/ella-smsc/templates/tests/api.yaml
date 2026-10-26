@@ -1,7 +1,8 @@
+{{- if ne (default "internet-ims-sms" (.Values.global | default dict).mode) "internet" }}
 apiVersion: v1
 kind: Pod
 metadata:
-  name: {{ include "ella.name" . }}-test
+  name: {{ include "ella-smsc.name" . }}-test
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: hook-succeeded,hook-failed
@@ -13,4 +14,6 @@ spec:
       image: {{ .Values.initImage | quote }}
       command: [sh, -ec]
       args:
-        - wget -qO /dev/null http://{{ include "ella.name" . }}:{{ .Values.api.port }}/api/v1/openapi.yaml
+        - wget -qO /dev/null http://{{ include "ella-smsc.name" . }}:{{ .Values.api.port }}/api/v1/openapi.yaml
+
+{{- end }}

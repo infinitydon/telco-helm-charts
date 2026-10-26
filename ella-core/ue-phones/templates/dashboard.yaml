@@ -4,6 +4,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $.Release.Name }}-{{ $phone.name }}
+  labels: {app.kubernetes.io/name: ue-phones, app.kubernetes.io/instance: {{ $.Release.Name }}}
 spec:
   replicas: 1
   strategy: {type: Recreate}
@@ -12,14 +13,38 @@ spec:
   template:
     metadata:
       labels: {app.kubernetes.io/name: ue-phones, app.kubernetes.io/instance: {{ $.Release.Name }}, ella-phone: {{ $phone.name }}}
+      {{- if $.Values.networkAttachment }}
       annotations:
         k8s.v1.cni.cncf.io/networks: {{ $.Values.networkAttachment | quote }}
+      {{- end }}
     spec:
       {{- with $.Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       automountServiceAccountToken: false
+      {{- if $.Values.waitForBootstrap.enabled }}
+      serviceAccountName: {{ $.Release.Name }}-phones-wait
+      initContainers:
+        - name: wait-provisioning
+          image: {{ $.Values.image.repository }}:{{ $.Values.image.tag }}
+          command: [sh, -ec]
+          args:
+            - |
+              for i in $(seq 1 300); do
+                result=$(curl -fsS --max-time 5 --cacert /access/ca.crt -H "Authorization: Bearer $(cat /access/token)" --get \
+                  --data-urlencode 'labelSelector=app.kubernetes.io/name=ella-core-bootstrap,app.kubernetes.io/instance={{ $.Release.Name }},ella-revision={{ $.Release.Revision }},ella-mode={{ default $.Values.mode ($.Values.global | default dict).mode }}' \
+                  'https://kubernetes.default.svc/apis/batch/v1/namespaces/{{ $.Release.Namespace }}/jobs')
+                if echo "$result" | jq -e 'any(.items[]; (.status.succeeded // 0) > 0)' >/dev/null; then
+                  core=$(curl -fsS --max-time 5 --cacert /access/ca.crt -H "Authorization: Bearer $(cat /access/token)" \
+                    'https://kubernetes.default.svc/apis/apps/v1/namespaces/{{ $.Release.Namespace }}/statefulsets/{{ $.Release.Name }}-core')
+                  echo "$core" | jq -e '.status.currentRevision == .status.updateRevision and .status.readyReplicas == .spec.replicas and .status.updatedReplicas == .spec.replicas' >/dev/null && exit 0
+                fi
+                sleep 2
+              done
+              exit 1
+          volumeMounts: [{name: bootstrap-access, mountPath: /access, readOnly: true}]
+      {{- end }}
       securityContext: {fsGroup: 1000, fsGroupChangePolicy: OnRootMismatch}
       nodeSelector:
         {{- toYaml $.Values.nodeSelector | nindent 8 }}
@@ -29,10 +54,10 @@ spec:
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
           securityContext: {privileged: true}
           env:
-            - {name: UE_MODE, value: {{ $.Values.mode | quote }}}
+            - {name: UE_MODE, value: {{ default $.Values.mode ($.Values.global | default dict).mode | quote }}}
             - name: POD_IP
               valueFrom: {fieldRef: {fieldPath: status.podIP}}
-            - {name: CORE_N2, value: {{ $.Values.coreN2 | quote }}}
+            - {name: CORE_N2, value: {{ tpl $.Values.coreN2 $ | quote }}}
             - {name: N3_INTERFACE, value: {{ $.Values.n3Interface | quote }}}
             - {name: PHONE_ID, value: {{ $phone.id | quote }}}
             - {name: PHONE_NAME, value: {{ $phone.label | quote }}}
@@ -41,8 +66,8 @@ spec:
             - {name: BROWSER_VIEWER_VERSION, value: {{ $.Values.browser.image.tag | quote }}}
             - {name: BROWSER_ENABLED, value: {{ $.Values.browser.enabled | quote }}}
           ports: [{name: http, containerPort: 8080}]
-          startupProbe: {httpGet: {path: /healthz, port: http}, failureThreshold: 60, periodSeconds: 2}
-          readinessProbe: {httpGet: {path: /healthz, port: http}}
+          startupProbe: {exec: {command: [sh, -ec, 'curl -fsS http://127.0.0.1:8080/api/state | jq -e .ready']}, failureThreshold: 60, periodSeconds: 2, timeoutSeconds: 3}
+          readinessProbe: {exec: {command: [sh, -ec, 'curl -fsS http://127.0.0.1:8080/api/state | jq -e .ready']}, timeoutSeconds: 3}
           livenessProbe: {httpGet: {path: /healthz, port: http}}
           resources:
             {{- toYaml $.Values.resources | nindent 12 }}
@@ -72,6 +97,13 @@ spec:
           volumeMounts: [{name: shm, mountPath: /dev/shm}, {name: browser-profile, mountPath: /home/browser/profile}]
         {{- end }}
       volumes:
+        {{- if $.Values.waitForBootstrap.enabled }}
+        - name: bootstrap-access
+          projected:
+            sources:
+              - serviceAccountToken: {path: token, expirationSeconds: 3600}
+              - configMap: {name: kube-root-ca.crt, items: [{key: ca.crt, path: ca.crt}]}
+        {{- end }}
         - name: tun
           hostPath: {path: /dev/net/tun, type: CharDevice}
         - name: browser-profile

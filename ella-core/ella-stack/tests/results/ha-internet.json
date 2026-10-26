@@ -1,0 +1,50 @@
+[
+  {
+    "check": "ella-ue-a internet attached without IMS/SMS",
+    "passed": true
+  },
+  {
+    "check": "ella-ue-a internet TUN only; no IMS TUN or IPsec state",
+    "passed": true
+  },
+  {
+    "check": "ella-ue-a IMS/SMS actions rejected",
+    "passed": true
+  },
+  {
+    "check": "ella-ue-a public ICMP via UE",
+    "passed": true
+  },
+  {
+    "check": "ella-ue-a public DNS via UE",
+    "passed": true
+  },
+  {
+    "check": "ella-ue-a Chromium UID HTTPS through UE proxy",
+    "passed": true
+  },
+  {
+    "check": "ella-ue-b internet attached without IMS/SMS",
+    "passed": true
+  },
+  {
+    "check": "ella-ue-b internet TUN only; no IMS TUN or IPsec state",
+    "passed": true
+  },
+  {
+    "check": "ella-ue-b IMS/SMS actions rejected",
+    "passed": true
+  },
+  {
+    "check": "ella-ue-b public ICMP via UE",
+    "passed": true
+  },
+  {
+    "check": "ella-ue-b public DNS via UE",
+    "passed": true
+  },
+  {
+    "check": "ella-ue-b Chromium UID HTTPS through UE proxy",
+    "passed": true
+  }
+]

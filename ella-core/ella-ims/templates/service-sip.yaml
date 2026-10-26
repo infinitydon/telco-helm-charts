@@ -1,13 +1,14 @@
+{{- if ne (default "internet-ims-sms" (.Values.global | default dict).mode) "internet" }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "ella.name" . }}-sip
+  name: {{ include "ella-ims.name" . }}-sip
   labels:
-    {{- include "ella.labels" . | nindent 4 }}
+    {{- include "ella-ims.labels" . | nindent 4 }}
 spec:
   clusterIP: None
   selector:
-    {{- include "ella.selector" . | nindent 4 }}
+    {{- include "ella-ims.selector" . | nindent 4 }}
   ports:
     {{- range $name, $port := dict "pcscf" .Values.pcscf.port "icscf" .Values.icscf.port "scscf" .Values.scscf.port }}
     - name: {{ $name }}-udp
@@ -19,3 +20,5 @@ spec:
       targetPort: {{ $port }}
       protocol: TCP
     {{- end }}
+
+{{- end }}

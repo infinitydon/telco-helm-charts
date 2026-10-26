@@ -1,20 +1,21 @@
+{{- if ne (default "internet-ims-sms" (.Values.global | default dict).mode) "internet" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "ella.name" . }}
+  name: {{ include "ella-smsc.name" . }}
   labels:
-    {{- include "ella.labels" . | nindent 4 }}
+    {{- include "ella-smsc.labels" . | nindent 4 }}
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      {{- include "ella.selector" . | nindent 6 }}
+      {{- include "ella-smsc.selector" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "ella.selector" . | nindent 8 }}
+        {{- include "ella-smsc.selector" . | nindent 8 }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         {{- with .Values.podAnnotations }}
@@ -98,13 +99,13 @@ spec:
       volumes:
         - name: input
           configMap:
-            name: {{ include "ella.name" . }}
+            name: {{ include "ella-smsc.name" . }}
         - name: config
           emptyDir: {}
         - name: data
           {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
-            claimName: {{ default (include "ella.name" .) .Values.persistence.existingClaim }}
+            claimName: {{ default (include "ella-smsc.name" .) .Values.persistence.existingClaim }}
           {{- else }}
           emptyDir: {}
           {{- end }}
@@ -123,3 +124,5 @@ spec:
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+
+{{- end }}

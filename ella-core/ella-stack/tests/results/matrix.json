@@ -1,0 +1,43 @@
+{
+  "coreSourceRevision": "c7cf03530e52a2d353d9d1cd6159943319075bf0",
+  "coreImage": "ghcr.io/infinitydon/ellacore@sha256:926206d7e1b4e4d64ef3f9f91211ec5630951f33ae62c33c694fbd4f83d6bf91",
+  "finalPreset": "standalone-internet-ims-sms",
+  "modes": [
+    {
+      "topology": "standalone",
+      "mode": "internet",
+      "phoneChecks": 12,
+      "helmTests": 1,
+      "acceptancePassed": true
+    },
+    {
+      "topology": "standalone",
+      "mode": "internet-ims-sms",
+      "phoneChecks": 22,
+      "helmTests": 3,
+      "protocolPassed": 24,
+      "protocolTotal": 24,
+      "acceptancePassed": true,
+      "expandedProtocolPassed": true
+    },
+    {
+      "topology": "ha",
+      "mode": "internet",
+      "phoneChecks": 12,
+      "helmTests": 1,
+      "failoverPassed": true,
+      "acceptancePassed": true
+    },
+    {
+      "topology": "ha",
+      "mode": "internet-ims-sms",
+      "phoneChecks": 22,
+      "helmTests": 3,
+      "failoverPassed": true,
+      "protocolPassed": 21,
+      "protocolTotal": 24,
+      "acceptancePassed": true,
+      "expandedProtocolPassed": false
+    }
+  ]
+}

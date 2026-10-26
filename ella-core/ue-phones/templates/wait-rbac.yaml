@@ -1,0 +1,18 @@
+{{- if .Values.waitForBootstrap.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: {{ .Release.Name }}-phones-wait}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: {{ .Release.Name }}-phones-wait}
+rules:
+  - {apiGroups: [batch], resources: [jobs], verbs: [list]}
+  - {apiGroups: [apps], resources: [statefulsets], resourceNames: [{{ .Release.Name }}-core], verbs: [get]}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: {{ .Release.Name }}-phones-wait}
+subjects: [{kind: ServiceAccount, name: {{ .Release.Name }}-phones-wait}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ .Release.Name }}-phones-wait}
+{{- end }}

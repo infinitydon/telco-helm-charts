@@ -1,3 +1,4 @@
+global: {}
 image:
   repository: ghcr.io/ellanetworks/ella-smsc
   tag: sha-6e7a275024fb

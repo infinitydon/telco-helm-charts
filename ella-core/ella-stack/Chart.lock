@@ -1,0 +1,21 @@
+dependencies:
+- name: ella-core
+  repository: file://../ella-core
+  version: 2.0.0
+- name: ella-ims
+  repository: file://../ella-ims
+  version: 0.2.0
+- name: ella-smsc
+  repository: file://../ella-smsc
+  version: 0.2.0
+- name: ue-phones
+  repository: file://../ue-phones
+  version: 0.5.0
+- name: ueransim
+  repository: file://../ueransim-5g-chart
+  version: 2.0.0
+- name: packetrusher
+  repository: file://../packetrusher
+  version: 1.0.0
+digest: sha256:8211d6467322c44ae7bf736e74da455799b4de7f2c27b95b5203931121e53307
+generated: "2026-10-26T07:40:21.2483374-04:00"

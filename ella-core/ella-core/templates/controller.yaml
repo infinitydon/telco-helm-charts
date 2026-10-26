@@ -1,0 +1,50 @@
+{{- $network := mergeOverwrite (deepCopy .Values.network) ((.Values.global | default dict).network | default dict) }}
+{{- if .Values.controller.enabled }}
+{{- $name := include "core.fullname" . }}
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: {{ $name }}-controller}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: {{ $name }}-controller}
+rules:
+  - apiGroups: [""]
+    resources: [services]
+    resourceNames: [{{ $name }}, {{ $name }}-active]
+    verbs: [get, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: {{ $name }}-controller}
+subjects: [{kind: ServiceAccount, name: {{ $name }}-controller}]
+roleRef: {kind: Role, name: {{ $name }}-controller, apiGroup: rbac.authorization.k8s.io}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: {{ $name }}-controller}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: {{ $name }}-controller}}
+  template:
+    metadata:
+      labels: {app: {{ $name }}-controller}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/controller-config.yaml") . | sha256sum }}
+        {{- if .Values.controller.gatewayEnabled }}
+        k8s.v1.cni.cncf.io/networks: {{ printf "%s-n6" $name | quote }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ $name }}-controller
+      nodeSelector:
+        {{- toYaml .Values.controller.nodeSelector | nindent 8 }}
+      containers:
+        - name: controller
+          image: {{ .Values.controller.image }}
+          command: [bash, /scripts/controller.sh]
+          securityContext: {privileged: {{ .Values.controller.gatewayEnabled }}}
+          resources: {requests: {cpu: 10m, memory: 32Mi}, limits: {memory: 256Mi}}
+          volumeMounts: [{name: script, mountPath: /scripts, readOnly: true}]
+      volumes: [{name: script, configMap: {name: {{ $name }}-controller}}]
+{{- end }}

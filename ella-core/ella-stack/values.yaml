@@ -1,0 +1,59 @@
+global:
+  mode: internet
+  network:
+    type: macvlan
+    master: eth0
+    bridge: ella-stack-n6
+    coreAddresses: [10.6.0.2/24, 10.6.0.3/24, 10.6.0.4/24]
+    gateway: 10.6.0.1
+    imsAddress: 10.6.0.5
+    internetPool: 10.45.0.0/16
+    imsPool: 10.60.0.0/16
+core:
+  topology: standalone
+  provisioning: {enabled: false}
+  service: {type: NodePort, nodePort: 30502}
+ims:
+  enabled: true
+  nodeSelector: {kubernetes.io/arch: amd64}
+  podAnnotations:
+    k8s.v1.cni.cncf.io/networks: '{{ .Release.Name }}-core-n6'
+  sip:
+    addresses: ['{{ .Values.global.network.imsAddress }}']
+    trustedNetworks: ['{{ .Values.global.network.imsPool }}']
+  extraInitContainers:
+    - name: n6-route
+      image: ghcr.io/infinitydon/ella-ue-phones:0.4.1
+      securityContext: {capabilities: {add: [NET_ADMIN, NET_RAW]}}
+      command: [sh, -ec]
+      args:
+        - |
+          ip address replace {{ .Values.global.network.imsAddress }}/{{ .Values.global.network.coreAddresses | first | splitList "/" | last }} dev net1
+          ip link set net1 up
+          ip route replace {{ .Values.global.network.imsPool }} via {{ .Values.global.network.gateway }} dev net1
+          # macvlan may retain parent TX offload despite ethtool; complete TCP/UDP
+          # checksums before user-plane packets are copied into a simulated TUN.
+          ethtool -K net1 tx off || true
+          tc qdisc replace dev net1 clsact
+          tc filter replace dev net1 egress protocol ip pref 10 matchall action csum ip4h and tcp and udp
+          arping -U -c 2 -I net1 {{ .Values.global.network.imsAddress }} || true
+smsc:
+  enabled: true
+phones:
+  enabled: false
+  mode: internet
+  waitForBootstrap: {enabled: true}
+  coreN2: '{{ .Release.Name }}-core-active:38412'
+  networkAttachment: ""
+  n3Interface: eth0
+  nodeSelector: {kubernetes.io/arch: amd64}
+  internetGateway: {enabled: false}
+tester:
+  enabled: false
+  image: ghcr.io/infinitydon/ella-services-tester:c7cf03530e52-tools1
+ueransim:
+  enabled: false
+  core: {host: '{{ .Release.Name }}-core-active'}
+packetrusher:
+  enabled: false
+  core: {host: '{{ .Release.Name }}-core-active'}

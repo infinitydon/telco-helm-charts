@@ -1,13 +1,14 @@
+{{- if ne (default "internet-ims-sms" (.Values.global | default dict).mode) "internet" }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "ella.name" . }}
+  name: {{ include "ella-ims.name" . }}
   labels:
-    {{- include "ella.labels" . | nindent 4 }}
+    {{- include "ella-ims.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   selector:
-    {{- include "ella.selector" . | nindent 4 }}
+    {{- include "ella-ims.selector" . | nindent 4 }}
   ports:
     - name: http
       port: {{ .Values.api.port }}
@@ -17,15 +18,17 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "ella.name" . }}-diameter
+  name: {{ include "ella-ims.name" . }}-diameter
   labels:
-    {{- include "ella.labels" . | nindent 4 }}
+    {{- include "ella-ims.labels" . | nindent 4 }}
 spec:
   clusterIP: None
   selector:
-    {{- include "ella.selector" . | nindent 4 }}
+    {{- include "ella-ims.selector" . | nindent 4 }}
   ports:
     - name: diameter
       port: {{ .Values.diameter.port }}
       targetPort: diameter
       protocol: SCTP
+
+{{- end }}

@@ -1,0 +1,46 @@
+{{- $name := include "core.fullname" . }}
+apiVersion: v1
+kind: Service
+metadata: {name: {{ $name }}-peers}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "core.labels" . | nindent 4 }}
+  ports:
+    - {name: api, port: 5002}
+    - {name: raft, port: 7000}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: {{ $name }}-active}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "core.serviceSelector" (dict "root" . "service" (printf "%s-active" $name)) | nindent 4 }}
+  ports:
+    - {name: api, port: 5002}
+    - {name: ngap, port: 38412, protocol: SCTP}
+    - {name: s1ap, port: 36412, protocol: SCTP}
+    - {name: diameter, port: 3868, protocol: SCTP}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "core.serviceSelector" (dict "root" . "service" $name) | nindent 4 }}
+  ports:
+    - name: api
+      port: {{ .Values.service.port }}
+      targetPort: 5002
+      {{- if and (ne .Values.service.type "ClusterIP") .Values.service.nodePort }}
+      nodePort: {{ .Values.service.nodePort }}
+      {{- end }}

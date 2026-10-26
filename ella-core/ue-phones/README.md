@@ -10,16 +10,16 @@ Calls exchange synthetic test packets on the dedicated voice QFI. Browser microp
 
 ## Prerequisites
 
-Deploy and provision the [Core lab](../ella-core-lab/README.md) first with the matching mode. IMS/SMSC are needed only for internet-ims-sms mode. This application uses its two voice subscribers:
+Deploy and provision the [Core lab](../ella-stack/README.md) first with the matching mode. IMS/SMSC are needed only for internet-ims-sms mode. This application uses its two voice subscribers:
 
 | Phone | IMSI | Number |
 | --- | --- | --- |
 | A | 001018400000003 | +15558400003 |
 | B | 001018400000004 | +15558400004 |
 
-Both need the public lab test key/OPc and internet/ims policies configured by the ella-core-lab Helm provisioning Job. They remain NAS-attached when IMS is unregistered, so SMS continues to work independently of IMS. Do not run the original test scenarios concurrently against these same IMSIs; each UE must have one owner.
+Both need the public lab test key/OPc and internet/ims policies configured by the ella-stack provisioning Job. They remain NAS-attached when IMS is unregistered, so SMS continues to work independently of IMS. Do not run the original test scenarios concurrently against these same IMSIs; each UE must have one owner.
 
-The simulator pod is privileged for TUN, IPsec/XFRM and network configuration. Each shares the existing `ella-ran` bridge attachment and must run on the same node as the lab Core/IMS. The chart defaults to dedicated NodePort Services on ports 30880 and 30881. It has no user authentication; use it on a trusted lab network.
+The simulator pod is privileged for TUN, IPsec/XFRM and network configuration. In ella-stack, N2/N3 use the pod network and phones do not require a Multus attachment or placement beside Core. The chart defaults to dedicated NodePort Services on ports 30880 and 30881. It has no user authentication; use it on a trusted lab network.
 
 ## Build and deploy
 
@@ -37,12 +37,14 @@ buildah push ghcr.io/infinitydon/ella-ue-browser:0.3.4
 
 The Dockerfile checks out Core revision `c7cf03530e52a2d353d9d1cd6159943319075bf0`, installs the application adapters and enables NAS SMS capability in the upstream voice UE constructor. The standalone application is compiled inside that upstream module because its RAN helpers are internal Go packages. Only the application/adapters are stored here; upstream source and licensing remain in their own repository.
 
-From the repository's ella-core directory:
+Recommended installation is through [ella-stack](../ella-stack/README.md), from the repository root:
 
 ```sh
-helm upgrade --install ue ./ue-phones -n ella-services-test --wait
-kubectl -n ella-services-test rollout status deployment/ue-ue-a
-kubectl -n ella-services-test rollout status deployment/ue-ue-b
+helm upgrade --install ella ./ella-core/ella-stack -n ella-services-test \
+  -f ./ella-core/ella-stack/examples/standalone-internet-ims-sms.yaml \
+  --set core.admin.existingSecret=ella-lab-admin --wait --wait-for-jobs
+kubectl -n ella-services-test rollout status deployment/ella-ue-a
+kubectl -n ella-services-test rollout status deployment/ella-ue-b
 ```
 
 Open Phone A at **http://<node-ip>:30880** and Phone B at **http://<node-ip>:30881**. The current lab uses node **192.168.88.165**. Each UI shows only its own subscriber. Register each phone for IMS calls and answer from the other UI. NAS SMS works independently of IMS registration. No port forwarding is required.
@@ -75,9 +77,9 @@ Chromium connects to a loopback-only SOCKS5 listener in the simulator. The liste
 
 Set browser.enabled=false for the lightweight formatted reader instead. Reader requests retain the 25-second/1-MiB limits; Chromium browsing does not use that reader body limit. Browser profiles and simulator message history reset with pod replacement. Full browser sessions use more RAM than the reader; requests/limits are configurable under browser.resources.
 
-The chart deploys an optional N6 gateway using the same image and routing tools. Defaults are bridge ella-test-n6, gateway 10.6.0.1/24, Core N6 address 10.6.0.2 and UE pool 10.45.0.0/16. It NATs both original UE sources and Core's already-translated N6 source onto its pod-network egress. Configure internetGateway values for a different topology, or disable it when using your own gateway. It must share the node-local bridge with Core/IMS. Gateway replacement can briefly interrupt browsing while neighbor entries refresh.
+The independent chart retains an optional older N6 gateway, disabled by default. If enabled, its defaults are bridge ella-test-n6, gateway 10.6.0.1/24, Core N6 address 10.6.0.2 and UE pool 10.45.0.0/16. It NATs original UE sources and Core's translated N6 source onto its pod-network egress and must share that node-local bridge with Core/IMS. Prefer the shared gateway in ella-stack for the consolidated deployment.
 
-The ella-core-lab chart installs the Core source route through its permanent troubleshoot sidecar. No debug-container injection or host-side route script is needed on a fresh install. Only internet-pool traffic uses table 200 through the N6 gateway; Core API/Diameter routes remain on the pod network. The default coreN2 uses the headless Core Service DNS name, so reinstalling Core does not require editing a pod IP.
+The ella-stack chart installs the Core source route in its network init container and supplies its shared N6 gateway through the leader controller. It disables the older phone-chart gateway described above. Only internet-pool traffic uses table 200; Core API/Diameter routes remain on the pod network. The controller maintains the active Core Service, so reinstalling Core does not require editing a pod IP.
 
 ## Validate
 
@@ -132,7 +134,7 @@ kubectl -n ella-services-test exec deployment/ue-ue-a -c phone -- ip address
 kubectl -n ella-services-test exec deployment/ue-ue-a -c phone -- ss -lnptu
 kubectl -n ella-services-test exec deployment/ue-ue-a -c phone -- tcpdump -ni any -c 10
 kubectl -n ella-services-test exec deployment/ue-ue-a -c browser -- curl --socks5-hostname 127.0.0.1:1080 -I https://example.com
-kubectl -n ella-services-test exec ella-services-tester -- dig ella-core-lab
+kubectl -n ella-services-test exec ella-services-tester -- dig ella-core-active
 ```
 
 Use `ping -I <internetIp>` or `dig -b <internetIp> @8.8.8.8 example.com` in the phone container to test its current UE data address shown by `/api/state`. Browser UID 1000 remains restricted to the local SOCKS proxy; raw sockets and direct external traffic are intentionally unavailable there. Packet capture and interface changes belong in the privileged phone/tester containers or the Core diagnostic sidecar.
@@ -141,4 +143,4 @@ For a private registry, create a Kubernetes pull Secret separately and set `imag
 
 ## Modes
 
-Set `mode: internet` for browsing/connectivity only, or `mode: internet-ims-sms` (default) for internet, calls and NAS SMS. Set the matching `bootstrap.mode` on ella-core-lab. Use the supplied examples/internet.yaml and examples/internet-ims-sms.yaml; the complete Linux Helm install sequences are in [the Core lab guide](../ella-core-lab/README.md#select-a-deployment-mode-linux). Internet-only mode does not require IMS or SMSC services. Subscriber credentials and PLMN remain the fixed lab identities in either mode.
+Set `mode: internet` for browsing/connectivity only, or `mode: internet-ims-sms` (default) for internet, calls and NAS SMS. Set the matching `global.mode` on ella-stack. Use the supplied examples/internet.yaml and examples/internet-ims-sms.yaml; the complete Linux Helm install sequences are in [the Core lab guide](../ella-stack/README.md#select-a-deployment-mode-linux). Internet-only mode does not require IMS or SMSC services. Subscriber credentials and PLMN remain the fixed lab identities in either mode.

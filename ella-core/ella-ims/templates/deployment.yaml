@@ -1,24 +1,25 @@
+{{- if ne (default "internet-ims-sms" (.Values.global | default dict).mode) "internet" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "ella.name" . }}
+  name: {{ include "ella-ims.name" . }}
   labels:
-    {{- include "ella.labels" . | nindent 4 }}
+    {{- include "ella-ims.labels" . | nindent 4 }}
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      {{- include "ella.selector" . | nindent 6 }}
+      {{- include "ella-ims.selector" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "ella.selector" . | nindent 8 }}
+        {{- include "ella-ims.selector" . | nindent 8 }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         {{- with .Values.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
+        {{- tpl (toYaml .) $ | nindent 8 }}
         {{- end }}
     spec:
       automountServiceAccountToken: false
@@ -50,7 +51,7 @@ spec:
             - name: config
               mountPath: /config
       {{- with .Values.extraInitContainers }}
-      {{- toYaml . | nindent 8 }}
+      {{- tpl (toYaml .) $ | nindent 8 }}
       {{- end }}
       containers:
         - name: ims
@@ -99,13 +100,13 @@ spec:
       volumes:
         - name: input
           configMap:
-            name: {{ include "ella.name" . }}
+            name: {{ include "ella-ims.name" . }}
         - name: config
           emptyDir: {}
         - name: data
           {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
-            claimName: {{ default (include "ella.name" .) .Values.persistence.existingClaim }}
+            claimName: {{ default (include "ella-ims.name" .) .Values.persistence.existingClaim }}
           {{- else }}
           emptyDir: {}
           {{- end }}
@@ -124,3 +125,5 @@ spec:
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+
+{{- end }}

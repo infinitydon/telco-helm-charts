@@ -2,23 +2,17 @@
 
 This disposable lab validates the two independent charts against Ella Core v1.20.0. It uses Ella Core's existing `core-tester` rather than creating a new NAS SMS implementation. The upstream runner simulates real RAN/UE NAS signalling and sends IMS traffic through GTP-U and the Core user plane.
 
-Requirements: Helm 3+, kubectl, Python 3 for optional host-side tests, Multus with bridge/static/host-local plugins, a default RWO StorageClass, kernel SCTP, XFRM and TUN support. Run on kernel 6.6+ for TCX. The sample pins the lab Core, IMS and tester to `ebpf-bng-node-01`; change that node in all three manifests/values for another cluster. Bridge attachments are node-local, so these workloads must share a node. SMSC uses the pod network and may run elsewhere.
+Requirements: Helm 3+, kubectl, Python 3 for optional tests, Multus with macvlan support, a default RWO StorageClass, kernel SCTP, XFRM and TUN support. Core requires kernel 6.6+ for TCX. See the stack chart for shared N6 networking and three-node HA requirements.
 
-The lab Core and tester require privileged pods. Their interfaces are confined to pod namespaces; the lab does not use host networking. Core mounts `/sys/fs/bpf`. Core's database is ephemeral; chart databases are persistent. Only deploy this fixture in a dedicated test namespace: bootstrap sets operator configuration and creates test subscribers with public test keys.
+The lab Core and tester require privileged pods. Core mounts `/sys/fs/bpf`; Core, IMS and SMSC databases are persistent in the consolidated chart. Only deploy the presets in a dedicated test namespace: bootstrap configures the operator and creates subscribers with public test keys.
 
 ## Deploy
 
-Installation is Helm-only. Follow [ella-core-lab/README.md](../../ella-core-lab/README.md) for the complete install order, the in-cluster provisioning Job and the diagnostic shell. It deploys Core, its network attachments and tester pod; the independent IMS, SMSC, UI Service and UE charts complete the lab. No host setup script is required.
-
-The raw core-lab.yaml, n6-lab.yaml and tester-pod.yaml files are retained as legacy fixtures; do not apply them alongside the corresponding Helm resources.
-
-The `ella-ran` bridge uses 10.204.0.0/24. The N6 bridge uses Core 10.6.0.2 and IMS 10.6.0.5. UE IMS addresses use 10.60.0.0/16. Change these ranges if they overlap existing networks. Core advertises its pod IP for N2 and Diameter. Its image digest is pinned to the tested v1.20.0 build.
-
-`ims-values.yaml` adds a route back to the UE pool and disables transmit checksum offload on the virtual N6 interface. This matches [upstream's IMS fixture](https://github.com/ellanetworks/core/blob/c7cf03530e52a2d353d9d1cd6159943319075bf0/integration/compose/ims/ims.yaml). Without this setting, partial UDP checksums from the virtual interface can arrive unchanged at the simulated UE's TUN, causing the UE kernel to discard SIP challenges. This setting belongs to the virtual test topology; determine offload requirements separately for physical interfaces.
+Use [ella-stack](../../ella-stack/README.md) for the consolidated Linux Helm install and all four deployment presets. It owns Core, its UI Service and networking, selected IMS/SMSC resources, phones, diagnostics and the optional tester under one release. The raw historical YAML fixtures in this directory are retained only as records of the earlier lab layout; they are not the consolidated installation procedure.
 
 ## Build the runner
 
-The Core lab chart pulls `ghcr.io/infinitydon/ella-services-tester:c7cf03530e52-tools1`. No local build or image import is required. The image includes `ip`, `ss`, `ping`, `dig`, `nslookup`, `curl`, `wget`, `nc`, `tcpdump`, `tracepath`, `traceroute`, `iptables`, `ethtool` and `jq`.
+The stack chart pulls `ghcr.io/infinitydon/ella-services-tester:c7cf03530e52-tools1`. No local build or image import is required. The image includes `ip`, `ss`, `ping`, `dig`, `nslookup`, `curl`, `wget`, `nc`, `tcpdump`, `tracepath`, `traceroute`, `iptables`, `ethtool` and `jq`.
 
 To rebuild on Linux from this directory, the Dockerfile checks out its pinned upstream Core revision itself:
 
@@ -28,24 +22,30 @@ buildah bud --layers -f Dockerfile.tester -t ghcr.io/infinitydon/ella-services-t
 buildah push ghcr.io/infinitydon/ella-services-tester:c7cf03530e52-tools1
 ```
 
-Core, IMS and SMSC use their existing upstream images. Core provides these diagnostic tools through its troubleshooting sidecar.
+Core uses the pinned source build documented in ella-stack and also includes a troubleshooting sidecar. IMS and SMSC use upstream images.
 
 ## UI access
 
-The Core UI is http://<node-ip>:30502/ (current lab: http://192.168.88.165:30502/). Configure the ella-core-ui chart through tests/services/core-ui-values.yaml. Login uses the initialized admin account.
+The Core UI is http://NODE_IP:30502/. Configure core.service in ella-stack. Login uses the initialized admin account from core.admin or its existing Secret.
 
 ## Validate
 
 ```sh
-helm test ims -n ella-services-test
-helm test smsc -n ella-services-test
+helm test ella -n ella-services-test
+kubectl -n ella-services-test scale deployment -l 'app.kubernetes.io/name in (ue-phones,ueransim,packetrusher)' --replicas=0
+kubectl -n ella-services-test wait --for=delete pod -l 'app.kubernetes.io/name in (ue-phones,ueransim,packetrusher)' --timeout=90s
 # Supply the initialized admin password in ELLA_LAB_PASSWORD.
-python3 tests/services/run-scenarios.py --output ./integration-results
+python3 ella-core/tests/services/run-scenarios.py \
+  --core-selector app.kubernetes.io/name=ella-core --core-service ella-core \
+  --smsc-service ella-ella-smsc --core-api http://NODE_IP:30502 \
+  --output ./integration-results
+# Essential tests do not delete subscribers. Restore the phones afterward:
+kubectl -n ella-services-test scale deployment -l 'app.kubernetes.io/name in (ue-phones,ueransim,packetrusher)' --replicas=1
 ```
 
-The cross-platform Python runner discovers the Core and tester interface addresses, writes a log per scenario and machine-readable results.json, and exits nonzero if any scenario fails. Run it sequentially: scenarios bind the same simulated RAN ports. The default matrix includes 20 NAS SMS scenarios and four IMS registration/call scenarios. IMS registration covers UDP/TCP, AKA/IPsec, resynchronization and subscriber deletion; calls verify upstream's SIP/RTP/QoS assertions. This is functional testing, not a throughput or HA benchmark.
+The cross-platform Python runner discovers the Core and tester interface addresses, writes a log per scenario and machine-readable results.json, and exits nonzero if any scenario fails. Run it sequentially: scenarios bind the same simulated RAN ports. The runner refuses to start while UE phones or native simulators are active in the test namespace, since they share public fixture IMSIs. The default essential suite has four scenarios: bidirectional NAS SMS and IMS calls on both 5G and 4G. Add --suite extended for the original 24 scenarios (20 NAS SMS and four IMS registration/call scenarios). The extended registration tests delete a subscriber; rerun the same Helm preset before restoring phones after that suite. Extended IMS registration covers UDP/TCP, AKA/IPsec, resynchronization and subscriber deletion; calls verify upstream's SIP/RTP/QoS assertions. This is functional testing, not a throughput or HA benchmark.
 
-See [VALIDATION.md](VALIDATION.md) for recorded results and tested versions. Smoke-test command completion was verified with MicroK8s Helm 3.20.2 on the control-plane node. Windows Helm 4.2.1 completed the hook but hung during hook deletion in this environment; use Helm 3 for the smoke-test command if that occurs.
+See [stack validation](../../ella-stack/VALIDATION.md) for the consolidated chart results. [Earlier validation](VALIDATION.md) records the historical separate-release installation.
 
 ## UERANSIM evaluation
 
@@ -54,8 +54,7 @@ See [VALIDATION.md](VALIDATION.md) for recorded results and tested versions. Smo
 ## Remove the lab
 
 ```sh
-helm uninstall ue ims smsc core-ui core -n ella-services-test
-kubectl delete namespace ella-services-test
+helm uninstall ella -n ella-services-test
 ```
 
-Uninstall removes chart-owned PVCs; copy database backups first if needed. Deleting the test namespace removes the ephemeral Core and runner. Keep build caches or remove them separately on the build node.
+Uninstall removes IMS/SMSC chart PVCs but retains Core StatefulSet PVCs. Back up databases first; explicitly delete only the intended test PVCs when resetting a disposable lab. Namespace deletion also removes Secrets and retained PVCs, so it is not required for ordinary uninstall.

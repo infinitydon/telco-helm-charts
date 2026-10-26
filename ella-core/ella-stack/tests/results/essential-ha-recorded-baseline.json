@@ -1,0 +1,134 @@
+{
+  "evidence": "Subset of recorded HA validation; not a new HA deployment run",
+  "phones": {
+    "source": "ha-internet-ims-sms.json",
+    "checks": [
+      {
+        "check": "Both UEs attached with NAS SMS",
+        "passed": true
+      },
+      {
+        "check": "Both UEs IMS registered",
+        "passed": true
+      },
+      {
+        "check": "NAS SMS 1 to 2 received and delivered",
+        "passed": true
+      },
+      {
+        "check": "NAS SMS 2 to 1 received and delivered",
+        "passed": true
+      },
+      {
+        "check": "IMS incoming 1 to 2",
+        "passed": true
+      },
+      {
+        "check": "IMS confirmed with bidirectional voice QFI 1 to 2",
+        "passed": true
+      },
+      {
+        "check": "IMS call released 1 to 2",
+        "passed": true
+      },
+      {
+        "check": "IMS incoming 2 to 1",
+        "passed": true
+      },
+      {
+        "check": "IMS confirmed with bidirectional voice QFI 2 to 1",
+        "passed": true
+      },
+      {
+        "check": "IMS call released 2 to 1",
+        "passed": true
+      },
+      {
+        "check": "HTTPS reader through UE 1",
+        "passed": true
+      },
+      {
+        "check": "HTTPS reader through UE 2",
+        "passed": true
+      }
+    ]
+  },
+  "phonesAfterFailover": {
+    "source": "ha-internet-ims-sms-after-failover.json",
+    "checks": [
+      {
+        "check": "Both UEs attached with NAS SMS",
+        "passed": true
+      },
+      {
+        "check": "Both UEs IMS registered",
+        "passed": true
+      },
+      {
+        "check": "NAS SMS 1 to 2 received and delivered",
+        "passed": true
+      },
+      {
+        "check": "NAS SMS 2 to 1 received and delivered",
+        "passed": true
+      },
+      {
+        "check": "IMS incoming 1 to 2",
+        "passed": true
+      },
+      {
+        "check": "IMS confirmed with bidirectional voice QFI 1 to 2",
+        "passed": true
+      },
+      {
+        "check": "IMS call released 1 to 2",
+        "passed": true
+      },
+      {
+        "check": "IMS incoming 2 to 1",
+        "passed": true
+      },
+      {
+        "check": "IMS confirmed with bidirectional voice QFI 2 to 1",
+        "passed": true
+      },
+      {
+        "check": "IMS call released 2 to 1",
+        "passed": true
+      },
+      {
+        "check": "HTTPS reader through UE 1",
+        "passed": true
+      },
+      {
+        "check": "HTTPS reader through UE 2",
+        "passed": true
+      }
+    ]
+  },
+  "protocol": {
+    "source": "ha-protocol.json",
+    "scenarios": [
+      {
+        "scenario": "sms/5g_mo_mt",
+        "exitCode": 0,
+        "passed": true
+      },
+      {
+        "scenario": "sms/4g_mo_mt",
+        "exitCode": 0,
+        "passed": true
+      },
+      {
+        "scenario": "ims/5g_call",
+        "exitCode": 0,
+        "passed": true
+      },
+      {
+        "scenario": "ims/4g_call",
+        "exitCode": 0,
+        "passed": true
+      }
+    ]
+  }
+}

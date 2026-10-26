@@ -1,0 +1,8 @@
+apiVersion: v2
+name: packetrusher
+description: PacketRusher stable release with explicit eBPF datapath for Ella Core
+type: application
+version: 1.0.0
+appVersion: "2.0.0"
+dependencies:
+  - {name: ella-simulator, version: 0.1.0, repository: "file://../ella-simulator"}

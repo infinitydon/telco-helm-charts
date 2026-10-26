@@ -1,9 +1,10 @@
+{{- if ne (default "internet-ims-sms" (.Values.global | default dict).mode) "internet" }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "ella.name" . }}
+  name: {{ include "ella-ims.name" . }}
   labels:
-    {{- include "ella.labels" . | nindent 4 }}
+    {{- include "ella-ims.labels" . | nindent 4 }}
 data:
   config.yaml: |
     logging:
@@ -19,11 +20,11 @@ data:
     sip:
       addresses:
       {{- if .Values.sip.addresses }}
-        {{- toYaml .Values.sip.addresses | nindent 8 }}
+        {{- tpl (toYaml .Values.sip.addresses) . | nindent 8 }}
       {{- else }}
         - "__POD_IP__"
       {{- end }}
-      trusted_networks: {{ .Values.sip.trustedNetworks | toJson }}
+      trusted_networks: {{ tpl (toJson .Values.sip.trustedNetworks) . }}
     pcscf:
       port: {{ .Values.pcscf.port }}
       ipsec:
@@ -37,3 +38,5 @@ data:
     n5:
       {{- toYaml . | nindent 6 }}
     {{- end }}
+
+{{- end }}
