@@ -54,14 +54,28 @@ The controller watches public Core status, patches only the Core UI/API and acti
 
 ## Tests
 
+Run the essential acceptance suite against either standalone or HA:
+
 ```sh
-helm test ella -n ella-services-test --timeout 90s
-python3 ella-core/ue-phones/tests/internet-smoke.py --release ella --host NODE_IP
-python3 ella-core/ue-phones/tests/smoke.py --release ella --network \
-  --phone-a http://NODE_IP:30880 --phone-b http://NODE_IP:30881
+python3 ella-core/ella-stack/tests/smoke.py --host NODE_IP
 ```
 
-Use the internet-only test in internet mode and the full smoke test in combined mode. The scenario runner uses the same IMSIs as persistent phones: pause those deployments before running it. Test runners need kubectl access to the namespace. All commands are Linux shell/Helm commands; no Windows scripts are shipped.
+It detects the installed service mode, runs Helm health checks, then runs 12 essential phone checks. In combined mode these cover both UE attachments, IMS registration, SMS in both directions, calls/answer/media/release in both directions, and HTTPS through each UE. Internet-only mode checks internet attachment, DNS, ICMP and HTTPS with IMS/SMS disabled. No admin password, subscriber changes, phone scaling or simulated outages are needed. The command assumes the preset phone NodePorts 30880/30881; release, namespace and kubeconfig are selectable.
+
+Optional extended checks remain available:
+
+```sh
+# Additional registration/security checks plus tunnel-failure recovery: 22 checks.
+python3 ella-core/ue-phones/tests/smoke.py --release ella --network \
+  --phone-a http://NODE_IP:30880 --phone-b http://NODE_IP:30881
+# Separate protocol runner: four essential 4G/5G SMS/call scenarios by default.
+# See the service test guide for credentials and pausing/restoring the phones.
+python3 ella-core/tests/services/run-scenarios.py --core-api http://NODE_IP:30502
+# All 24 protocol edge cases, including the three known HA SMS failures:
+python3 ella-core/tests/services/run-scenarios.py --suite extended --core-api http://NODE_IP:30502
+```
+
+The essential four protocol scenarios passed in both recorded topology runs. The extended suite is diagnostic and is not the default acceptance gate; its known HA failures remain recorded in VALIDATION.md. All commands are Linux shell/Helm or standard-library Python commands.
 
 ## Core image provenance
 

@@ -1,5 +1,19 @@
 # Consolidated chart validation
 
+The default acceptance suite is now `tests/smoke.py`: Helm health checks plus
+12 essential phone checks, using the same command for standalone and HA.
+The optional service protocol runner defaults to four scenarios:
+`sms/5g_mo_mt`, `sms/4g_mo_mt`, `ims/5g_call`, and `ims/4g_call`.
+All four passed in both recorded full topology runs below. The original
+22-check phone suite is retained with `--network`; the original 24 protocol
+scenarios are retained with `--suite extended`. The expanded results and known
+failures below are historical evidence, not removed or relabelled as passing.
+The new defaults were exercised on Linux against the running standalone lab:
+12/12 phone checks and 4/4 protocol scenarios passed. The HA essential baseline
+is extracted from the recorded full run, including 12/12 phone checks before
+and after failover, rather than claiming a new HA deployment run. See the
+essential-* summaries under tests/results.
+
 Live runs: October 25, 2026 US Eastern / October 26 UTC, namespace
 `ella-services-test`, release `ella`. Results below distinguish the phone
 acceptance tests from the broader upstream protocol scenarios. HA is not a

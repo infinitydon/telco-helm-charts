@@ -1,0 +1,22 @@
+[
+  {
+    "scenario": "sms/5g_mo_mt",
+    "exitCode": 0,
+    "passed": true
+  },
+  {
+    "scenario": "sms/4g_mo_mt",
+    "exitCode": 0,
+    "passed": true
+  },
+  {
+    "scenario": "ims/5g_call",
+    "exitCode": 0,
+    "passed": true
+  },
+  {
+    "scenario": "ims/4g_call",
+    "exitCode": 0,
+    "passed": true
+  }
+]
