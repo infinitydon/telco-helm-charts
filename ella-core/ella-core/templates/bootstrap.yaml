@@ -48,6 +48,7 @@ spec:
             - {name: TOPOLOGY, value: {{ .Values.topology | quote }}}
             - {name: UE_MODE, value: {{ default "internet" (.Values.global | default dict).mode | quote }}}
             - {name: PROVISION, value: {{ .Values.provisioning.enabled | quote }}}
+            - {name: N6_GATEWAY_ENABLED, value: {{ include "core.n6GatewayEnabled" . | quote }}}
             - {name: RECONCILE_DATA_NETWORKS, value: {{ .Values.provisioning.reconcileDataNetworks | default false | quote }}}
             - {name: MEMBER_DISPLAY_NAME_ENABLED, value: {{ .Values.memberDisplayName.enabled | quote }}}
             - {name: MEMBER_DISPLAY_NAME_TEMPLATE, value: {{ .Values.memberDisplayName.template | quote }}}

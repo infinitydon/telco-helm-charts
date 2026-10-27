@@ -1,12 +1,12 @@
 """Internet-only acceptance checks. Run with python3; requires kubectl and a provisioned lab."""
 import argparse,json,pathlib,subprocess,urllib.request,urllib.error
-p=argparse.ArgumentParser();p.add_argument('--release',default='ue');p.add_argument('--host',default='192.168.88.165');p.add_argument('--icmp-host',default='8.8.8.8');p.add_argument('--kubeconfig');p.add_argument('--namespace',default='ella-services-test');p.add_argument('--output',default='internet-results.json');a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--release',default='ue');p.add_argument('--host',default='192.168.88.165');p.add_argument('--phone-a-port',type=int,default=30880);p.add_argument('--phone-b-port',type=int,default=30881);p.add_argument('--icmp-host',default='8.8.8.8');p.add_argument('--kubeconfig');p.add_argument('--namespace',default='ella-services-test');p.add_argument('--output',default='internet-results.json');a=p.parse_args()
 k=['kubectl']+(['--kubeconfig',a.kubeconfig] if a.kubeconfig else [])+['-n',a.namespace]
 results=[]
 def command(deployment,container,*args):
  return subprocess.check_output(k+['exec','deployment/'+deployment,'-c',container,'--',*args],text=True,timeout=30).strip()
 def passed(name):results.append({'check':name,'passed':True});print('PASS '+name,flush=True)
-for id,port,dep in [('1',30880,a.release+'-ue-a'),('2',30881,a.release+'-ue-b')]:
+for id,port,dep in [('1',a.phone_a_port,a.release+'-ue-a'),('2',a.phone_b_port,a.release+'-ue-b')]:
  base='http://'+a.host+':'+str(port)
  with urllib.request.urlopen(base+'/api/state',timeout=10) as r:state=json.load(r)
  phone=state['phones'][0]

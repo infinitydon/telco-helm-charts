@@ -17,11 +17,12 @@ def addresses():
             for a in link.get('addr_info',[]) if a['family']=='inet' and a['scope']=='global']
 
 def configure(core):
-    pod=os.environ['POD_IP'];sd=int(session['sd'],16);sst=session['sst']
+    pod=(os.environ.get('N2N3_ADDRESS','') or os.environ['POD_IP']).split('/')[0];sd=int(session['sd'],16);sst=session['sst']
+    core_address=select_n2_address()
     imsi=sub['imsi'].removeprefix('imsi-');mcc=sub['mcc'];mnc=sub['mnc']
     if kind=='ueransim':
         radio={'mcc':mcc,'mnc':mnc,'nci':gnb['nci'],'idLength':gnb['idLength'],'tac':int(gnb['tac'],16),
-               'linkIp':'127.0.0.1','ngapIp':pod,'gtpIp':pod,'amfConfigs':[{'address':core,'port':38412}],
+               'linkIp':'127.0.0.1','ngapIp':pod,'gtpIp':pod,'amfConfigs':[{'address':core_address,'port':38412}],
                'slices':[{'sst':sst,'sd':sd}],'ignoreStreamIds':True}
         ue={'supi':'imsi-'+imsi,'mcc':mcc,'mnc':mnc,'key':sub['key'],'op':sub['opc'],'opType':'OPC',
             'amf':sub['amf'],'imei':'356938035643803','imeiSv':'4370816125816151',
@@ -43,12 +44,30 @@ def configure(core):
                   'dnn':session['dnn'],'snssai':{'sst':f'{sst:02x}','sd':session['sd']},
                   'integrity':{'nia0':False,'nia1':False,'nia2':True,'nia3':False},
                   'ciphering':{'nea0':True,'nea1':False,'nea2':True,'nea3':False}},
-            'amfif':[{'ip':core,'port':38412}],'logs':{'level':4}}
+            'amfif':[{'ip':core_address,'port':38412}],'logs':{'level':4}}
     (out/'packetrusher.yaml').write_text(json.dumps(config))
     return [['/packetrusher/packetrusher','--config',str(out/'packetrusher.yaml'),
              '--tunnel-backend',settings['backend'],'--metrics-addr','127.0.0.1:9090',
              '--report-json',str(out/'report.json'),'multi-ue','-n',str(settings['ueCount']),
              '--tunnel','--tunnel-vrf=false','--control-socket',str(out/'control.sock')]]
+
+def select_n2_address():
+    addresses=[x.strip() for x in os.environ.get('CORE_N2_ADDRESSES','').split(',') if x.strip()]
+    hosts=[x.strip() for x in os.environ.get('CORE_MEMBER_HOSTS','').split(',') if x.strip()]
+    active_id=''
+    try:
+        with urllib.request.urlopen('http://'+socket.gethostbyname(os.environ['CORE_HOST'])+':'+str(settings['core']['apiPort'])+'/api/v1/status',timeout=2) as response:
+            active_id=json.load(response).get('result',{}).get('cluster',{}).get('nodeId','')
+    except (OSError,ValueError):
+        pass
+    if active_id:
+        for host,address in zip(hosts,addresses):
+            try:
+                with urllib.request.urlopen('http://'+host+':'+str(settings['core']['apiPort'])+'/api/v1/status',timeout=2) as response:
+                    if json.load(response).get('result',{}).get('cluster',{}).get('nodeId')==active_id:return address
+            except (OSError,ValueError):
+                continue
+    return addresses[0] if addresses else socket.gethostbyname(os.environ['CORE_HOST'])
 
 def stop():
     state['ready']=False

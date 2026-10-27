@@ -57,12 +57,17 @@ if HA:
             if member_status.get('displayName')!=display_name:
                 until(lambda:api(CORE,'PUT',f'cluster/members/{quote(str(node_id),safe="")}/display-name',{'displayName':display_name},True),f'set display name for {NAME}-{i}',seconds=120)
                 print(f'Set Core member {NAME}-{i} display name to {display_name}',flush=True)
+def core(method,path,body=None): return api(CORE,method,path,body,True)
+if os.environ.get('N6_GATEWAY_ENABLED')=='true':
+    nat=core('GET','networking/nat')
+    if nat.get('enabled',True):
+        core('PUT','networking/nat',{'enabled':False})
+        print('Disabled Ella Core NAT; the separate lab N6 gateway performs internet-pool SNAT.',flush=True)
 if os.environ['PROVISION']!='true':
     print('Core initialized; subscriber/service provisioning disabled.');raise SystemExit(0)
 IMS=os.environ['IMS_API']; SMSC=os.environ['SMSC_API']
 if SERVICES:
     for base in (IMS,SMSC):until(lambda base=base:api(base,'GET','operator'),'service API '+base)
-def core(method,path,body=None): return api(CORE,method,path,body,True)
 def ensure(path,name,body):
     if not any(x['name']==name for x in core('GET',path).get('items',[])): core('POST',path,body)
 operator=core('GET','operator')

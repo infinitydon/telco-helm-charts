@@ -1,0 +1,28 @@
+{{- if or .Values.n6Gateway.enabled .Values.controller.gatewayEnabled }}
+{{- $name := include "core.fullname" . }}
+{{- $nodeSelector := .Values.n6Gateway.nodeSelector | default .Values.controller.nodeSelector }}
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: {{ $name }}-n6-gateway}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: {{ $name }}-n6-gateway}}
+  template:
+    metadata:
+      labels: {app: {{ $name }}-n6-gateway}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/gateway-config.yaml") . | sha256sum }}
+        k8s.v1.cni.cncf.io/networks: {{ printf "%s-n6" $name | quote }}
+    spec:
+      nodeSelector:
+        {{- toYaml $nodeSelector | nindent 8 }}
+      containers:
+        - name: gateway
+          image: {{ .Values.n6Gateway.image }}
+          command: [bash, /scripts/gateway.sh]
+          securityContext: {privileged: true}
+          resources: {requests: {cpu: 10m, memory: 32Mi}, limits: {memory: 256Mi}}
+          volumeMounts: [{name: script, mountPath: /scripts, readOnly: true}]
+      volumes: [{name: script, configMap: {name: {{ $name }}-n6-gateway}}]
+{{- end }}

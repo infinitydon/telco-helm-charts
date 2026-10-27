@@ -80,7 +80,8 @@ func (d *phoneDashboard) event(id, text string) {
 	log.Printf("phone=%s %s", id, text)
 }
 func (d *phoneDashboard) initialize() {
-	env := scenarios.Env{CoreN2Addresses: []string{os.Getenv("CORE_N2")}, GNBs: []scenarios.GNB{{Name: "phones", N2Address: os.Getenv("POD_IP"), N3Address: os.Getenv("N3_ADDRESS")}}}
+	coreN2Addresses := strings.Split(os.Getenv("CORE_N2"), ",")
+	env := scenarios.Env{CoreN2Addresses: coreN2Addresses, GNBs: []scenarios.GNB{{Name: "phones", N2Address: os.Getenv("N2N3_ADDRESS"), N3Address: os.Getenv("N3_ADDRESS")}}}
 	g, err := startPhoneGNB(env)
 	if err != nil {
 		d.fail(err)
@@ -474,8 +475,8 @@ func ServePhones(address string) error {
 	if address == "" {
 		address = ":8080"
 	}
-	if os.Getenv("CORE_N2") == "" || os.Getenv("N3_ADDRESS") == "" || os.Getenv("POD_IP") == "" {
-		return fmt.Errorf("CORE_N2, N3_ADDRESS and POD_IP are required")
+	if os.Getenv("CORE_N2") == "" || os.Getenv("N3_ADDRESS") == "" || os.Getenv("N2N3_ADDRESS") == "" {
+		return fmt.Errorf("CORE_N2, N3_ADDRESS and N2N3_ADDRESS are required")
 	}
 	if phoneMode() != "internet" && phoneMode() != "internet-ims-sms" {
 		return fmt.Errorf("invalid UE_MODE: %s", phoneMode())

@@ -2,6 +2,15 @@
   "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
+    "networkAttachment": {"type": "string"},
+    "n3Interface": {"type": "string"},
+    "n2n3Address": {"type": "string"},
+    "n2n3Interface": {"type": "string"},
+    "coreN2": {"type": "string"},
+    "coreN2Addresses": {"type": "string"},
+    "coreMemberHosts": {"type": "string"},
+    "coreActiveHost": {"type": "string"},
+    "core": {"type": "object", "properties": {"namespace": {"type": "string"}, "clusterDomain": {"type": "string"}}},
     "service": {
       "type": "object",
       "properties": {

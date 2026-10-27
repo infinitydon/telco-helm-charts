@@ -16,6 +16,11 @@
       "minimum": 1,
       "maximum": 1
     },
+    "networkAttachment": {"type": "string"},
+    "n2n3Address": {"type": "string"},
+    "coreN2Addresses": {"type": "string"},
+    "coreMemberHosts": {"type": "string"},
+    "waitForBootstrap": {"type": "object", "properties": {"enabled": {"type": "boolean"}}},
     "subscriber": {
       "type": "object",
       "properties": {

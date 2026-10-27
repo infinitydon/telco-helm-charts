@@ -24,7 +24,7 @@ kubectl -n ella-services-test exec deployment/load-packetrusher -- \
   --ue 1 --action wait --timeout 30s
 ```
 
-Dependencies and the supervisor are included in the charts; no host installation script or gtp5g kernel-module build is required. The privileged Pod loads TCX eBPF programs in its own network namespace and uses pod-network N2/N3. The image targets Linux/amd64. Set nodeSelector/affinity to compatible nodes.
+Dependencies and the supervisor are included in the charts; no host installation script or gtp5g kernel-module build is required. The privileged Pod loads TCX eBPF programs in its own network namespace. Configure `networkAttachment`, `n2n3Address` and `coreN2Addresses` to attach N2/N3 to a dedicated Multus network. The image targets Linux/amd64. Set nodeSelector/affinity to compatible nodes.
 
 ## Configuration and operation
 

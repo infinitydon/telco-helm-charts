@@ -5,7 +5,7 @@ replicaCount: 3
 image: ghcr.io/infinitydon/ellacore@sha256:926206d7e1b4e4d64ef3f9f91211ec5630951f33ae62c33c694fbd4f83d6bf91
 pullPolicy: IfNotPresent
 imagePullSecrets: []
-initImage: ghcr.io/infinitydon/ella-ue-phones:0.4.1
+initImage: ghcr.io/infinitydon/ella-ue-phones:0.4.5
 admin:
   existingSecret: ""
   email: lab@example.com
@@ -39,11 +39,20 @@ network:
   imsAddress: 10.6.0.5
   internetPool: 10.45.0.0/16
   imsPool: 10.60.0.0/16
+  n2n3:
+    enabled: false
+    coreAddresses: [10.211.0.2/24, 10.211.0.3/24, 10.211.0.4/24]
 controller:
   enabled: true
-  image: ghcr.io/infinitydon/ella-ue-phones:0.4.1
+  image: ghcr.io/infinitydon/ella-ue-phones:0.4.5
+  # Deprecated compatibility switch. Prefer n6Gateway.enabled.
   gatewayEnabled: false
   nodeSelector: {kubernetes.io/arch: amd64}
+n6Gateway:
+  # Enabling the lab gateway also disables Core NAT during bootstrap.
+  enabled: false
+  image: ghcr.io/infinitydon/ella-ue-phones:0.4.5
+  nodeSelector: {}
 nodeSelector: {kubernetes.io/arch: amd64}
 affinity: {}
 tolerations: []

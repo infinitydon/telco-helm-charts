@@ -9,10 +9,22 @@ global:
     imsAddress: 10.6.0.5
     internetPool: 10.45.0.0/16
     imsPool: 10.60.0.0/16
+    n2n3:
+      enabled: true
+      coreAddresses: [10.211.0.2/24, 10.211.0.3/24, 10.211.0.4/24]
+      coreN2Addresses: [10.211.0.2, 10.211.0.3, 10.211.0.4]
+      phoneAddresses: [10.211.0.20/24, 10.211.0.21/24]
+      ueransimAddress: 10.211.0.30/24
+      packetrusherAddress: 10.211.0.31/24
 core:
   topology: standalone
+  network:
+    n2n3:
+      enabled: true
   provisioning: {enabled: false}
   service: {type: NodePort, nodePort: 30502}
+  n6Gateway:
+    enabled: false
 ims:
   enabled: true
   nodeSelector: {kubernetes.io/arch: amd64}
@@ -23,7 +35,7 @@ ims:
     trustedNetworks: ['{{ .Values.global.network.imsPool }}']
   extraInitContainers:
     - name: n6-route
-      image: ghcr.io/infinitydon/ella-ue-phones:0.4.1
+      image: ghcr.io/infinitydon/ella-ue-phones:0.4.5
       securityContext: {capabilities: {add: [NET_ADMIN, NET_RAW]}}
       command: [sh, -ec]
       args:
@@ -43,9 +55,14 @@ phones:
   enabled: false
   mode: internet
   waitForBootstrap: {enabled: true}
-  coreN2: '{{ .Release.Name }}-core-active:38412'
-  networkAttachment: ""
-  n3Interface: eth0
+  networkAttachment: '[{"name":"{{ .Release.Name }}-core-n2n3","interface":"net1"}]'
+  coreN2: '{{ first .Values.global.network.n2n3.coreN2Addresses }}:38412'
+  coreN2Addresses: '{{ join "," .Values.global.network.n2n3.coreN2Addresses }}'
+  coreMemberHosts: '{{ list (printf "%s-core-0.%s-core-peers.%s.svc.%s" .Release.Name .Release.Name .Release.Namespace .Values.core.clusterDomain) (printf "%s-core-1.%s-core-peers.%s.svc.%s" .Release.Name .Release.Name .Release.Namespace .Values.core.clusterDomain) (printf "%s-core-2.%s-core-peers.%s.svc.%s" .Release.Name .Release.Name .Release.Namespace .Values.core.clusterDomain) | join "," }}'
+  coreActiveHost: '{{ printf "%s-core-active.%s.svc.%s" .Release.Name .Release.Namespace .Values.core.clusterDomain }}'
+  n2n3Address: '{{ join "," .Values.global.network.n2n3.phoneAddresses }}'
+  n2n3Interface: net1
+  n3Interface: net1
   nodeSelector: {kubernetes.io/arch: amd64}
   internetGateway: {enabled: false}
 tester:
@@ -53,7 +70,17 @@ tester:
   image: ghcr.io/infinitydon/ella-services-tester:c7cf03530e52-tools1
 ueransim:
   enabled: false
+  waitForBootstrap: {enabled: true}
   core: {host: '{{ .Release.Name }}-core-active'}
+  networkAttachment: '[{"name":"{{ .Release.Name }}-core-n2n3","interface":"net1"}]'
+  n2n3Address: '{{ .Values.global.network.n2n3.ueransimAddress }}'
+  coreN2Addresses: '{{ join "," .Values.global.network.n2n3.coreN2Addresses }}'
+  coreMemberHosts: '{{ list (printf "%s-core-0.%s-core-peers.%s.svc.%s" .Release.Name .Release.Name .Release.Namespace .Values.core.clusterDomain) (printf "%s-core-1.%s-core-peers.%s.svc.%s" .Release.Name .Release.Name .Release.Namespace .Values.core.clusterDomain) (printf "%s-core-2.%s-core-peers.%s.svc.%s" .Release.Name .Release.Name .Release.Namespace .Values.core.clusterDomain) | join "," }}'
 packetrusher:
   enabled: false
+  waitForBootstrap: {enabled: true}
   core: {host: '{{ .Release.Name }}-core-active'}
+  networkAttachment: '[{"name":"{{ .Release.Name }}-core-n2n3","interface":"net1"}]'
+  n2n3Address: '{{ .Values.global.network.n2n3.packetrusherAddress }}'
+  coreN2Addresses: '{{ join "," .Values.global.network.n2n3.coreN2Addresses }}'
+  coreMemberHosts: '{{ list (printf "%s-core-0.%s-core-peers.%s.svc.%s" .Release.Name .Release.Name .Release.Namespace .Values.core.clusterDomain) (printf "%s-core-1.%s-core-peers.%s.svc.%s" .Release.Name .Release.Name .Release.Namespace .Values.core.clusterDomain) (printf "%s-core-2.%s-core-peers.%s.svc.%s" .Release.Name .Release.Name .Release.Namespace .Values.core.clusterDomain) | join "," }}'

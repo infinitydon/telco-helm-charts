@@ -4,7 +4,7 @@ core:
   topology: standalone
   replicaCount: 3
   provisioning: {enabled: true}
-  controller: {gatewayEnabled: true}
+  n6Gateway: {enabled: true}
 phones:
   enabled: true
 tester:

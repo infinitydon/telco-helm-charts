@@ -35,10 +35,14 @@ class Render(unittest.TestCase):
             self.assertIn('type: '+kind, text)
 
     def test_optional_native_simulators(self):
-        text = render('--set', 'ueransim.enabled=true,packetrusher.enabled=true')
+        text = render('--set', 'ueransim.enabled=true,packetrusher.enabled=true,phones.enabled=true,core.provisioning.enabled=true')
         self.assertIn('name: ella-ueransim', text)
         self.assertIn('name: ella-packetrusher', text)
         self.assertIn('"backend": "ebpf"', text)
+        self.assertIn('interfaces:\n      n2: {name: net2}\n      n3: {name: net2}', text)
+        self.assertGreaterEqual(text.count('ella-core-n2n3'), 4)
+        self.assertIn('10.211.0.2,10.211.0.3,10.211.0.4', text)
+        self.assertIn('N2N3_ADDRESS', text)
         self.assertNotIn('apiTokenSecret', text)
         render('--set', 'packetrusher.enabled=true,packetrusher.backend=auto', valid=False)
 
@@ -47,6 +51,29 @@ class Render(unittest.TestCase):
         self.assertIn('value: "{namespace}-{pod}"', text)
         disabled = render('--set', 'core.memberDisplayName.enabled=false')
         self.assertIn('MEMBER_DISPLAY_NAME_ENABLED, value: "false"', disabled)
+
+    def test_controller_logs_have_timestamps_and_actionable_events(self):
+        text = render('-f', str(CHART/'examples'/'ha-internet-ims-sms.yaml'))
+        for message in ('date -u', 'Active Core leader changed',
+                        'No ready Core leader found', 'Reconciled Service selector',
+                        'UE return routes', 'IMS Diameter peer', 'command failed exit='):
+            with self.subTest(message=message):
+                self.assertIn(message, text)
+
+    def test_n6_gateway_is_separate_from_controller(self):
+        text = render('-f', str(CHART/'examples'/'ha-internet-ims-sms.yaml'))
+        self.assertIn('name: ella-core-n6-gateway', text)
+        self.assertIn('app: ella-core-n6-gateway', text)
+        self.assertIn('N6_GATEWAY_ENABLED, value: "true"', text)
+        controller = text.split('kind: Deployment\nmetadata: {name: ella-core-controller}', 1)[1].split('\n---', 1)[0]
+        gateway = text.split('kind: Deployment\nmetadata: {name: ella-core-n6-gateway}', 1)[1].split('\n---', 1)[0]
+        self.assertIn('securityContext: {privileged: false}', controller)
+        self.assertNotIn('k8s.v1.cni.cncf.io/networks', controller)
+        self.assertIn('securityContext: {privileged: true}', gateway)
+        self.assertIn('k8s.v1.cni.cncf.io/networks: "ella-core-n6"', gateway)
+        standalone = render('--set', 'core.topology=standalone,core.n6Gateway.enabled=false,core.controller.gatewayEnabled=false')
+        self.assertNotIn('ella-core-n6-gateway', standalone)
+        self.assertIn('N6_GATEWAY_ENABLED, value: "false"', standalone)
 
     def test_invalid_combinations(self):
         for values in ('global.mode=invalid', 'core.topology=invalid',

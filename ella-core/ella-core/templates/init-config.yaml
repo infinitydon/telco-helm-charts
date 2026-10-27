@@ -12,9 +12,20 @@ data:
     test "$n6" != null
     ip address replace "$n6" dev net1
     ip link set net1 up
+    {{- if $network.n2n3.enabled }}
+    {{- if eq .Values.topology "ha" }}
+    n2n3=$(echo '{{ $network.n2n3.coreAddresses | toJson }}' | jq -r ".[$ordinal]")
+    test "$n2n3" != null
+    ip address replace "$n2n3" dev net2
+    {{- else }}
+    for n2n3 in $(echo '{{ $network.n2n3.coreAddresses | toJson }}' | jq -r '.[]'); do ip address replace "$n2n3" dev net2; done
+    {{- end }}
+    ip link set net2 up
+    ethtool -K net2 tx off || true
+    {{- end }}
     # Complete checksums for same-host macvlan delivery before NIC offload.
     ethtool -K net1 tx off || true
-    for iface in eth0 net1; do ethtool -K "$iface" gro off gso off tso off || true; done
+    for iface in eth0 net1 {{ if $network.n2n3.enabled }}net2{{ end }}; do ethtool -K "$iface" gro off gso off tso off || true; done
     tc qdisc replace dev net1 clsact
     tc filter replace dev net1 egress protocol ip pref 10 matchall action csum ip4h and tcp and udp
     ip route replace default via {{ $network.gateway }} dev net1 table 200
@@ -27,8 +38,13 @@ data:
       audit: {output: stdout}
     db: {path: /data/core.db}
     interfaces:
+      {{- if $network.n2n3.enabled }}
+      n2: {name: net2}
+      n3: {name: net2}
+      {{- else }}
       n2: {address: "$POD_IP"}
       n3: {name: eth0}
+      {{- end }}
       n6: {name: net1}
       api: {address: "$POD_IP", port: 5002}
       diameter: {address: "$POD_IP"}

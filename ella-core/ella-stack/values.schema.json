@@ -13,6 +13,17 @@
         "network": {
           "type": "object",
           "properties": {
+            "n2n3": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "coreAddresses": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+                "coreN2Addresses": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+                "phoneAddresses": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+                "ueransimAddress": {"type": "string"},
+                "packetrusherAddress": {"type": "string"}
+              }
+            },
             "type": {
               "enum": [
                 "bridge",

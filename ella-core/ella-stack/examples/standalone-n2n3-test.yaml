@@ -1,0 +1,35 @@
+global:
+  mode: internet-ims-sms
+  network:
+    type: macvlan
+    master: eth0
+    coreAddresses: [10.240.0.2/24, 10.240.0.3/24, 10.240.0.4/24]
+    gateway: 10.240.0.1
+    imsAddress: 10.240.0.5
+    internetPool: 10.242.0.0/16
+    imsPool: 10.60.0.0/16
+    n2n3:
+      enabled: true
+      coreAddresses: [10.241.0.2/24, 10.241.0.3/24, 10.241.0.4/24]
+      coreN2Addresses: [10.241.0.2, 10.241.0.3, 10.241.0.4]
+      phoneAddresses: [10.241.0.20/24, 10.241.0.21/24]
+      ueransimAddress: 10.241.0.30/24
+      packetrusherAddress: 10.241.0.31/24
+core:
+  topology: standalone
+  nodeSelector: {kubernetes.io/hostname: ebpf-bng-node-01}
+  provisioning: {enabled: true}
+  n6Gateway: {enabled: true}
+  service: {type: NodePort, nodePort: 30504}
+phones:
+  enabled: true
+  mode: internet-ims-sms
+  service: {type: NodePort, port: 8080}
+  phones:
+    - {name: ue-a, id: "1", label: Phone A, peer: ue-b, gnbId: "000009", nodePort: 30960}
+    - {name: ue-b, id: "2", label: Phone B, peer: ue-a, gnbId: "00000a", nodePort: 30961}
+tester: {enabled: true}
+ueransim: {enabled: true}
+packetrusher:
+  enabled: true
+  nodeSelector: {kubernetes.io/hostname: ebpf-bng-node-01}

@@ -1,0 +1,43 @@
+global:
+  mode: internet-ims-sms
+  network:
+    type: macvlan
+    master: eth0
+    coreAddresses: [10.244.0.2/24, 10.244.0.3/24, 10.244.0.4/24]
+    gateway: 10.244.0.1
+    imsAddress: 10.244.0.5
+    internetPool: 10.246.0.0/16
+    imsPool: 10.60.0.0/16
+    n2n3:
+      enabled: true
+      coreAddresses: [10.245.0.2/24, 10.245.0.3/24, 10.245.0.4/24]
+      coreN2Addresses: [10.245.0.2, 10.245.0.3, 10.245.0.4]
+      phoneAddresses: [10.245.0.20/24, 10.245.0.21/24]
+      ueransimAddress: 10.245.0.30/24
+      packetrusherAddress: 10.245.0.31/24
+core:
+  topology: ha
+  replicaCount: 3
+  provisioning: {enabled: true}
+  n6Gateway: {enabled: true}
+  service: {type: NodePort, nodePort: 30505}
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: NotIn
+                values: [ebpf-bng-node-03-ubuntu-focal]
+phones:
+  enabled: true
+  mode: internet-ims-sms
+  service: {type: NodePort, port: 8080}
+  phones:
+    - {name: ue-a, id: "1", label: Phone A, peer: ue-b, gnbId: "000009", nodePort: 30962}
+    - {name: ue-b, id: "2", label: Phone B, peer: ue-a, gnbId: "00000a", nodePort: 30963}
+tester: {enabled: true}
+ueransim: {enabled: true}
+packetrusher:
+  enabled: true
+  nodeSelector: {kubernetes.io/hostname: ebpf-bng-node-01}

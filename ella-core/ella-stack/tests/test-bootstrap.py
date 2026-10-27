@@ -3,10 +3,11 @@ import argparse,contextlib,io,json,os,pathlib,runpy,unittest
 from unittest.mock import patch
 p=argparse.ArgumentParser();p.add_argument('--script',default=str(pathlib.Path(__file__).resolve().parents[2]/'ella-core/files/bootstrap.py'));a,remaining=p.parse_known_args()
 class Bootstrap(unittest.TestCase):
- def exercise(self,mode,ha=False,default_network=False,active_sessions=0,existing_core=False):
-  calls=[];ready=set();count=3 if ha else 1
+ def exercise(self,mode,ha=False,default_network=False,active_sessions=0,existing_core=False,n6_gateway=False,provision=True,core_nat_enabled=True):
+  calls=[];ready=set();count=3 if ha else 1;nat_enabled=core_nat_enabled
   if existing_core:ready.add('http://core-0.core-peers.ns.svc.cluster.local:5002')
   def request(req,timeout):
+   nonlocal nat_enabled
    base=req.full_url.split('/api/v1/')[0];path=req.full_url.split('/api/v1/')[1];body=json.loads(req.data) if req.data else None
    calls.append((base,path,req.method,body));result={}
    if path=='status':result={'initialized':base in ready,'ready':base in ready,'cluster':{'isLeader':base.endswith('-0.core-peers.ns.svc.cluster.local:5002'),'nodeId':base.split('//')[1].split('.')[0],'displayName':''}}
@@ -16,15 +17,19 @@ class Bootstrap(unittest.TestCase):
    elif path=='cluster/join':ready.add(base)
    elif path=='cluster/members':result=[{'nodeId':str(i+1),'suffrage':'Voter'} for i in range(count)]
    elif path.endswith('/display-name'):result={'message':'Display name updated'}
+   elif path=='networking/nat' and req.method=='GET':result={'enabled':nat_enabled}
+   elif path=='networking/nat':nat_enabled=body['enabled'];result={'message':'NAT configuration updated successfully'}
    elif path=='operator' and req.method=='GET':result={'id':{'mcc':'001','mnc':'01'}}
    elif path=='networking/data-networks' and req.method=='GET' and default_network:
     result={'items':[{'name':'internet','ipv4_pool':'10.45.0.0/22','dns':'8.8.8.8','mtu':1400,'status':{'sessions':active_sessions}}]}
    elif req.method=='GET':result={'items':[]}
    return io.BytesIO(json.dumps({'result':result}).encode())
-  env={'CORE_NAME':'core','NAMESPACE':'ns','CLUSTER_DOMAIN':'cluster.local','REPLICAS':str(count),'TOPOLOGY':'ha' if ha else 'standalone','UE_MODE':mode,'PROVISION':'true','IMS_API':'http://ims','SMSC_API':'http://smsc','ADMIN_EMAIL':'lab@example.com','ADMIN_PASSWORD':'test-only','IMS_ADDRESS':'10.6.0.5','SMSC_ADDRESS_HOST':'smsc','CORE_ADDRESS_HOST':'core-active','MEMBER_DISPLAY_NAME_ENABLED':'true','MEMBER_DISPLAY_NAME_TEMPLATE':'{pod}.{namespace}'}
+  env={'CORE_NAME':'core','NAMESPACE':'ns','CLUSTER_DOMAIN':'cluster.local','REPLICAS':str(count),'TOPOLOGY':'ha' if ha else 'standalone','UE_MODE':mode,'PROVISION':str(provision).lower(),'N6_GATEWAY_ENABLED':str(n6_gateway).lower(),'IMS_API':'http://ims','SMSC_API':'http://smsc','ADMIN_EMAIL':'lab@example.com','ADMIN_PASSWORD':'test-only','IMS_ADDRESS':'10.6.0.5','SMSC_ADDRESS_HOST':'smsc','CORE_ADDRESS_HOST':'core-active','MEMBER_DISPLAY_NAME_ENABLED':'true','MEMBER_DISPLAY_NAME_TEMPLATE':'{pod}.{namespace}'}
   if default_network:env['INTERNET_POOL']='10.208.0.0/16'
   with patch.dict(os.environ,env),patch('urllib.request.urlopen',side_effect=request),patch('socket.gethostbyname',return_value='10.0.0.1'),contextlib.redirect_stdout(io.StringIO()):
-   runpy.run_path(a.script,run_name='__main__')
+   try:runpy.run_path(a.script,run_name='__main__')
+   except SystemExit as exit:
+    if provision or exit.code!=0:raise
   return calls
  def test_internet_never_contacts_service_apis(self):
   calls=self.exercise('internet')
@@ -49,6 +54,17 @@ class Bootstrap(unittest.TestCase):
  def test_standalone_does_not_set_cluster_member_names(self):
   calls=self.exercise('internet')
   self.assertFalse(any(path.endswith('/display-name') for _,path,_,_ in calls))
+ def test_lab_gateway_disables_core_nat_before_provisioning(self):
+  calls=self.exercise('internet',n6_gateway=True,provision=False)
+  updates=[body for _,path,method,body in calls if path=='networking/nat' and method=='PUT']
+  self.assertEqual(updates,[{'enabled':False}])
+ def test_no_lab_gateway_leaves_core_nat_untouched(self):
+  calls=self.exercise('internet',n6_gateway=False,provision=False)
+  self.assertFalse(any(path=='networking/nat' for _,path,_,_ in calls))
+ def test_lab_gateway_keeps_core_nat_disabled_without_rewriting_it(self):
+  calls=self.exercise('internet',n6_gateway=True,provision=False,core_nat_enabled=False)
+  self.assertTrue(any(path=='networking/nat' and method=='GET' for _,path,method,_ in calls))
+  self.assertFalse(any(path=='networking/nat' and method=='PUT' for _,path,method,_ in calls))
  def test_ha_combined_connects_ims_to_every_hss(self):
   calls=self.exercise('internet-ims-sms',True)
   peers=[body for base,path,method,body in calls if base=='http://ims' and path=='diameter/peers' and method=='POST']

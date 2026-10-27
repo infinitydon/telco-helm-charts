@@ -2,22 +2,48 @@
 
 One Helm release deploys the unified Ella Core, its UI/API Service and diagnostics, with optional IMS, SMSC and per-UE phone/browser UIs. This replaces the duplicated HA, FQDN, lab and UI-only Core charts. Core is pinned to upstream source revision c7cf03530e52 (version string v1.20.0), built with its matching frontend and Linux connectivity tools; custom runtime images are public GHCR images with connectivity tools.
 
-## Linux installation
+## Install two independent lab stacks
 
-Install Helm 3+, kubectl and Python 3 only for optional tests. From the repository root:
+Install Helm 3+, kubectl and Python 3 for the optional acceptance tests. The
+two sample values files use separate N6/N2N3 address ranges and NodePorts, so
+the standalone and HA releases can run at the same time. Check that the sample
+subnets are unused and that `eth0` reaches the same Layer 2 network on every
+node selected for Core, IMS/SMSC and the radio simulators.
+
+From the repository root, build the vendored chart dependencies once:
 
 ```sh
 helm dependency build ./ella-core/ella-stack
-helm upgrade --install ella ./ella-core/ella-stack \
-  --namespace ella-services-test --create-namespace \
-  -f ./ella-core/ella-stack/examples/standalone-internet-ims-sms.yaml \
-  --set-file core.admin.password=/secure/ella-admin-password \
-  --wait --wait-for-jobs --timeout 10m
 ```
 
-The protected password file is a plain text file outside Git containing only the password, without a trailing newline. Alternatively set core.admin.existingSecret to an existing same-namespace Secret containing email and password. No host setup/provisioning script, local image import or registry credentials are required.
+Keep each admin password in a protected file outside the repository. Each
+file must contain only the password, without a trailing newline. Then install
+the two releases independently:
 
-The Linux tests use Helm 3.20.2. With Helm 4, use --wait=legacy in place of --wait; both clients were exercised against this cluster.
+```sh
+helm upgrade --install ella-sa ./ella-core/ella-stack \
+  --namespace ella-sa --create-namespace \
+  -f ./ella-core/ella-stack/examples/standalone-n2n3-test.yaml \
+  --set-file core.admin.password="$HOME/.secrets/ella-sa-password" \
+  --wait --wait-for-jobs --timeout 10m
+
+helm upgrade --install ella-ha ./ella-core/ella-stack \
+  --namespace ella-ha --create-namespace \
+  -f ./ella-core/ella-stack/examples/ha-n2n3-test.yaml \
+  --set-file core.admin.password="$HOME/.secrets/ella-ha-password" \
+  --wait --wait-for-jobs --timeout 15m
+```
+
+Use `core.admin.existingSecret` instead when a same-namespace Secret already
+contains `email` and `password`. The UI login email defaults to
+`lab@example.com`; set `core.admin.email` to change it. The password is the
+value from the protected file/Secret. No host setup script, local image import
+or registry credentials are required for the public images. Helm 4 users can
+use `--wait=legacy` if the Helm client does not accept `--wait`.
+
+The supplied sample addresses are examples, not automatically reserved IPs.
+Choose unused addresses on the network attached to `global.network.master`;
+keep every static address unique across both releases and other hosts.
 
 | Preset under examples/ | Core instances | Services |
 | --- | --- | --- |
@@ -25,20 +51,60 @@ The Linux tests use Helm 3.20.2. With Helm 4, use --wait=legacy in place of --wa
 | standalone-internet-ims-sms.yaml | One | Internet, IMS and NAS SMS |
 | ha-internet.yaml | Three on separate hosts | Internet only |
 | ha-internet-ims-sms.yaml | Three on separate hosts | Internet, IMS and NAS SMS |
+| standalone-n2n3-test.yaml | One | Internet, IMS/SMS, phones, UERANSIM and PacketRusher; unique lab subnet/NodePorts |
+| ha-n2n3-test.yaml | Three | Same components with HA; separate lab subnet/NodePorts |
 
-Both service modes are controlled by global.mode. Core topology is core.topology. The presets enable public test subscribers, two simulated UEs and the lab N6 gateway; use them only in a dedicated test namespace. Default values leave lab provisioning and phones disabled. For an existing provisioned network, set core.provisioning.enabled=false and configure subscribers through Core instead.
+Both service modes are controlled by `global.mode`; Core topology is
+`core.topology`. The internet/IMS/SMS sample presets provision public test
+subscribers, enable the two fixed-identity phone UEs and deploy the optional
+N6 lab gateway. The `*-n2n3-test.yaml` samples also enable UERANSIM and
+PacketRusher. These are isolated lab fixtures; use a dedicated namespace and
+never reuse their test subscriber identities in another active UE simulator.
+Default chart values leave provisioning and the phone/native simulators
+disabled. For an existing provisioned network, disable the bootstrap
+provisioning fixture and configure subscribers through Core instead.
 
 ## Network requirements
 
-All Core nodes require Linux 6.6+ (TCX), SCTP, Multus, a default RWO StorageClass and privileges to attach the datapath. The phone simulator also needs TUN and XFRM. HA requires three compatible nodes and enforces anti-affinity unless explicitly overridden.
+Core nodes require Linux 6.6+ with TCX support, SCTP, Multus, an available
+RWO StorageClass and privileges to attach the datapath. HA requires three
+compatible nodes and spreads Core members with anti-affinity. The phone
+simulator needs `/dev/net/tun` and XFRM. PacketRusher's eBPF backend requires a
+compatible Linux 6.6+ node with BTF; use `packetrusher.nodeSelector` or
+`packetrusher.affinity` to keep it off older-kernel nodes. UERANSIM can run on
+a wider set of Linux kernels.
 
-Core N2, N3 and Raft use the routable Kubernetes pod network. Raft advertises stable pod FQDNs; it never guesses addresses from Whereabouts allocation order. The configurable clusterDomain defaults to cluster.local. N6 uses a Multus macvlan on global.network.master (default eth0), with a shared L2 network across the Core nodes, IMS and gateway. Configure addresses/pools before installation if the defaults overlap your network. The sample uses N6 gateway10.6.0.1, Core10.6.0.2/.3/.4 and IMS10.6.0.5, internet UE pool10.45/16 and IMS UE pool10.60/16. The host's own macvlan parent cannot directly reach its child; management uses pod-network Services instead.
+Raft uses the Kubernetes pod network and stable per-member FQDNs. N6 is a
+Multus macvlan interface (`net1`); N2/N3 use a separate Multus attachment
+(`net2`) by default in `ella-stack`. Core, phone UEs, UERANSIM and PacketRusher
+must share the N2/N3 Layer 2 network. Standalone assigns all three configured
+Core N2/N3 addresses to its one Core Pod; HA assigns one address to each
+member. Each radio has its own static address. The phone and simulator
+supervisors inspect the active Core API and reattach their gNB after
+leadership changes. These are static addresses, not Whereabouts allocations.
 
-A node-local bridge is available for standalone deployments through global.network.type=bridge and global.network.bridge. HA with bridge is rejected because separate host bridges do not provide shared L2 connectivity. The lab gateway is core.controller.gatewayEnabled; disable it and provide external routing/NAT in real networks.
+N6 macvlan must also share Layer 2 across the Core hosts, IMS and gateway. The
+default example uses gateway `10.6.0.1`, Core `10.6.0.2/.3/.4`, IMS
+`10.6.0.5`, N2/N3 Core `10.211.0.2/.3/.4`, radio devices `.20/.21/.30/.31`,
+internet pool `10.45.0.0/16`, and IMS pool `10.60.0.0/16`. The dedicated
+`*-n2n3-test.yaml` files use distinct subnets and ports for simultaneous SA
+and HA installs. A macvlan parent host cannot directly reach its child; use
+the pod-network Services for management and the documented NodePorts for UIs.
+
+A node-local bridge is available for standalone deployments through global.network.type=bridge and global.network.bridge. HA with bridge is rejected because separate host bridges do not provide shared L2 connectivity. The optional lab N6 gateway is a dedicated `core-n6-gateway` Deployment (`core.n6Gateway.enabled`), separate from the Core HA/IMS reconciliation controller. It supplies the sample isolated N6 network's next hop and cluster egress; disable it when N6 is directly connected to a suitable upstream router. When the lab gateway is enabled, the Core bootstrap Job disables Ella Core NAT and the gateway applies one SNAT for internet-pool traffic as it enters Kubernetes egress. The separate IMS UE pool is not SNATed by the gateway: IMS shares the N6 L2 network and its return route sends IMS-pool traffic through the gateway to the elected Core member. The old `core.controller.gatewayEnabled` value remains as a compatibility alias; new values should use `core.n6Gateway.enabled`.
 
 ## UI and components
 
-The default Core UI/API Service is NodePort30502. Configure core.service.type as ClusterIP, NodePort or LoadBalancer, with nodePort and annotations as required. Phone A/B use ports30880/30881 and independently support the same Service types through phones.service.type. No port forwarding is needed. Lab UIs are intended for a trusted network.
+The Core UI/API and each phone UI support `ClusterIP`, `NodePort` or
+`LoadBalancer` Services. Configure `core.service.type` and
+`phones.service.type`; use `core.service.nodePort` and each entry in
+`phones.phones[].nodePort` for fixed NodePorts. The defaults are Core
+`30502`, Phone A `30880`, and Phone B `30881`. For simultaneous installs,
+choose different free NodePorts for every release; the test examples use
+`30504/30505` for Core and `30960–30963` for phones. Provider-specific
+LoadBalancer options belong in the relevant Service `annotations`. No port
+forward is needed with reachable NodePorts/LoadBalancers. Lab UIs have no
+user authentication and should stay on a trusted network.
 
 IMS and SMSC remain separately installable charts, but the umbrella automatically renders neither when global.mode=internet. Combined mode requires both dependencies enabled. phones.enabled toggles the phone simulator; phones.browser.enabled toggles Chromium/noVNC, with the lighter reader still available.
 
@@ -56,17 +122,55 @@ Core uses StatefulSets and persistent per-node databases. IMS/SMSC use their own
 
 Service-mode changes preserve Core subscriber/configuration data and recreate UE pods and their ephemeral browser profiles/history. Switching back to internet-only stops IMS/SMSC and prunes their chart-owned PVCs; use external claims through ims.persistence.existingClaim and smsc.persistence.existingClaim, or take backups, if their databases must survive that switch. The Core's earlier IMS/SMS configuration remains stored even when the phone/service mode is internet-only.
 
-The controller watches public Core status, patches only the Core UI/API and active NGAP/Diameter Services, and updates the lab return routes on leader changes. Its gateway disables ICMP redirects so IMS cannot cache a route that bypasses the gateway and keeps pointing at an old leader. A Raft election is not a guarantee that ongoing calls or RAN sessions survive a process failure; clients may need to reattach. See VALIDATION.md for exactly what was tested.
+The HA controller watches Core status and patches the Core UI/API and active NGAP/Diameter Services. In combined lab mode, it also reconciles IMS Diameter peers after Pod IP changes. When enabled, the separate N6 gateway watches leadership and updates lab return routes; it disables ICMP redirects so IMS cannot cache a route that bypasses the gateway and keeps pointing at an old leader. A Raft election is not a guarantee that ongoing calls or RAN sessions survive a process failure; clients may need to reattach. See VALIDATION.md for exactly what was tested.
 
 ## Tests
 
-Run the essential acceptance suite against either standalone or HA:
+Run topology checks and the essential phone/Helm acceptance suite against
+either independent test release. The phone ports are parameters so the two
+examples can be tested side-by-side:
 
 ```sh
-python3 ella-core/ella-stack/tests/smoke.py --host NODE_IP
+python3 ella-core/ella-stack/tests/check-topology.py \
+  --release ella-sa --namespace ella-sa --topology standalone \
+  --output ella-sa-topology.json
+python3 ella-core/ella-stack/tests/smoke.py \
+  --release ella-sa --namespace ella-sa --host NODE_IP \
+  --mode internet-ims-sms --phone-a-port 30960 --phone-b-port 30961 \
+  --output ella-sa-smoke.json
+
+python3 ella-core/ella-stack/tests/check-topology.py \
+  --release ella-ha --namespace ella-ha --topology ha \
+  --output ella-ha-topology.json
+python3 ella-core/ella-stack/tests/smoke.py \
+  --release ella-ha --namespace ella-ha --host NODE_IP \
+  --mode internet-ims-sms --phone-a-port 30962 --phone-b-port 30963 \
+  --output ella-ha-smoke.json
 ```
 
-It detects the installed service mode, runs Helm health checks, then runs 12 essential phone checks. In combined mode these cover both UE attachments, IMS registration, SMS in both directions, calls/answer/media/release in both directions, and HTTPS through each UE. Internet-only mode checks internet attachment, DNS, ICMP and HTTPS with IMS/SMS disabled. No admin password, subscriber changes, phone scaling or simulated outages are needed. The command assumes the preset phone NodePorts 30880/30881; release, namespace and kubeconfig are selectable.
+The smoke runner detects the service mode, runs Helm health checks, then runs
+the matching phone checks. In combined mode these cover both UE attachments,
+IMS registration, SMS in both directions, calls/answer/media/release, and
+HTTPS through each UE. Internet-only mode checks internet attachment, DNS,
+ICMP and HTTPS with IMS/SMS disabled. Tests do not need the Core admin
+password or subscriber changes. Provide `--kubeconfig` when the active
+kubectl/Helm context is not the intended cluster. See [VALIDATION.md](VALIDATION.md)
+for the latest live results and known limitations.
+
+To verify native simulator readiness and their internet DNN sessions, run:
+
+```sh
+python3 ella-core/tests/simulators/smoke.py --release ella-sa \
+  --namespace ella-sa --ue-pool 10.242.0.0/16
+python3 ella-core/tests/simulators/smoke.py --release ella-ha \
+  --namespace ella-ha --ue-pool 10.246.0.0/16
+```
+
+For a controlled HA recovery test in a disposable namespace, save a topology
+snapshot, delete the currently elected Core leader Pod, wait for a replacement
+member to lead, then run the topology check again. Run the phone acceptance
+suite after the UEs reattach. A leader election does not preserve active RAN
+sessions or calls; supervisors create fresh UE sessions.
 
 Optional extended checks remain available:
 
@@ -83,13 +187,25 @@ python3 ella-core/tests/services/run-scenarios.py --suite extended --core-api ht
 
 The essential four protocol scenarios passed in both recorded topology runs. The extended suite is diagnostic and is not the default acceptance gate; its known HA failures remain recorded in VALIDATION.md. All commands are Linux shell/Helm or standard-library Python commands.
 
-When both native components are enabled, check their registration and UE data paths with:
+## Remove a lab
+
+Uninstall the two releases independently:
 
 ```sh
-python3 ella-core/tests/simulators/smoke.py
+helm uninstall ella-sa --namespace ella-sa
+helm uninstall ella-ha --namespace ella-ha
 ```
 
-Use --simulator ueransim or --simulator packetrusher for a single component. Their default fixture IMSIs overlap the optional core-tester scenarios, so pause all simulated UE deployments before running that separate protocol suite; its preflight rejects conflicting active owners. The phone acceptance command above can run with the native simulators enabled.
+Uninstall leaves Core and IMS/SMSC PVCs behind so data is not silently lost.
+For a fully disposable lab, remove only its dedicated namespaces after
+checking they contain no unrelated workloads:
+
+```sh
+kubectl delete namespace ella-sa ella-ha
+```
+
+Deleting those namespaces also deletes their chart PVCs and test data. Back up
+anything needed first. Do not delete a shared namespace to remove a release.
 
 ## Core image provenance
 

@@ -9,9 +9,17 @@ assert len(pods)==(3 if a.topology=='ha' else 1)
 records=[];claims=[]
 for pod in pods:
  assert all(c['ready'] for c in pod['status']['containerStatuses'])
+ annotations=pod['metadata'].get('annotations',{})
+ attached=json.loads(annotations.get('k8s.v1.cni.cncf.io/network-status','[]'))
+ n2n3=next((x for x in attached if x.get('interface')=='net2'),None)
+ assert n2n3, f"{pod['metadata']['name']} has no Multus N2/N3 attachment: {attached}"
+ n2n3_link=json.loads(execute(pod['metadata']['name'],'troubleshoot','ip','-j','-4','address','show','dev','net2'))[0]
+ n2n3_addresses=[x['local'] for x in n2n3_link.get('addr_info',[]) if x['family']=='inet']
+ expected_n2n3_count=3 if a.topology=='standalone' else 1
+ assert len(n2n3_addresses)==expected_n2n3_count, f"{pod['metadata']['name']} expected {expected_n2n3_count} static N2/N3 addresses, got {n2n3_link}"
  status=json.loads(execute(pod['metadata']['name'],'troubleshoot','curl','-fsS','http://'+pod['status']['podIP']+':5002/api/v1/status'))['result']
  assert status['ready'] and status['cluster']['enabled']==(a.topology=='ha')
- records.append({'pod':pod['metadata']['name'],'uid':pod['metadata']['uid'],'node':pod['spec']['nodeName'],'podIP':pod['status']['podIP'],'cluster':status['cluster']})
+ records.append({'pod':pod['metadata']['name'],'uid':pod['metadata']['uid'],'node':pod['spec']['nodeName'],'podIP':pod['status']['podIP'],'n2n3Addresses':n2n3_addresses,'cluster':status['cluster']})
  for v in pod['spec']['volumes']:
   if 'persistentVolumeClaim' in v:
    claim=get('get','pvc',v['persistentVolumeClaim']['claimName'],'-o','json');assert claim['status']['phase']=='Bound';claims.append({'name':claim['metadata']['name'],'uid':claim['metadata']['uid']})
@@ -20,8 +28,8 @@ leader=leaders[0]['pod']
 for service in (name,name+'-active'):
  assert get('get','service',service,'-o','json')['spec']['selector']['statefulset.kubernetes.io/pod-name']==leader
 if a.topology=='ha':assert len({r['node'] for r in records})==3
-controller=get('get','pods','-l','app='+name+'-controller','-o','json')['items'][0]['metadata']['name']
-route=json.loads(execute(controller,'controller','ip','-j','route','get',a.ims_ue_address))[0]
+gateway=get('get','pods','-l','app='+name+'-n6-gateway','-o','json')['items'][0]['metadata']['name']
+route=json.loads(execute(gateway,'gateway','ip','-j','route','get',a.ims_ue_address))[0]
 leader_link=json.loads(execute(leader,'troubleshoot','ip','-j','-4','address','show','dev','net1'))[0]
 expected=next(x['local'] for x in leader_link['addr_info'] if x['family']=='inet');assert route['gateway']==expected
 result={'topology':a.topology,'passed':True,'leader':leader,'members':records,'claims':claims,'imsReturnGateway':expected}

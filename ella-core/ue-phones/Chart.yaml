@@ -3,4 +3,4 @@ name: ue-phones
 description: Dedicated simulated 5G phones with IMS, NAS SMS and Chromium/noVNC
 type: application
 version: 0.5.0
-appVersion: 0.4.1
+appVersion: 0.4.5

@@ -4,6 +4,9 @@
 {{- define "core.count" -}}
 {{- if eq .Values.topology "ha" -}}{{ .Values.replicaCount }}{{- else -}}1{{- end -}}
 {{- end -}}
+{{- define "core.n6GatewayEnabled" -}}
+{{- or .Values.n6Gateway.enabled .Values.controller.gatewayEnabled -}}
+{{- end -}}
 {{- define "core.labels" -}}
 app.kubernetes.io/name: ella-core
 app.kubernetes.io/instance: {{ .Release.Name }}

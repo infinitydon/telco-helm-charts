@@ -2,7 +2,7 @@
 
 This chart uses upstream [UERANSIM v3.3.0](https://github.com/aligungr/UERANSIM/releases/tag/v3.3.0), the latest stable release checked on October 26, 2026. The old free5gc image tag v4.2.2 was a different image/version line; the default now contains an unmodified build of the aligungr release at commit 6bf5a1a96aaef6ae8778b9d8b477ac6e2bbf8156.
 
-One Pod runs the native gNB and UE, with N2/N3 on the Kubernetes pod network and RLS on loopback. A supervisor resolves the active Core Service, waits for Core readiness, and restarts both native processes when the active endpoint changes. This works with standalone and three-member Core HA. Readiness requires a UE tunnel address and live native processes. Recovery is reattachment, not uninterrupted sessions or a radio handover.
+One Pod runs the native gNB and UE. When `networkAttachment`, `n2n3Address` and `coreN2Addresses` are configured, N2/N3 use a dedicated Multus interface; otherwise they remain on the Kubernetes pod network. RLS stays on loopback. A supervisor resolves the active Core Service, waits for Core readiness, and restarts both native processes when the active endpoint changes. This works with standalone and three-member Core HA. Readiness requires a UE tunnel address and live native processes. Recovery is reattachment, not uninterrupted sessions or a radio handover.
 
 ## Install
 

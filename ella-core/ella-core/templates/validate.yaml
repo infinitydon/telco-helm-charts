@@ -2,6 +2,9 @@
 {{- if lt (len $network.coreAddresses) (include "core.count" . | int) }}
 {{- fail "network.coreAddresses must contain an address for every Core replica" }}
 {{- end }}
+{{- if and $network.n2n3.enabled (lt (len $network.n2n3.coreAddresses) (include "core.count" . | int)) }}
+{{- fail "network.n2n3.coreAddresses must contain an address for every Core replica" }}
+{{- end }}
 {{- if and (eq .Values.topology "ha") (eq $network.type "bridge") }}
 {{- fail "HA requires a shared L2 N6 network (macvlan), not a node-local bridge" }}
 {{- end }}

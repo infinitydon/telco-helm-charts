@@ -19,18 +19,18 @@ Deploy and provision the [Core lab](../ella-stack/README.md) first with the matc
 
 Both need the public lab test key/OPc and internet/ims policies configured by the ella-stack provisioning Job. They remain NAS-attached when IMS is unregistered, so SMS continues to work independently of IMS. Do not run the original test scenarios concurrently against these same IMSIs; each UE must have one owner.
 
-The simulator pod is privileged for TUN, IPsec/XFRM and network configuration. In ella-stack, N2/N3 use the pod network and phones do not require a Multus attachment or placement beside Core. The chart defaults to dedicated NodePort Services on ports 30880 and 30881. It has no user authentication; use it on a trusted lab network.
+The simulator pod is privileged for TUN, IPsec/XFRM and network configuration. In ella-stack, each phone uses a static Multus N2/N3 attachment on the same L2 as Core. Each phone follows the active Core member through the Core API; gNB reattachment restarts the phone process and recreates per-UE TUN/routing state after an HA leader change. The chart defaults to dedicated NodePort Services on ports 30880 and 30881. It has no user authentication; use it on a trusted lab network.
 
 ## Build and deploy
 
-The chart pulls the published `ghcr.io/infinitydon/ella-ue-phones:0.4.1` and `ghcr.io/infinitydon/ella-ue-browser:0.3.4` images. No node-local image import or installation script is required. Both images include Linux IP, ICMP, DNS, HTTP, socket and packet-capture tools. Browser tools retain the same unprivileged UE-only network restrictions.
+The chart pulls the published `ghcr.io/infinitydon/ella-ue-phones:0.4.5` and `ghcr.io/infinitydon/ella-ue-browser:0.3.4` images. No node-local image import or installation script is required. The phone image includes Linux IP, ICMP, DNS, HTTP, socket and packet-capture tools. Browser tools retain the same unprivileged UE-only network restrictions. With Multus N2/N3 configured, each phone sets its static `n2n3Address` before starting its gNB, uses the configured IMS address for P-CSCF tests, and follows the active Core member through the Core API.
 
 Optional rebuild and publication from this directory on Linux:
 
 ```sh
 buildah login ghcr.io
-buildah bud --layers -t ghcr.io/infinitydon/ella-ue-phones:0.4.1 .
-buildah push ghcr.io/infinitydon/ella-ue-phones:0.4.1
+buildah bud --layers -t ghcr.io/infinitydon/ella-ue-phones:0.4.5 .
+buildah push ghcr.io/infinitydon/ella-ue-phones:0.4.5
 buildah bud --layers -t ghcr.io/infinitydon/ella-ue-browser:0.3.4 ./browser
 buildah push ghcr.io/infinitydon/ella-ue-browser:0.3.4
 ```
@@ -79,7 +79,7 @@ Set browser.enabled=false for the lightweight formatted reader instead. Reader r
 
 The independent chart retains an optional older N6 gateway, disabled by default. If enabled, its defaults are bridge ella-test-n6, gateway 10.6.0.1/24, Core N6 address 10.6.0.2 and UE pool 10.45.0.0/16. It NATs original UE sources and Core's translated N6 source onto its pod-network egress and must share that node-local bridge with Core/IMS. Prefer the shared gateway in ella-stack for the consolidated deployment.
 
-The ella-stack chart installs the Core source route in its network init container and supplies its shared N6 gateway through the leader controller. It disables the older phone-chart gateway described above. Only internet-pool traffic uses table 200; Core API/Diameter routes remain on the pod network. The controller maintains the active Core Service, so reinstalling Core does not require editing a pod IP.
+The ella-stack chart installs the Core source route in its network init container and supplies its shared N6 gateway through a dedicated `core-n6-gateway` Deployment, separate from the Core service/IMS reconciler. It disables the older phone-chart gateway described above. Only internet-pool traffic uses table 200; Core API/Diameter routes remain on the pod network. The controller maintains the active Core Service, so reinstalling Core does not require editing a pod IP.
 
 ## Validate
 

@@ -8,6 +8,42 @@ All four passed in both recorded full topology runs below. The original
 22-check phone suite is retained with `--network`; the original 24 protocol
 scenarios are retained with `--suite extended`. The expanded results and known
 failures below are historical evidence, not removed or relabelled as passing.
+
+## Fresh separate-stack install (October 27, 2026)
+
+After removing the three prior Ella lab releases and their dedicated test
+namespaces, two independent releases were installed from the N2/N3 test
+presets: `ella-sa` in namespace `ella-sa` and `ella-ha` in namespace
+`ella-ha`. Both completed Helm installation with `--wait --wait-for-jobs`.
+Their pods use separate N6/N2/N3 subnets and distinct Core/phone NodePorts.
+Both releases were left running. Other cluster releases and namespaces were
+not included in the cleanup.
+
+The Core, IMS and SMSC health hook Pods reached `Completed`. Helm 4.2.1's
+aggregate `helm test` command did not return on the fresh SA release after
+creating its hooks, so it was stopped and its completed hook Pods were cleaned
+up. Do not count the aggregate SA hook command as a pass. The successful
+waited install, topology check, phone suite and native UE suites provide the
+SA acceptance evidence instead.
+
+| Fresh release | Topology check | Phone essential suite | Native UE suite |
+| --- | --- | --- | --- |
+| `ella-sa` | 1 Core ready; Services and routes aligned | 12/12 passed | UERANSIM + PacketRusher 11/11 passed |
+| `ella-ha` | 3 Core members ready; elected leader, Services and routes aligned | 12/12 passed | UERANSIM 5/5; PacketRusher 6/6 passed |
+
+Both native simulators registered and established PDU sessions. PacketRusher's
+own eBPF attachment check passed with no fallback. ICMP, DNS and HTTPS through
+the UE passed for both simulators in both topologies. The phone checks covered
+UE attachment, IMS registration, bidirectional NAS SMS, bidirectional IMS
+calls with voice QFI, release, and HTTPS over each UE. These are clean
+installation checks, not a new leader-failure test. The separate fresh HA
+deployment's expanded protocol-edge suite was not run; prior extended HA SMS
+limitations remain as recorded below.
+
+The test presets select compatible kernel nodes for this cluster. Their
+`nodeSelector`/affinity hostnames are examples and must be adapted or removed
+for another cluster with different node names and kernel capabilities.
+
 The new defaults were exercised on Linux against the running standalone lab:
 12/12 phone checks and 4/4 protocol scenarios passed. The HA essential baseline
 is extracted from the recorded full run, including 12/12 phone checks before
@@ -36,7 +72,7 @@ The internet-to-combined standalone service-mode upgrade was also tested.
 Core runs on Linux 6.8 nodes. HA uses three separate hosts and three voter
 members, stable Raft FQDNs and separate bound PVCs. IMS/phones use one worker;
 SMSC uses the control-plane node. Shared N6 is macvlan on eth0. The lab has
-local-path storage and a single gateway/controller; this does not test a
+local-path storage, a dedicated N6 gateway and a separate Core controller; this does not test a
 permanent host/storage failure or provide IMS/SMSC high availability.
 
 ## Final matrix
@@ -107,9 +143,10 @@ IMS registration records remain in the IMS database during this test.
   initialization waits for the current release revision's successful Job and
   completed Core rollout, instead of treating an HTTP listener as UE readiness.
 - Services select the elected leader; the controller reconciles drift and
-  preserves its selector across Helm upgrades. Routes follow that leader.
-  Gateway ICMP redirects are disabled: otherwise IMS caches a direct route to
-  the old Core and bypasses updated gateway routes after an election.
+  preserves its selector across Helm upgrades. The separate N6 gateway updates
+  UE return routes to follow that leader. Gateway ICMP redirects are disabled:
+  otherwise IMS caches a direct route to the old Core and bypasses updated
+  gateway routes after an election.
 - IMS maintains a peer for every Core identity. The leader is preferred for
   realm routing, while remembered HSS identities remain reachable. Peer Pod
   addresses are refreshed after replacement.

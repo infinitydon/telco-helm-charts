@@ -1,17 +1,25 @@
 waitForBootstrap:
   enabled: false
+core:
+  namespace: ""
+  clusterDomain: cluster.local
 global: {}
 # internet or internet-ims-sms
 mode: internet-ims-sms
 imagePullSecrets: []
 image:
   repository: ghcr.io/infinitydon/ella-ue-phones
-  tag: 0.4.1
+  tag: 0.4.5
   pullPolicy: IfNotPresent
 # Must be a routable Core NGAP address with its SCTP port.
 coreN2: ella-core-active:38412
+coreN2Addresses: ""
+coreMemberHosts: ""
+coreActiveHost: ""
 networkAttachment: ""
 n3Interface: eth0
+n2n3Address: ""
+n2n3Interface: net1
 nodeSelector:
   kubernetes.io/arch: amd64
 service:

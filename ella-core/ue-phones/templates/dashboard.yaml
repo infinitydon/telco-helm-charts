@@ -1,4 +1,6 @@
-{{- range $phone := .Values.phones }}
+{{- range $index, $phone := .Values.phones }}
+{{- $n2n3Address := "" }}
+{{- if $.Values.n2n3Address }}{{- $addresses := splitList "," (tpl $.Values.n2n3Address $) }}{{- $n2n3Address = index $addresses $index }}{{- end }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -15,7 +17,7 @@ spec:
       labels: {app.kubernetes.io/name: ue-phones, app.kubernetes.io/instance: {{ $.Release.Name }}, ella-phone: {{ $phone.name }}}
       {{- if $.Values.networkAttachment }}
       annotations:
-        k8s.v1.cni.cncf.io/networks: {{ $.Values.networkAttachment | quote }}
+        k8s.v1.cni.cncf.io/networks: {{ tpl $.Values.networkAttachment $ | quote }}
       {{- end }}
     spec:
       {{- with $.Values.imagePullSecrets }}
@@ -55,9 +57,15 @@ spec:
           securityContext: {privileged: true}
           env:
             - {name: UE_MODE, value: {{ default $.Values.mode ($.Values.global | default dict).mode | quote }}}
+            - {name: IMS_ADDRESS, value: {{ dig "network" "imsAddress" "10.6.0.5" ($.Values.global | default dict) | quote }}}
             - name: POD_IP
               valueFrom: {fieldRef: {fieldPath: status.podIP}}
+            - {name: N2N3_ADDRESS, value: {{ $n2n3Address | quote }}}
+            - {name: N2N3_INTERFACE, value: {{ $.Values.n2n3Interface | quote }}}
             - {name: CORE_N2, value: {{ tpl $.Values.coreN2 $ | quote }}}
+            - {name: CORE_N2_ADDRESSES, value: {{ tpl $.Values.coreN2Addresses $ | quote }}}
+            - {name: CORE_MEMBER_HOSTS, value: {{ tpl $.Values.coreMemberHosts $ | quote }}}
+            - {name: CORE_ACTIVE_HOST, value: {{ tpl $.Values.coreActiveHost $ | quote }}}
             - {name: N3_INTERFACE, value: {{ $.Values.n3Interface | quote }}}
             - {name: PHONE_ID, value: {{ $phone.id | quote }}}
             - {name: PHONE_NAME, value: {{ $phone.label | quote }}}

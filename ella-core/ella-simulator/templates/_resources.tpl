@@ -3,11 +3,36 @@
 {{- with .root -}}
 {{- $name := printf "%s-%s" .Release.Name .Chart.Name | trunc 63 | trimSuffix "-" -}}
 {{- $coreHost := tpl .Values.core.host . -}}
+{{- $waitName := printf "%s-bootstrap-wait" $name -}}
 {{- if not (contains "." $coreHost) -}}
 {{- $coreHost = printf "%s.%s.svc.%s" $coreHost (default .Release.Namespace .Values.core.namespace) .Values.core.clusterDomain -}}
 {{- end -}}
 {{- $sub := deepCopy .Values.subscriber -}}
 {{- if .Values.subscriber.existingSecret -}}{{- $sub = omit $sub "key" "opc" -}}{{- end -}}
+{{- if .Values.waitForBootstrap.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: {{ $waitName }}}
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: {{ $waitName }}}
+rules:
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: [get, list]
+  - apiGroups: [apps]
+    resources: [statefulsets]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: {{ $waitName }}}
+subjects: [{kind: ServiceAccount, name: {{ $waitName }}}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $waitName }}}
+---
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata: {name: {{ $name }}}
@@ -32,8 +57,33 @@ spec:
       labels: {app.kubernetes.io/name: {{ .Chart.Name }}, app.kubernetes.io/instance: {{ .Release.Name }}}
       annotations:
         checksum/settings: {{ dict "values" .Values "runner" $runner | toJson | sha256sum }}
+        {{- if .Values.networkAttachment }}
+        k8s.v1.cni.cncf.io/networks: {{ tpl .Values.networkAttachment . | quote }}
+        {{- end }}
     spec:
       automountServiceAccountToken: false
+      {{- if .Values.waitForBootstrap.enabled }}
+      serviceAccountName: {{ $waitName }}
+      initContainers:
+        - name: wait-for-core-bootstrap
+          image: {{ .Values.image | quote }}
+          command: [sh, -ec]
+          args:
+            - |
+              for i in $(seq 1 300); do
+                result=$(curl -fsS --max-time 5 --cacert /access/ca.crt -H "Authorization: Bearer $(cat /access/token)" --get \
+                  --data-urlencode 'labelSelector=app.kubernetes.io/name=ella-core-bootstrap,app.kubernetes.io/instance={{ .Release.Name }},ella-revision={{ .Release.Revision }},ella-mode={{ default "internet" (.Values.global | default dict).mode }}' \
+                  'https://kubernetes.default.svc/apis/batch/v1/namespaces/{{ .Release.Namespace }}/jobs')
+                if echo "$result" | jq -e 'any(.items[]; (.status.succeeded // 0) > 0)' >/dev/null; then
+                  core=$(curl -fsS --max-time 5 --cacert /access/ca.crt -H "Authorization: Bearer $(cat /access/token)" \
+                    'https://kubernetes.default.svc/apis/apps/v1/namespaces/{{ .Release.Namespace }}/statefulsets/{{ .Release.Name }}-core')
+                  echo "$core" | jq -e '.status.currentRevision == .status.updateRevision and .status.readyReplicas == .spec.replicas and .status.updatedReplicas == .spec.replicas' >/dev/null && exit 0
+                fi
+                sleep 2
+              done
+              exit 1
+          volumeMounts: [{name: bootstrap-access, mountPath: /access, readOnly: true}]
+      {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -52,10 +102,22 @@ spec:
         - name: simulator
           image: {{ .Values.image | quote }}
           imagePullPolicy: {{ .Values.pullPolicy }}
-          command: [python3, /settings/supervisor.py]
+          command: [sh, -ec]
+          args:
+            - |
+              {{- if .Values.n2n3Address }}
+              ip address replace {{ tpl .Values.n2n3Address . }} dev net1
+              ip link set net1 up
+              export N2N3_ADDRESS="${N2N3_ADDRESS%/*}"
+              {{- end }}
+              ulimit -l unlimited || true
+              exec python3 /settings/supervisor.py
           securityContext: {privileged: true}
           env:
             - {name: POD_IP, valueFrom: {fieldRef: {fieldPath: status.podIP}}}
+            - {name: N2N3_ADDRESS, value: {{ tpl .Values.n2n3Address . | quote }}}
+            - {name: CORE_N2_ADDRESSES, value: {{ tpl .Values.coreN2Addresses . | quote }}}
+            - {name: CORE_MEMBER_HOSTS, value: {{ tpl .Values.coreMemberHosts . | quote }}}
             - name: CORE_HOST
               value: {{ $coreHost | quote }}
             {{- if .Values.subscriber.existingSecret }}
@@ -72,6 +134,13 @@ spec:
             - {name: run, mountPath: /run/simulator}
             - {name: tun, mountPath: /dev/net/tun}
       volumes:
+        {{- if .Values.waitForBootstrap.enabled }}
+        - name: bootstrap-access
+          projected:
+            sources:
+              - serviceAccountToken: {path: token, expirationSeconds: 3600}
+              - configMap: {name: kube-root-ca.crt, items: [{key: ca.crt, path: ca.crt}]}
+        {{- end }}
         - {name: settings, configMap: {name: {{ $name }}}}
         - {name: run, emptyDir: {medium: Memory}}
         - {name: tun, hostPath: {path: /dev/net/tun, type: CharDevice}}
@@ -91,6 +160,9 @@ metadata:
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    {{- if .Values.networkAttachment }}
+    k8s.v1.cni.cncf.io/networks: {{ tpl .Values.networkAttachment . | quote }}
+    {{- end }}
 spec:
   automountServiceAccountToken: false
   restartPolicy: Never

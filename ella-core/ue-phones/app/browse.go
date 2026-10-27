@@ -26,6 +26,24 @@ func attachInternet(p *dashboardPhone, index int) error {
 		return err
 	}
 	name := fmt.Sprintf("ellaweb%d", index)
+	// The gNB process can be restarted in the same pod network namespace when
+	// the active Core changes. Remove the previous UE tunnel and policy rules
+	// before creating them again; otherwise Linux returns EEXIST and the phone
+	// remains detached after an HA failover.
+	_, all, _ := net.ParseCIDR("0.0.0.0/0")
+	rule := netlink.NewRule()
+	rule.Table = 200 + index
+	rule.Priority = 1200 + index
+	rule.Src = &net.IPNet{IP: net.ParseIP(session.UEIPv4), Mask: net.CIDRMask(32, 32)}
+	_ = netlink.RuleDel(rule)
+	fallback := netlink.NewRule()
+	fallback.Table, fallback.Priority, fallback.Src = 400+index, 1300+index, rule.Src
+	_ = netlink.RuleDel(fallback)
+	if old, lookupErr := netlink.LinkByName(name); lookupErr == nil {
+		if err = netlink.LinkDel(old); err != nil {
+			return fmt.Errorf("remove stale UE tunnel %s: %w", name, err)
+		}
+	}
 	if err = p.access.leg.gnb.AddTunnel(&radio.TunnelOpts{UEIPv4: session.UEIPv4 + "/32", UpfAddress: session.UpfAddress, ULTEID: session.ULTEID, DLTEID: session.DLTEID, QFI: session.QFI, TunInterfaceName: name}); err != nil {
 		return err
 	}
@@ -34,14 +52,9 @@ func attachInternet(p *dashboardPhone, index int) error {
 		return err
 	}
 	table := 200 + index
-	_, all, _ := net.ParseCIDR("0.0.0.0/0")
 	if err = netlink.RouteReplace(&netlink.Route{LinkIndex: link.Attrs().Index, Dst: all, Table: table, Scope: netlink.SCOPE_UNIVERSE}); err != nil {
 		return err
 	}
-	rule := netlink.NewRule()
-	rule.Table = table
-	rule.Priority = 1200 + index
-	rule.Src = &net.IPNet{IP: net.ParseIP(session.UEIPv4), Mask: net.CIDRMask(32, 32)}
 	if err = netlink.RuleAdd(rule); err != nil {
 		return err
 	}
@@ -49,8 +62,6 @@ func attachInternet(p *dashboardPhone, index int) error {
 	if err = netlink.RouteReplace(&netlink.Route{Dst: all, Table: 400 + index, Type: unix.RTN_UNREACHABLE}); err != nil {
 		return err
 	}
-	fallback := netlink.NewRule()
-	fallback.Table, fallback.Priority, fallback.Src = 400+index, 1300+index, rule.Src
 	if err = netlink.RuleAdd(fallback); err != nil {
 		return err
 	}

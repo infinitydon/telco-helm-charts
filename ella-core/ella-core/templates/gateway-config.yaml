@@ -1,0 +1,53 @@
+{{- $network := mergeOverwrite (deepCopy .Values.network) ((.Values.global | default dict).network | default dict) }}
+{{- if or .Values.n6Gateway.enabled .Values.controller.gatewayEnabled }}
+{{- $name := include "core.fullname" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: {{ $name }}-n6-gateway}
+data:
+  gateway.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    log() { printf '%s [%s] n6-gateway: %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$1" "$2"; }
+    trap 'rc=$?; log ERROR "command failed exit=$rc line=$LINENO command=$BASH_COMMAND"; exit "$rc"' ERR
+    log INFO "Starting lab N6 gateway namespace={{ .Release.Namespace }} replicas={{ include "core.count" . }}"
+    ip address replace {{ $network.gateway }}/{{ $network.coreAddresses | first | splitList "/" | last }} dev net1
+    ip link set net1 up
+    sysctl -w net.ipv4.ip_forward=1 >/dev/null
+    # IMS and Core share N6. Redirects could cache an old Core next hop.
+    sysctl -w net.ipv4.conf.all.send_redirects=0 net.ipv4.conf.default.send_redirects=0 net.ipv4.conf.net1.send_redirects=0 >/dev/null
+    iptables -P FORWARD ACCEPT
+    iptables -t nat -C POSTROUTING -s {{ $network.internetPool }} -o eth0 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s {{ $network.internetPool }} -o eth0 -j MASQUERADE
+    {{- range $network.coreAddresses }}
+    iptables -t nat -C POSTROUTING -s {{ . | splitList "/" | first }}/32 -o eth0 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s {{ . | splitList "/" | first }}/32 -o eth0 -j MASQUERADE
+    {{- end }}
+    arping -U -c 2 -I net1 {{ $network.gateway }} >/dev/null 2>&1 || true
+    log INFO "N6 lab gateway ready address={{ $network.gateway }} internetPool={{ $network.internetPool }} imsPool={{ $network.imsPool }} egress=eth0"
+    last=""
+    unavailable_logged=false
+    while true; do
+      found=false
+      for i in $(seq 0 {{ sub (include "core.count" . | int) 1 }}); do
+        url="http://{{ $name }}-$i.{{ $name }}-peers.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}:5002/api/v1/status"
+        status=$(curl -fsS --connect-timeout 1 --max-time 2 "$url" 2>/dev/null || true)
+        if echo "$status" | jq -e '.result.ready and (.result.cluster.isLeader == true or .result.cluster.enabled == false)' >/dev/null 2>&1; then
+          found=true
+          unavailable_logged=false
+          if [ "$last" != "$i" ]; then
+            address=$(echo '{{ $network.coreAddresses | toJson }}' | jq -r ".[$i]" | cut -d/ -f1)
+            ip route replace {{ $network.imsPool }} via "$address" dev net1
+            ip route replace {{ $network.internetPool }} via "$address" dev net1
+            previous="${last:-none}"
+            last="$i"
+            log INFO "Updated UE return routes previous_leader=$previous leader_pod={{ $name }}-$i next_hop=$address imsPool={{ $network.imsPool }} internetPool={{ $network.internetPool }}"
+          fi
+          break
+        fi
+      done
+      if [ "$found" = false ] && [ "$unavailable_logged" = false ]; then
+        log WARN "No ready Core leader found; UE return routes are waiting"
+        unavailable_logged=true
+      fi
+      sleep 3
+    done
+{{- end }}

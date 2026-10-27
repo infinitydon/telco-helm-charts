@@ -1,4 +1,7 @@
 {{- $name := include "core.fullname" . }}
+{{- $network := mergeOverwrite (deepCopy .Values.network) ((.Values.global | default dict).network | default dict) }}
+{{- $attachments := list (dict "name" (printf "%s-n6" $name) "interface" "net1") }}
+{{- if $network.n2n3.enabled }}{{- $attachments = append $attachments (dict "name" (printf "%s-n2n3" $name) "interface" "net2") }}{{- end }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -16,7 +19,7 @@ spec:
       labels:
         {{- include "core.labels" . | nindent 8 }}
       annotations:
-        k8s.v1.cni.cncf.io/networks: {{ printf "%s-n6" $name | quote }}
+        k8s.v1.cni.cncf.io/networks: {{ $attachments | toJson | quote }}
         checksum/config: {{ include (print $.Template.BasePath "/init-config.yaml") . | sha256sum }}
     spec:
       automountServiceAccountToken: false

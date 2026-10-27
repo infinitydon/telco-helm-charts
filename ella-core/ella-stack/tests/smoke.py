@@ -4,6 +4,7 @@ import argparse,json,pathlib,subprocess,sys
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--release',default='ella');p.add_argument('--namespace',default='ella-services-test')
 p.add_argument('--host',required=True);p.add_argument('--kubeconfig')
+p.add_argument('--phone-a-port',type=int,default=30880);p.add_argument('--phone-b-port',type=int,default=30881)
 p.add_argument('--mode',choices=['internet','internet-ims-sms'])
 p.add_argument('--output',default='stack-smoke-results.json')
 a=p.parse_args()
@@ -20,5 +21,6 @@ cmd=[sys.executable,str(tests/('internet-smoke.py' if mode=='internet' else 'smo
      '--release',a.release,'--namespace',a.namespace,'--output',a.output]
 if a.kubeconfig:cmd+=['--kubeconfig',a.kubeconfig]
 if mode=='internet':cmd+=['--host',a.host]
-else:cmd+=['--phone-a',f'http://{a.host}:30880','--phone-b',f'http://{a.host}:30881','--suite','essential']
+if mode=='internet':cmd+=['--phone-a-port',str(a.phone_a_port),'--phone-b-port',str(a.phone_b_port)]
+else:cmd+=['--phone-a',f'http://{a.host}:{a.phone_a_port}','--phone-b',f'http://{a.host}:{a.phone_b_port}','--suite','essential']
 sys.exit(subprocess.call(cmd))

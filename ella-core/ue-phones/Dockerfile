@@ -17,6 +17,7 @@ COPY app/enhancements.js internal/tester/scenarios/gnb/enhancements.js
 COPY app/main.go cmd/ue-phones/main.go
 # The stock voice scenario omits SMS capability. These persistent UEs need both.
 RUN sed -i '/func newSubscriberUE/,/^}/s/PDUSessionID: /RequestSMS: servicesEnabled(),\n\t\tPDUSessionID: /' internal/tester/scenarios/gnb/common.go
+RUN sed -i 's/"10\.6\.0\.5"/os.Getenv("IMS_ADDRESS")/' internal/tester/scenarios/ims.go
 RUN gofmt -w internal/tester/scenarios/dashboard_ims.go internal/tester/scenarios/gnb/dashboard_server.go internal/tester/scenarios/gnb/dashboard_browse*.go internal/tester/scenarios/gnb/dashboard_phone_gnb.go internal/tester/gnb/dashboard_internet.go cmd/ue-phones/main.go && go test ./internal/tester/scenarios/gnb -run 'TestMobileReader|TestBrowserRoutes|TestPhoneMode|TestInternetActionsDisabled' && go build -o /ue-phones ./cmd/ue-phones
 FROM docker.io/library/debian:trixie-slim
 LABEL org.opencontainers.image.source="https://github.com/infinitydon/telco-helm-charts"

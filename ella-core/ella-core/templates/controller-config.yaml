@@ -1,4 +1,3 @@
-{{- $network := mergeOverwrite (deepCopy .Values.network) ((.Values.global | default dict).network | default dict) }}
 {{- if .Values.controller.enabled }}
 {{- $name := include "core.fullname" . }}
 apiVersion: v1
@@ -8,35 +7,24 @@ data:
   controller.sh: |
     #!/bin/bash
     set -euo pipefail
-    {{- if .Values.controller.gatewayEnabled }}
-    ip address replace {{ $network.gateway }}/{{ $network.coreAddresses | first | splitList "/" | last }} dev net1
-    ip link set net1 up
-    sysctl -w net.ipv4.ip_forward=1
-    # IMS and Core share N6. Redirects would cache the previous Core next hop
-    # inside IMS and bypass this gateway after leadership changes.
-    sysctl -w net.ipv4.conf.all.send_redirects=0 net.ipv4.conf.default.send_redirects=0 net.ipv4.conf.net1.send_redirects=0
-    iptables -P FORWARD ACCEPT
-    iptables -t nat -C POSTROUTING -s {{ $network.internetPool }} -o eth0 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s {{ $network.internetPool }} -o eth0 -j MASQUERADE
-    {{- range $network.coreAddresses }}
-    iptables -t nat -C POSTROUTING -s {{ . | splitList "/" | first }}/32 -o eth0 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s {{ . | splitList "/" | first }}/32 -o eth0 -j MASQUERADE
-    {{- end }}
-    arping -U -c 2 -I net1 {{ $network.gateway }} || true
-    {{- end }}
+    log() { printf '%s [%s] core-controller: %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$1" "$2"; }
+    trap 'rc=$?; log ERROR "command failed exit=$rc line=$LINENO command=$BASH_COMMAND"; exit "$rc"' ERR
+    log INFO "Starting Core leader, Service, and IMS peer reconciler namespace={{ .Release.Namespace }} replicas={{ include "core.count" . }}"
     last=""
+    unavailable_logged=false
     while true; do
+      found=false
       for i in $(seq 0 {{ sub (include "core.count" . | int) 1 }}); do
         url="http://{{ $name }}-$i.{{ $name }}-peers.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}:5002/api/v1/status"
         status=$(curl -fsS --connect-timeout 1 --max-time 2 "$url" 2>/dev/null || true)
         if echo "$status" | jq -e '.result.ready and (.result.cluster.isLeader == true or .result.cluster.enabled == false)' >/dev/null 2>&1; then
+          found=true
+          unavailable_logged=false
           peer_ip=$(getent ahostsv4 "{{ $name }}-$i.{{ $name }}-peers.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}" | awk 'NR==1 {print $1}')
           if [ "$last" != "$i:$peer_ip" ]; then
-            {{- if .Values.controller.gatewayEnabled }}
-            address=$(echo '{{ $network.coreAddresses | toJson }}' | jq -r ".[$i]" | cut -d/ -f1)
-            ip route replace {{ $network.imsPool }} via "$address" dev net1
-            ip route replace {{ $network.internetPool }} via "$address" dev net1
-            {{- end }}
+            previous="${last:-none}"
             last="$i:$peer_ip"
-            echo "Active Core: {{ $name }}-$i"
+            log INFO "Active Core leader changed previous=$previous leader_pod={{ $name }}-$i pod_ip=$peer_ip"
           fi
           # Reconcile drift as well as leader changes: Helm upgrades may
           # restore the initial selector while another member is leader.
@@ -45,7 +33,11 @@ data:
             endpoint="https://kubernetes.default.svc/api/v1/namespaces/{{ .Release.Namespace }}/services/$svc"
             selected=$(curl -fsS --max-time 3 --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt -H "Authorization: Bearer $token" "$endpoint" 2>/dev/null | jq -r '.spec.selector["statefulset.kubernetes.io/pod-name"]' || true)
             if [ "$selected" != "{{ $name }}-$i" ]; then
-              curl -fsS --max-time 5 --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt -H "Authorization: Bearer $token" -H 'Content-Type: application/merge-patch+json' -X PATCH "$endpoint" -d "{\"spec\":{\"selector\":{\"statefulset.kubernetes.io/pod-name\":\"{{ $name }}-$i\"}}}" >/dev/null || echo "Service reconciliation will retry"
+              if curl -fsS --max-time 5 --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt -H "Authorization: Bearer $token" -H 'Content-Type: application/merge-patch+json' -X PATCH "$endpoint" -d "{\"spec\":{\"selector\":{\"statefulset.kubernetes.io/pod-name\":\"{{ $name }}-$i\"}}}" >/dev/null; then
+                log INFO "Reconciled Service selector service=$svc leader_pod={{ $name }}-$i"
+              else
+                log WARN "Service selector reconciliation failed service=$svc target_pod={{ $name }}-$i; will retry"
+              fi
             fi
           done
           {{- if and .Values.provisioning.enabled (eq (default "internet" (.Values.global | default dict).mode) "internet-ims-sms") }}
@@ -60,15 +52,23 @@ data:
           priority=20; [ "$j" != "$i" ] || priority=10
           current_priority=$(echo "$peers" | jq -r --argjson j "$j" '.result.items | sort_by(.id) | .[$j].priority // 10' 2>/dev/null || true)
           if [ -n "$peer_id" ] && [ -n "$member_ip" ] && { [ "$current" != "$member_ip" ] || [ "$current_priority" != "$priority" ]; }; then
-            curl -fsS --max-time 5 -X PUT -H 'Content-Type: application/json' \
+            if curl -fsS --max-time 5 -X PUT -H 'Content-Type: application/json' \
               "$ims_api/diameter/peers/$peer_id" \
-              -d "{\"host\":\"\",\"address\":\"$member_ip\",\"port\":3868,\"transport\":\"sctp\",\"applications\":[\"cx\",\"rx\"],\"priority\":$priority}" >/dev/null || echo "IMS peer update will retry"
+              -d "{\"host\":\"\",\"address\":\"$member_ip\",\"port\":3868,\"transport\":\"sctp\",\"applications\":[\"cx\",\"rx\"],\"priority\":$priority}" >/dev/null; then
+              log INFO "Reconciled IMS Diameter peer peer_id=$peer_id address=$member_ip priority=$priority"
+            else
+              log WARN "IMS Diameter peer reconciliation failed peer_id=$peer_id address=$member_ip; will retry"
+            fi
           fi
           done
           {{- end }}
           break
         fi
       done
+      if [ "$found" = false ] && [ "$unavailable_logged" = false ]; then
+        log WARN "No ready Core leader found; Service and IMS peer reconciliation is waiting"
+        unavailable_logged=true
+      fi
       sleep 3
     done
 

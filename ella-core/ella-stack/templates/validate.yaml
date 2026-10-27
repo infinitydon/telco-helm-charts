@@ -4,6 +4,9 @@
 {{- if and .Values.phones.enabled (not .Values.core.provisioning.enabled) }}
 {{- fail "The supplied lab phones require core.provisioning.enabled" }}
 {{- end }}
+{{- if and .Values.phones.enabled (lt (len .Values.global.network.n2n3.phoneAddresses) (len .Values.phones.phones)) }}
+{{- fail "global.network.n2n3.phoneAddresses must provide one address for each phone" }}
+{{- end }}
 
 {{- if .Values.core.fullnameOverride }}
 {{- fail "Use the release-derived Core name in ella-stack; fullnameOverride is only supported by the standalone base chart" }}
