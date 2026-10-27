@@ -46,7 +46,9 @@ Optional native simulators are included through ueransim.enabled and packetrushe
 
 ## Bootstrap and persistence
 
-The provisioning Job is an ordinary Kubernetes Job, not a post-install hook. It initializes the first Core, joins followers through the v1.20 cluster API, waits for membership, then optionally provisions the selected services and lab subscribers. This avoids a Helm readiness/join deadlock. Always use --wait-for-jobs. Phone init containers wait for provisioning success and Core rollout readiness; their short-lived API token can list namespace Jobs and read the release's Core StatefulSet, and is not mounted in the runtime containers. Keep the current completed bootstrap Job: replacement phone Pods use it to verify provisioning.
+The provisioning Job is an ordinary Kubernetes Job, not a post-install hook. It initializes the first Core, joins followers through the v1.20 cluster API, waits for membership, assigns HA member display names from each StatefulSet pod name and namespace, then optionally provisions the selected services and lab subscribers. This avoids a Helm readiness/join deadlock. Always use --wait-for-jobs. Phone init containers wait for provisioning success and Core rollout readiness; their short-lived API token can list namespace Jobs and read the release's Core StatefulSet, and is not mounted in the runtime containers. Keep the current completed bootstrap Job: replacement phone Pods use it to verify provisioning.
+
+The default HA names are `<statefulset-pod-name>.<namespace>`, such as `ella-ha-core-0.ella-ha-test`. Set `core.memberDisplayName.template` using `{pod}` and `{namespace}` placeholders, or set `core.memberDisplayName.enabled=false` to leave Core's generated short IDs in the Cluster page. Names over 63 bytes are rejected by bootstrap.
 
 On a fresh Core, provisioning applies the requested data-network pools, including replacing Core's seeded default. Existing data networks are preserved on upgrades so UI changes are retained. Set core.provisioning.reconcileDataNetworks=true to explicitly reconcile their pools/DNS/MTU; pool changes with attached sessions are rejected. Existing IPv6 pools are preserved.
 

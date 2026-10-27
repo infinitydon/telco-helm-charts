@@ -58,6 +58,18 @@
           }
         }
       }
+    },
+    "memberDisplayName": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "template": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "^([^{}]|\\{(pod|namespace)\\})+$"
+        }
+      }
     }
   }
 }

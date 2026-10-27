@@ -1,7 +1,7 @@
 dependencies:
 - name: ella-core
   repository: file://../ella-core
-  version: 2.0.0
+  version: 2.1.0
 - name: ella-ims
   repository: file://../ella-ims
   version: 0.2.0
@@ -17,5 +17,5 @@ dependencies:
 - name: packetrusher
   repository: file://../packetrusher
   version: 1.0.0
-digest: sha256:8211d6467322c44ae7bf736e74da455799b4de7f2c27b95b5203931121e53307
-generated: "2026-10-26T07:40:21.2483374-04:00"
+digest: sha256:439bb2f199707094976a18f123b354215b1a57ce36f19a81a04482463801534a
+generated: "2026-10-27T13:41:30.9532273-04:00"

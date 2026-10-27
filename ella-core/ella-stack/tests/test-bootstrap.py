@@ -9,18 +9,19 @@ class Bootstrap(unittest.TestCase):
   def request(req,timeout):
    base=req.full_url.split('/api/v1/')[0];path=req.full_url.split('/api/v1/')[1];body=json.loads(req.data) if req.data else None
    calls.append((base,path,req.method,body));result={}
-   if path=='status':result={'initialized':base in ready,'ready':base in ready,'cluster':{'isLeader':base.endswith('-0.core-peers.ns.svc.cluster.local:5002')}}
+   if path=='status':result={'initialized':base in ready,'ready':base in ready,'cluster':{'isLeader':base.endswith('-0.core-peers.ns.svc.cluster.local:5002'),'nodeId':base.split('//')[1].split('.')[0],'displayName':''}}
    elif path=='init':ready.add(base);result={'token':'test-only'}
    elif path=='auth/login':result={'token':'test-only'}
    elif path=='cluster/pki/join-tokens':result={'token':'test-join'}
    elif path=='cluster/join':ready.add(base)
    elif path=='cluster/members':result=[{'nodeId':str(i+1),'suffrage':'Voter'} for i in range(count)]
+   elif path.endswith('/display-name'):result={'message':'Display name updated'}
    elif path=='operator' and req.method=='GET':result={'id':{'mcc':'001','mnc':'01'}}
    elif path=='networking/data-networks' and req.method=='GET' and default_network:
     result={'items':[{'name':'internet','ipv4_pool':'10.45.0.0/22','dns':'8.8.8.8','mtu':1400,'status':{'sessions':active_sessions}}]}
    elif req.method=='GET':result={'items':[]}
    return io.BytesIO(json.dumps({'result':result}).encode())
-  env={'CORE_NAME':'core','NAMESPACE':'ns','CLUSTER_DOMAIN':'cluster.local','REPLICAS':str(count),'TOPOLOGY':'ha' if ha else 'standalone','UE_MODE':mode,'PROVISION':'true','IMS_API':'http://ims','SMSC_API':'http://smsc','ADMIN_EMAIL':'lab@example.com','ADMIN_PASSWORD':'test-only','IMS_ADDRESS':'10.6.0.5','SMSC_ADDRESS_HOST':'smsc','CORE_ADDRESS_HOST':'core-active'}
+  env={'CORE_NAME':'core','NAMESPACE':'ns','CLUSTER_DOMAIN':'cluster.local','REPLICAS':str(count),'TOPOLOGY':'ha' if ha else 'standalone','UE_MODE':mode,'PROVISION':'true','IMS_API':'http://ims','SMSC_API':'http://smsc','ADMIN_EMAIL':'lab@example.com','ADMIN_PASSWORD':'test-only','IMS_ADDRESS':'10.6.0.5','SMSC_ADDRESS_HOST':'smsc','CORE_ADDRESS_HOST':'core-active','MEMBER_DISPLAY_NAME_ENABLED':'true','MEMBER_DISPLAY_NAME_TEMPLATE':'{pod}.{namespace}'}
   if default_network:env['INTERNET_POOL']='10.208.0.0/16'
   with patch.dict(os.environ,env),patch('urllib.request.urlopen',side_effect=request),patch('socket.gethostbyname',return_value='10.0.0.1'),contextlib.redirect_stdout(io.StringIO()):
    runpy.run_path(a.script,run_name='__main__')
@@ -41,6 +42,13 @@ class Bootstrap(unittest.TestCase):
   self.assertEqual(len(joins),2)
   self.assertTrue(all(body['suffrage']=='voter' and body['seedAddresses']==['core-0.core-peers.ns.svc.cluster.local:7000'] for _,body in joins))
   self.assertLess(next(i for i,x in enumerate(calls) if x[1]=='init'),next(i for i,x in enumerate(calls) if x[1]=='cluster/join'))
+ def test_ha_sets_names_from_statefulset_pod_and_namespace(self):
+  calls=self.exercise('internet',True)
+  updates=[(path,body) for _,path,method,body in calls if method=='PUT' and path.endswith('/display-name')]
+  self.assertEqual(updates,[(f'cluster/members/core-{i}/display-name',{'displayName':f'core-{i}.ns'}) for i in range(3)])
+ def test_standalone_does_not_set_cluster_member_names(self):
+  calls=self.exercise('internet')
+  self.assertFalse(any(path.endswith('/display-name') for _,path,_,_ in calls))
  def test_ha_combined_connects_ims_to_every_hss(self):
   calls=self.exercise('internet-ims-sms',True)
   peers=[body for base,path,method,body in calls if base=='http://ims' and path=='diameter/peers' and method=='POST']

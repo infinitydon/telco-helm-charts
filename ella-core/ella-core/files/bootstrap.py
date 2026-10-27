@@ -1,4 +1,5 @@
 import json, os, socket, time, urllib.request, urllib.error
+from urllib.parse import quote
 NAME=os.environ['CORE_NAME']; NS=os.environ['NAMESPACE']; DOMAIN=os.environ['CLUSTER_DOMAIN']
 COUNT=int(os.environ['REPLICAS']); HA=os.environ['TOPOLOGY']=='ha'
 MODE=os.environ['UE_MODE']; SERVICES=MODE=='internet-ims-sms'
@@ -42,6 +43,20 @@ if HA:
         until(lambda:api(target,'GET','status').get('ready'),f'follower {i} joined')
         print(f'Core member {i+1} ready',flush=True)
     until(lambda:(lambda members:len(members)==COUNT and all(x.get('suffrage','').lower()=='voter' for x in members))(api(CORE,'GET','cluster/members',auth=True)),'all cluster voters')
+    if os.environ.get('MEMBER_DISPLAY_NAME_ENABLED','true')=='true':
+        template=os.environ.get('MEMBER_DISPLAY_NAME_TEMPLATE','{pod}.{namespace}')
+        for i in range(COUNT):
+            member_status=api(node(i),'GET','status').get('cluster',{})
+            node_id=member_status.get('nodeId')
+            if not node_id:raise RuntimeError(f'Core member {i} did not report its node ID')
+            display_name=template.replace('{pod}',f'{NAME}-{i}').replace('{namespace}',NS)
+            if len(display_name.encode('utf-8'))>63:
+                raise RuntimeError(f'Display name for {NAME}-{i} exceeds Ella Core\'s 63-byte limit: {display_name}')
+            if '{' in display_name or '}' in display_name:
+                raise RuntimeError(f'Unsupported placeholder in member display-name template: {template}')
+            if member_status.get('displayName')!=display_name:
+                until(lambda:api(CORE,'PUT',f'cluster/members/{quote(str(node_id),safe="")}/display-name',{'displayName':display_name},True),f'set display name for {NAME}-{i}',seconds=120)
+                print(f'Set Core member {NAME}-{i} display name to {display_name}',flush=True)
 if os.environ['PROVISION']!='true':
     print('Core initialized; subscriber/service provisioning disabled.');raise SystemExit(0)
 IMS=os.environ['IMS_API']; SMSC=os.environ['SMSC_API']

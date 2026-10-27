@@ -6,6 +6,8 @@ It replaces the old IP-based and FQDN HA chart variants, the ella-core-lab chart
 
 Supply admin.existingSecret or admin.password before enabling bootstrap. The ordinary bootstrap Job initializes and joins Core through the v1.20 APIs; use Helm --wait --wait-for-jobs. The optional provisioning.enabled fixture creates public test subscribers and selected services, while normal deployments can provision their own users/subscribers through the Core UI/API.
 
+In HA mode, the bootstrap Job assigns each member a persistent display name through the Core cluster API. By default the Cluster page shows `{pod}.{namespace}` (for example, `ella-ha-core-0.ella-ha-test`) and retains the generated short node ID beside it. Configure `memberDisplayName.enabled` or `memberDisplayName.template`; supported placeholders are `{pod}` and `{namespace}`, and rendered names must be no longer than 63 bytes. This is an operator-facing name; Core continues to generate and manage its internal node identity.
+
 Core N3/N2 use the pod network and N6 uses the configured Multus attachment. A shared macvlan N6 supports separate hosts; a node-local bridge is supported only for standalone deployments. All Core hosts require Linux6.6+ for TCX. See values.yaml and the umbrella guide for networking, Services, diagnostics, persistence and migration constraints.
 
 Core controller permissions are restricted to reading and patching its two Services. The bootstrap Job has no Kubernetes API permissions. Diagnostics provide a separate shell and Linux network tools alongside Core. Standalone or three-node Core HA does not imply that singleton IMS/SMSC, ongoing voice media or UE RAN sessions are automatically replicated.

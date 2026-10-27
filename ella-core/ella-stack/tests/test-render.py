@@ -21,6 +21,8 @@ class Render(unittest.TestCase):
                     text = render('-f', str(CHART/'examples'/f'{topology}-{mode}.yaml'))
                     self.assertIn('replicas: '+('3' if topology == 'ha' else '1'), text)
                     self.assertIn('ella-core-bootstrap', text)
+                    self.assertIn('MEMBER_DISPLAY_NAME_TEMPLATE', text)
+                    self.assertIn('"{pod}.{namespace}"', text)
                     self.assertEqual('image: "ghcr.io/ellanetworks/ella-ims:' in text,
                                      mode == 'internet-ims-sms')
                     self.assertEqual('image: "ghcr.io/ellanetworks/ella-smsc:' in text,
@@ -39,6 +41,12 @@ class Render(unittest.TestCase):
         self.assertIn('"backend": "ebpf"', text)
         self.assertNotIn('apiTokenSecret', text)
         render('--set', 'packetrusher.enabled=true,packetrusher.backend=auto', valid=False)
+
+    def test_member_display_name_template_is_configurable(self):
+        text = render('--set-json', 'core.memberDisplayName.template="{namespace}-{pod}"')
+        self.assertIn('value: "{namespace}-{pod}"', text)
+        disabled = render('--set', 'core.memberDisplayName.enabled=false')
+        self.assertIn('MEMBER_DISPLAY_NAME_ENABLED, value: "false"', disabled)
 
     def test_invalid_combinations(self):
         for values in ('global.mode=invalid', 'core.topology=invalid',

@@ -16,6 +16,10 @@ bootstrap:
 provisioning:
   enabled: false
   reconcileDataNetworks: false
+memberDisplayName:
+  enabled: true
+  # Supported placeholders: {pod} and {namespace}. Keep the rendered name <=63 characters.
+  template: "{pod}.{namespace}"
 persistence:
   enabled: true
   size: 2Gi
