@@ -23,14 +23,14 @@ The simulator pod is privileged for TUN, IPsec/XFRM and network configuration. I
 
 ## Build and deploy
 
-The chart pulls the published `ghcr.io/infinitydon/ella-ue-phones:0.4.5` and `ghcr.io/infinitydon/ella-ue-browser:0.3.4` images. No node-local image import or installation script is required. The phone image includes Linux IP, ICMP, DNS, HTTP, socket and packet-capture tools. Browser tools retain the same unprivileged UE-only network restrictions. With Multus N2/N3 configured, each phone sets its static `n2n3Address` before starting its gNB, uses the configured IMS address for P-CSCF tests, and follows the active Core member through the Core API.
+The chart pulls the published `ghcr.io/infinitydon/ella-ue-phones:0.4.6` and `ghcr.io/infinitydon/ella-ue-browser:0.3.4` images. No node-local image import or installation script is required. The phone UI shows each UE's Core internet-DNN IP and IMS-DNN IP as they are allocated. The phone image includes Linux IP, ICMP, DNS, HTTP, socket and packet-capture tools. Browser tools retain the same unprivileged UE-only network restrictions. With Multus N2/N3 configured, each phone sets its static `n2n3Address` before starting its gNB, uses the configured IMS address for P-CSCF tests, and follows the active Core member through the Core API.
 
 Optional rebuild and publication from this directory on Linux:
 
 ```sh
 buildah login ghcr.io
-buildah bud --layers -t ghcr.io/infinitydon/ella-ue-phones:0.4.5 .
-buildah push ghcr.io/infinitydon/ella-ue-phones:0.4.5
+buildah bud --layers -t ghcr.io/infinitydon/ella-ue-phones:0.4.6 .
+buildah push ghcr.io/infinitydon/ella-ue-phones:0.4.6
 buildah bud --layers -t ghcr.io/infinitydon/ella-ue-browser:0.3.4 ./browser
 buildah push ghcr.io/infinitydon/ella-ue-browser:0.3.4
 ```

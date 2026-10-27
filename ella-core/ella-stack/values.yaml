@@ -53,6 +53,9 @@ smsc:
   enabled: true
 phones:
   enabled: false
+  image:
+    repository: ghcr.io/infinitydon/ella-ue-phones
+    tag: 0.4.6
   mode: internet
   waitForBootstrap: {enabled: true}
   networkAttachment: '[{"name":"{{ .Release.Name }}-core-n2n3","interface":"net1"}]'

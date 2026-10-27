@@ -40,6 +40,13 @@ installation checks, not a new leader-failure test. The separate fresh HA
 deployment's expanded protocol-edge suite was not run; prior extended HA SMS
 limitations remain as recorded below.
 
+Follow-up UI update: both releases were upgraded to `ella-stack` 1.3.0 and all
+four phone Pods pulled `ghcr.io/infinitydon/ella-ue-phones:0.4.6` (manifest
+`sha256:52fa32be76c46bf45ebc29486ff5323c8f932dc653310485e4e906484fee9587`).
+The Phone A page rendered separate **Core / Internet IP** and **IMS IP** values;
+live API responses verified both address fields for both phones in SA and HA.
+Both phone Deployments are Ready in each namespace.
+
 The test presets select compatible kernel nodes for this cluster. Their
 `nodeSelector`/affinity hostnames are examples and must be adapted or removed
 for another cluster with different node names and kernel capabilities.

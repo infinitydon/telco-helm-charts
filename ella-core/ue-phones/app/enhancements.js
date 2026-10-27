@@ -6,6 +6,7 @@ extraStyle.textContent+=`
 .call-buttons{gap:10px}.round{width:64px;height:56px;border-radius:15px;border:2px solid transparent;box-shadow:0 3px 8px #20382925}.round svg{width:25px;height:25px}.round:not(:disabled){transform:translateY(-2px)}.round.dial:not(:disabled),.round.answer:not(:disabled){background:#08783b;color:#fff;border-color:#005b29;box-shadow:0 0 0 4px #b8e7c5,0 4px 9px #124e3925}.round.end:not(:disabled){background:#ce283a;color:#fff;border-color:#a41123;box-shadow:0 0 0 4px #ffe0e4,0 4px 9px #691b2925}.round:disabled{opacity:1;background:#e6e9e5;color:#a6ada6;border-color:#dbe0da;box-shadow:none}.round-label{font-size:12px;font-weight:800;color:#253c2c;margin-top:9px}.round:disabled+.round-label{color:#899287;font-weight:500}.round-label .availability{display:block;font-size:9px;margin-top:3px;font-weight:600;letter-spacing:.3px}.ring-actions button,.attention button{font-weight:800;font-size:13px}.ring-actions .decline{background:#b92135}.web-page{height:390px;padding:18px 16px;font:14px/1.65 system-ui,sans-serif;color:#25302b;overflow-wrap:anywhere}.web-page h1{font-size:25px;letter-spacing:-.7px;margin:0 0 16px;line-height:1.22}.web-page h2{font-size:21px;margin:24px 0 10px}.web-page h3{font-size:18px;margin:20px 0 9px}.web-page p{margin:0 0 16px}.web-page a{color:#0868ae;text-decoration:underline;text-underline-offset:3px;cursor:pointer}.web-page ul,.web-page ol{padding-left:22px}.web-page li{margin:7px 0}.web-page blockquote{border-left:3px solid #6b997f;padding-left:12px;margin:16px 0;color:#52685a}.web-page pre{white-space:pre-wrap;background:#f1f4f2;border-radius:6px;padding:10px;font:12px/1.6 monospace}.web-page code{font-size:12px}.web-page table{display:block;overflow:auto;border-collapse:collapse;font-size:12px}.web-page th,.web-page td{padding:7px;border:1px solid #d7dfd8}.web-page hr{border:0;border-top:1px solid #d7dfd8;margin:20px 0}.web-page article:empty,.web-page div:empty{display:none}
 `;
 document.head.append(extraStyle);
+extraStyle.textContent+='.registration>div{min-width:0}.registration small{display:block;overflow-wrap:anywhere;line-height:1.45}.registration small+small{margin-top:2px}';
 const attention=document.createElement('aside');attention.id='attention';attention.className='attention';attention.setAttribute('role','status');attention.setAttribute('aria-live','polite');attention.hidden=true;document.body.append(attention);
 const soundButton=document.createElement('button');soundButton.className='sound-toggle';soundButton.textContent='Enable alert sounds';soundButton.setAttribute('aria-pressed','false');document.querySelector('.topbar').append(soundButton);
 let audio=null,sounds=false,ringTimer=null,ringKey='',messageNotice=null;
@@ -17,6 +18,7 @@ function selectPhoneTab(id,tab){document.querySelector('[data-tab="'+tab+'"][dat
 function markRead(p){const received=p.messages.filter(m=>m.direction==='received');seenMessages[p.id]=Math.max(0,...received.map(m=>m.id));if(messageNotice?.id===p.id)messageNotice=null}
 for(const id of ['1','2']){
  const content=$('calls-'+id).parentElement;
+ const imsAddress=$('ip-'+id),coreAddress=document.createElement('small');coreAddress.id='core-ip-'+id;coreAddress.textContent='Core / Internet IP · Not assigned';imsAddress.parentElement.insertBefore(coreAddress,imsAddress);
  const ring=document.createElement('section');ring.className='ring-banner';ring.id='ring-'+id;ring.hidden=true;ring.setAttribute('role','status');ring.innerHTML='<strong class="ring-title">☎ Incoming call · Ringing</strong><p>Your other subscriber is calling.</p><div class="ring-actions"><button data-action="answer" data-phone="'+id+'" aria-label="Answer ringing Phone '+(id==='1'?'A':'B')+'">Answer call</button><button class="decline" data-action="hangup" data-phone="'+id+'" aria-label="Decline ringing Phone '+(id==='1'?'A':'B')+'">Decline</button></div>';
  content.insertBefore(ring,content.querySelector('.tabs'));
  const alert=document.createElement('div');alert.className='message-alert';alert.id='message-alert-'+id;alert.hidden=true;content.insertBefore(alert,content.querySelector('.tabs'));
@@ -52,10 +54,11 @@ function enhance(){
  const ringing=p.incoming&&!['idle','terminated','confirmed'].includes(p.call);$('ring-'+p.id).hidden=!ringing;document.querySelector('[aria-label="'+p.name+'"]').querySelector('.phone').classList.toggle('is-ringing',ringing);if(ringing)$('call-status-'+p.id).textContent='INCOMING CALL · RINGING';
  if(!$('web-meta-'+p.id).dataset.loaded)$('web-meta-'+p.id).textContent=p.internetIp?'Internet UE IP · '+p.internetIp+' · via N3 / GTP-U':'Internet session unavailable';}
  updateAttention();}
+function updateAllocatedAddresses(){for(const p of state.phones){$('core-ip-'+p.id).textContent='Core / Internet IP · '+(p.internetIp||'Not assigned');$('ip-'+p.id).textContent='IMS IP · '+(p.ip||'Not assigned')}}
 let displayedMode=null;
 const originalRender=render;render=function(){
  if(state.mode&&displayedMode&&state.mode!==displayedMode){location.reload();return;}
- displayedMode=state.mode||displayedMode;originalRender();enhance();
+ displayedMode=state.mode||displayedMode;originalRender();enhance();updateAllocatedAddresses();
 };
 document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');if(tab){$('browser-'+tab.dataset.phone).hidden=tab.dataset.tab!=='browser';if(tab.dataset.tab==='messages'){const p=state.phones.find(p=>p.id===tab.dataset.phone);if(p)markRead(p)}enhance()}
  const open=e.target.closest('[data-open-message]');if(open)selectPhoneTab(open.dataset.openMessage,'messages');if(e.target.closest('[data-dismiss-message]')){messageNotice=null;updateAttention()}

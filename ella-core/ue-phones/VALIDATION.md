@@ -1,5 +1,21 @@
 # UE phone validation
 
+## Allocated UE addresses in the phone UI (October 27, 2026)
+
+The phone UI now displays both addresses for each subscriber: **Core / Internet
+IP** from its internet DNN session and **IMS IP** from its IMS DNN session.
+Values come from the live `/api/state` response and refresh with the phone
+status, so the UI reflects the addresses assigned to that UE.
+
+Phone image `ghcr.io/infinitydon/ella-ue-phones:0.4.6` was built on Linux; the
+embedded Go tests passed and the public image was pulled by both test stacks.
+Manifest digest: `sha256:52fa32be76c46bf45ebc29486ff5323c8f932dc653310485e4e906484fee9587`.
+The standalone and HA releases were upgraded to `ella-stack` 1.3.0 with both
+phone Deployments ready. The Phone A page rendered both labels in the browser,
+and the live APIs returned both addresses for Phone A and Phone B in each
+topology. Helm lint, rendering, bootstrap tests, and JavaScript syntax checks
+passed after the chart update.
+
 Browser recovery update: [0.3.3 validation](BROWSER-RECOVERY-VALIDATION.md), including the OOM diagnosis and live crash/hang recovery results.
 
 Latest clean reinstall: [25 October 2026 results](../tests/services/REINSTALL-VALIDATION.md). All 24 integration scenarios, both Helm API tests and 22 phone/browser checks passed after namespace/PVC recreation.

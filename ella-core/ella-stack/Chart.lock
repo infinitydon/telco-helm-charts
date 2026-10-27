@@ -10,12 +10,12 @@ dependencies:
   version: 0.2.0
 - name: ue-phones
   repository: file://../ue-phones
-  version: 0.5.0
+  version: 0.5.1
 - name: ueransim
   repository: file://../ueransim-5g-chart
   version: 2.0.0
 - name: packetrusher
   repository: file://../packetrusher
   version: 1.0.0
-digest: sha256:6d880a7808570f70cc4e4ad8a8c8ec1dde5fdda0a8d1fa1ae4545e5787898818
-generated: "2026-10-27T14:22:50.2089017-04:00"
+digest: sha256:baaa693559e1097ba3634050df31603f85bf7f2d54ceb177023ed3e79ed5ebe4
+generated: "2026-10-27T17:41:40.2029617-04:00"
