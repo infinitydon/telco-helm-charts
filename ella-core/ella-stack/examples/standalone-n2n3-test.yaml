@@ -3,14 +3,17 @@ global:
   network:
     type: macvlan
     master: eth0
-    coreAddresses: [10.240.0.2/24, 10.240.0.3/24, 10.240.0.4/24]
-    gateway: 10.240.0.1
-    imsAddress: 10.240.0.5
-    internetPool: 10.242.0.0/16
-    imsPool: 10.60.0.0/16
+    n6:
+      coreAddresses: [10.240.0.2/24, 10.240.0.3/24, 10.240.0.4/24]
+      gatewayAddress: 10.240.0.1
+      imsAddress: 10.240.0.5
+      smscAddress: 10.240.0.6
+    dnnPools:
+      internet: 10.242.0.0/16
+      ims: 10.60.0.0/16
     n2n3:
       enabled: true
-      coreAddresses: [10.241.0.2/24, 10.241.0.3/24, 10.241.0.4/24]
+      coreInterfaceAddresses: [10.241.0.2/24, 10.241.0.3/24, 10.241.0.4/24]
       coreN2Addresses: [10.241.0.2, 10.241.0.3, 10.241.0.4]
       phoneAddresses: [10.241.0.20/24, 10.241.0.21/24]
       ueransimAddress: 10.241.0.30/24

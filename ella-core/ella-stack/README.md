@@ -124,6 +124,10 @@ Service-mode changes preserve Core subscriber/configuration data and recreate UE
 
 The HA controller watches Core status and patches the Core UI/API and active NGAP/Diameter Services. In combined lab mode, it also reconciles IMS Diameter peers after Pod IP changes. When enabled, the separate N6 gateway watches leadership and updates lab return routes; it disables ICMP redirects so IMS cannot cache a route that bypasses the gateway and keeps pointing at an old leader. A Raft election is not a guarantee that ongoing calls or RAN sessions survive a process failure; clients may need to reattach. See VALIDATION.md for exactly what was tested.
 
+Network values are grouped by interface: `global.network.n6.coreAddresses`, `gatewayAddress`, `imsAddress` and `smscAddress` configure N6; `global.network.n2n3.coreInterfaceAddresses` configure the Core's shared N2/N3 interface; `coreN2Addresses` are the Core SCTP N2 destinations advertised to radios. UE DNN address pools are separately under `global.network.dnnPools.internet` and `global.network.dnnPools.ims`. In combined mode, IMS and SMSC attach to the Core N6 Multus network. SMSC's stable address defaults to `global.network.n6.smscAddress: 10.6.0.6`; the chart assigns it to `net1` and provisions Core's Diameter peer with it directly, avoiding the SMSC Pod's changeable Kubernetes `eth0` IP.
+
+For upgrades, legacy unscoped keys (`global.network.coreAddresses`, `gateway`, `imsAddress`, `smscAddress`, `internetPool`, `imsPool`, and `n2n3.coreAddresses`) are mapped to the scoped keys. New values files should use the scoped layout above.
+
 ## Tests
 
 Run topology checks and the essential phone/Helm acceptance suite against

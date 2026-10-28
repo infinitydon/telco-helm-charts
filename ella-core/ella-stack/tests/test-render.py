@@ -27,6 +27,10 @@ class Render(unittest.TestCase):
                                      mode == 'internet-ims-sms')
                     self.assertEqual('image: "ghcr.io/ellanetworks/ella-smsc:' in text,
                                      mode == 'internet-ims-sms')
+                    if mode == 'internet-ims-sms':
+                        self.assertIn("k8s.v1.cni.cncf.io/networks: 'ella-core-n6'", text)
+                        self.assertIn('address: "10.6.0.6"', text)
+                        self.assertIn('ip address replace 10.6.0.6/$prefix dev net1', text)
 
     def test_service_types(self):
         for kind in ('ClusterIP', 'NodePort', 'LoadBalancer'):

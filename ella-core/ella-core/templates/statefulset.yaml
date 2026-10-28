@@ -1,5 +1,5 @@
 {{- $name := include "core.fullname" . }}
-{{- $network := mergeOverwrite (deepCopy .Values.network) ((.Values.global | default dict).network | default dict) }}
+{{- $network := include "core.network" . | fromJson }}
 {{- $attachments := list (dict "name" (printf "%s-n6" $name) "interface" "net1") }}
 {{- if $network.n2n3.enabled }}{{- $attachments = append $attachments (dict "name" (printf "%s-n2n3" $name) "interface" "net2") }}{{- end }}
 apiVersion: apps/v1

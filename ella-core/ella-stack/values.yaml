@@ -4,14 +4,20 @@ global:
     type: macvlan
     master: eth0
     bridge: ella-stack-n6
-    coreAddresses: [10.6.0.2/24, 10.6.0.3/24, 10.6.0.4/24]
-    gateway: 10.6.0.1
-    imsAddress: 10.6.0.5
-    internetPool: 10.45.0.0/16
-    imsPool: 10.60.0.0/16
+    n6:
+      # Core's per-pod N6/net1 addresses; the gateway, IMS and SMSC share this subnet.
+      coreAddresses: [10.6.0.2/24, 10.6.0.3/24, 10.6.0.4/24]
+      gatewayAddress: 10.6.0.1
+      imsAddress: 10.6.0.5
+      smscAddress: 10.6.0.6
+    dnnPools:
+      internet: 10.45.0.0/16
+      ims: 10.60.0.0/16
     n2n3:
       enabled: true
-      coreAddresses: [10.211.0.2/24, 10.211.0.3/24, 10.211.0.4/24]
+      # Core's N2/N3 net2 addresses. N2 SCTP and N3 GTP-U share this interface.
+      coreInterfaceAddresses: [10.211.0.2/24, 10.211.0.3/24, 10.211.0.4/24]
+      # N2 destination list that UEs/gNBs use when connecting to Core.
       coreN2Addresses: [10.211.0.2, 10.211.0.3, 10.211.0.4]
       phoneAddresses: [10.211.0.20/24, 10.211.0.21/24]
       ueransimAddress: 10.211.0.30/24
@@ -31,8 +37,8 @@ ims:
   podAnnotations:
     k8s.v1.cni.cncf.io/networks: '{{ .Release.Name }}-core-n6'
   sip:
-    addresses: ['{{ .Values.global.network.imsAddress }}']
-    trustedNetworks: ['{{ .Values.global.network.imsPool }}']
+    addresses: ['{{ if hasKey .Values.global.network `imsAddress` }}{{ .Values.global.network.imsAddress }}{{ else }}{{ .Values.global.network.n6.imsAddress }}{{ end }}']
+    trustedNetworks: ['{{ if hasKey .Values.global.network `imsPool` }}{{ .Values.global.network.imsPool }}{{ else }}{{ .Values.global.network.dnnPools.ims }}{{ end }}']
   extraInitContainers:
     - name: n6-route
       image: ghcr.io/infinitydon/ella-ue-phones:0.4.5
@@ -40,17 +46,33 @@ ims:
       command: [sh, -ec]
       args:
         - |
-          ip address replace {{ .Values.global.network.imsAddress }}/{{ .Values.global.network.coreAddresses | first | splitList "/" | last }} dev net1
+          ip address replace {{ if hasKey .Values.global.network `imsAddress` }}{{ .Values.global.network.imsAddress }}{{ else }}{{ .Values.global.network.n6.imsAddress }}{{ end }}/{{ if hasKey .Values.global.network `coreAddresses` }}{{ first .Values.global.network.coreAddresses | splitList "/" | last }}{{ else }}{{ first .Values.global.network.n6.coreAddresses | splitList "/" | last }}{{ end }} dev net1
           ip link set net1 up
-          ip route replace {{ .Values.global.network.imsPool }} via {{ .Values.global.network.gateway }} dev net1
+          ip route replace {{ if hasKey .Values.global.network `imsPool` }}{{ .Values.global.network.imsPool }}{{ else }}{{ .Values.global.network.dnnPools.ims }}{{ end }} via {{ if hasKey .Values.global.network `gateway` }}{{ .Values.global.network.gateway }}{{ else }}{{ .Values.global.network.n6.gatewayAddress }}{{ end }} dev net1
           # macvlan may retain parent TX offload despite ethtool; complete TCP/UDP
           # checksums before user-plane packets are copied into a simulated TUN.
           ethtool -K net1 tx off || true
           tc qdisc replace dev net1 clsact
           tc filter replace dev net1 egress protocol ip pref 10 matchall action csum ip4h and tcp and udp
-          arping -U -c 2 -I net1 {{ .Values.global.network.imsAddress }} || true
+          arping -U -c 2 -I net1 {{ if hasKey .Values.global.network `imsAddress` }}{{ .Values.global.network.imsAddress }}{{ else }}{{ .Values.global.network.n6.imsAddress }}{{ end }} || true
 smsc:
   enabled: true
+  diameter:
+    # Core stores the SMSC Diameter peer as an address, so use a stable
+    # N6 Multus address rather than resolving the SMSC Pod's eth0 address.
+    address: '{{ if hasKey .Values.global.network "smscAddress" }}{{ .Values.global.network.smscAddress }}{{ else }}{{ .Values.global.network.n6.smscAddress }}{{ end }}'
+  podAnnotations:
+    k8s.v1.cni.cncf.io/networks: '{{ .Release.Name }}-core-n6'
+  extraInitContainers:
+    - name: n6-address
+      image: ghcr.io/infinitydon/ella-ue-phones:0.4.6
+      securityContext: {capabilities: {add: [NET_ADMIN]}}
+      command: [sh, -ec]
+      args:
+        - |
+          {{ if hasKey .Values.global.network `coreAddresses` }}prefix={{ first .Values.global.network.coreAddresses | splitList "/" | last }}{{ else }}prefix={{ first .Values.global.network.n6.coreAddresses | splitList "/" | last }}{{ end }}
+          {{ if hasKey .Values.global.network `smscAddress` }}ip address replace {{ .Values.global.network.smscAddress }}/$prefix dev net1{{ else }}ip address replace {{ .Values.global.network.n6.smscAddress }}/$prefix dev net1{{ end }}
+          ip link set net1 up
 phones:
   enabled: false
   image:

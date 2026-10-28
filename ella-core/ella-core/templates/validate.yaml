@@ -1,9 +1,12 @@
-{{- $network := mergeOverwrite (deepCopy .Values.network) ((.Values.global | default dict).network | default dict) }}
-{{- if lt (len $network.coreAddresses) (include "core.count" . | int) }}
-{{- fail "network.coreAddresses must contain an address for every Core replica" }}
+{{- $network := include "core.network" . | fromJson }}
+{{- if lt (len $network.n6.coreAddresses) (include "core.count" . | int) }}
+{{- fail "network.n6.coreAddresses must contain an address for every Core replica" }}
 {{- end }}
-{{- if and $network.n2n3.enabled (lt (len $network.n2n3.coreAddresses) (include "core.count" . | int)) }}
-{{- fail "network.n2n3.coreAddresses must contain an address for every Core replica" }}
+{{- if and $network.n2n3.enabled (lt (len $network.n2n3.coreInterfaceAddresses) (include "core.count" . | int)) }}
+{{- fail "network.n2n3.coreInterfaceAddresses must contain an address for every Core replica" }}
+{{- end }}
+{{- if and .Values.provisioning.enabled (eq (default "internet" (.Values.global | default dict).mode) "internet-ims-sms") (empty $network.n6.smscAddress) }}
+{{- fail "network.n6.smscAddress is required when provisioning IMS/SMSC" }}
 {{- end }}
 {{- if and (eq .Values.topology "ha") (eq $network.type "bridge") }}
 {{- fail "HA requires a shared L2 N6 network (macvlan), not a node-local bridge" }}

@@ -17,11 +17,28 @@
               "type": "object",
               "properties": {
                 "enabled": {"type": "boolean"},
+                "coreInterfaceAddresses": {"type": "array", "minItems": 1, "items": {"type": "string"}},
                 "coreAddresses": {"type": "array", "minItems": 1, "items": {"type": "string"}},
                 "coreN2Addresses": {"type": "array", "minItems": 1, "items": {"type": "string"}},
                 "phoneAddresses": {"type": "array", "minItems": 1, "items": {"type": "string"}},
                 "ueransimAddress": {"type": "string"},
                 "packetrusherAddress": {"type": "string"}
+              }
+            },
+            "n6": {
+              "type": "object",
+              "properties": {
+                "coreAddresses": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+                "gatewayAddress": {"type": "string"},
+                "imsAddress": {"type": "string"},
+                "smscAddress": {"type": "string"}
+              }
+            },
+            "dnnPools": {
+              "type": "object",
+              "properties": {
+                "internet": {"type": "string"},
+                "ims": {"type": "string"}
               }
             },
             "type": {

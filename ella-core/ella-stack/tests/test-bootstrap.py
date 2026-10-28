@@ -24,7 +24,7 @@ class Bootstrap(unittest.TestCase):
     result={'items':[{'name':'internet','ipv4_pool':'10.45.0.0/22','dns':'8.8.8.8','mtu':1400,'status':{'sessions':active_sessions}}]}
    elif req.method=='GET':result={'items':[]}
    return io.BytesIO(json.dumps({'result':result}).encode())
-  env={'CORE_NAME':'core','NAMESPACE':'ns','CLUSTER_DOMAIN':'cluster.local','REPLICAS':str(count),'TOPOLOGY':'ha' if ha else 'standalone','UE_MODE':mode,'PROVISION':str(provision).lower(),'N6_GATEWAY_ENABLED':str(n6_gateway).lower(),'IMS_API':'http://ims','SMSC_API':'http://smsc','ADMIN_EMAIL':'lab@example.com','ADMIN_PASSWORD':'test-only','IMS_ADDRESS':'10.6.0.5','SMSC_ADDRESS_HOST':'smsc','CORE_ADDRESS_HOST':'core-active','MEMBER_DISPLAY_NAME_ENABLED':'true','MEMBER_DISPLAY_NAME_TEMPLATE':'{pod}.{namespace}'}
+  env={'CORE_NAME':'core','NAMESPACE':'ns','CLUSTER_DOMAIN':'cluster.local','REPLICAS':str(count),'TOPOLOGY':'ha' if ha else 'standalone','UE_MODE':mode,'PROVISION':str(provision).lower(),'N6_GATEWAY_ENABLED':str(n6_gateway).lower(),'IMS_API':'http://ims','SMSC_API':'http://smsc','ADMIN_EMAIL':'lab@example.com','ADMIN_PASSWORD':'test-only','IMS_ADDRESS':'10.6.0.5','SMSC_ADDRESS':'10.6.0.6','CORE_ADDRESS_HOST':'core-active','MEMBER_DISPLAY_NAME_ENABLED':'true','MEMBER_DISPLAY_NAME_TEMPLATE':'{pod}.{namespace}'}
   if default_network:env['INTERNET_POOL']='10.208.0.0/16'
   with patch.dict(os.environ,env),patch('urllib.request.urlopen',side_effect=request),patch('socket.gethostbyname',return_value='10.0.0.1'),contextlib.redirect_stdout(io.StringIO()):
    try:runpy.run_path(a.script,run_name='__main__')
@@ -41,6 +41,8 @@ class Bootstrap(unittest.TestCase):
   calls=self.exercise('internet-ims-sms')
   self.assertTrue(any(base=='http://ims' for base,_,_,_ in calls));self.assertTrue(any(base=='http://smsc' for base,_,_,_ in calls))
   dn=[body['name'] for _,path,method,body in calls if path=='networking/data-networks' and method=='POST'];self.assertEqual(dn,['internet','ims'])
+  sms_peers=[body for _,path,method,body in calls if path=='operator/sms/smsc-peers' and method=='POST']
+  self.assertEqual(sms_peers[0]['address'],'10.6.0.6')
  def test_ha_found_init_then_joins_two_voters(self):
   calls=self.exercise('internet',True)
   joins=[(base,body) for base,path,_,body in calls if path=='cluster/join']

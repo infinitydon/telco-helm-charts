@@ -1,13 +1,13 @@
 dependencies:
 - name: ella-core
   repository: file://../ella-core
-  version: 2.2.0
+  version: 2.3.0
 - name: ella-ims
   repository: file://../ella-ims
   version: 0.2.0
 - name: ella-smsc
   repository: file://../ella-smsc
-  version: 0.2.0
+  version: 0.2.1
 - name: ue-phones
   repository: file://../ue-phones
   version: 0.5.1
@@ -17,5 +17,5 @@ dependencies:
 - name: packetrusher
   repository: file://../packetrusher
   version: 1.0.0
-digest: sha256:baaa693559e1097ba3634050df31603f85bf7f2d54ceb177023ed3e79ed5ebe4
-generated: "2026-10-27T17:41:40.2029617-04:00"
+digest: sha256:7ca15f6baba26e3109e580517cea79861539b64d574041813814b2a434b98dff
+generated: "2026-10-28T09:41:33.4322795-04:00"

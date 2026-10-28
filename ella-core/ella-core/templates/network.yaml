@@ -1,4 +1,4 @@
-{{- $network := mergeOverwrite (deepCopy .Values.network) ((.Values.global | default dict).network | default dict) }}
+{{- $network := include "core.network" . | fromJson }}
 apiVersion: k8s.cni.cncf.io/v1
 kind: NetworkAttachmentDefinition
 metadata: {name: {{ include "core.fullname" . }}-n6}

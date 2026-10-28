@@ -1,13 +1,13 @@
 apiVersion: v2
 name: ella-stack
 description: One-release standalone/HA Ella Core, optional IMS/SMSC and UE phones
-version: 1.3.0
+version: 1.4.0
 appVersion: "v1.20.0+c7cf035"
 type: application
 dependencies:
-  - {name: ella-core, alias: core, version: 2.2.0, repository: "file://../ella-core"}
+  - {name: ella-core, alias: core, version: 2.3.0, repository: "file://../ella-core"}
   - {name: ella-ims, alias: ims, version: 0.2.0, repository: "file://../ella-ims", condition: ims.enabled}
-  - {name: ella-smsc, alias: smsc, version: 0.2.0, repository: "file://../ella-smsc", condition: smsc.enabled}
+  - {name: ella-smsc, alias: smsc, version: 0.2.1, repository: "file://../ella-smsc", condition: smsc.enabled}
   - {name: ue-phones, alias: phones, version: 0.5.1, repository: "file://../ue-phones", condition: phones.enabled}
   - {name: ueransim, version: 2.0.0, repository: "file://../ueransim-5g-chart", condition: ueransim.enabled}
   - {name: packetrusher, version: 1.0.0, repository: "file://../packetrusher", condition: packetrusher.enabled}

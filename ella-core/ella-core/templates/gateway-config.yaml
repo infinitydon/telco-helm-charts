@@ -1,4 +1,4 @@
-{{- $network := mergeOverwrite (deepCopy .Values.network) ((.Values.global | default dict).network | default dict) }}
+{{- $network := include "core.network" . | fromJson }}
 {{- if or .Values.n6Gateway.enabled .Values.controller.gatewayEnabled }}
 {{- $name := include "core.fullname" . }}
 apiVersion: v1
@@ -11,18 +11,18 @@ data:
     log() { printf '%s [%s] n6-gateway: %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$1" "$2"; }
     trap 'rc=$?; log ERROR "command failed exit=$rc line=$LINENO command=$BASH_COMMAND"; exit "$rc"' ERR
     log INFO "Starting lab N6 gateway namespace={{ .Release.Namespace }} replicas={{ include "core.count" . }}"
-    ip address replace {{ $network.gateway }}/{{ $network.coreAddresses | first | splitList "/" | last }} dev net1
+    ip address replace {{ $network.n6.gatewayAddress }}/{{ $network.n6.coreAddresses | first | splitList "/" | last }} dev net1
     ip link set net1 up
     sysctl -w net.ipv4.ip_forward=1 >/dev/null
     # IMS and Core share N6. Redirects could cache an old Core next hop.
     sysctl -w net.ipv4.conf.all.send_redirects=0 net.ipv4.conf.default.send_redirects=0 net.ipv4.conf.net1.send_redirects=0 >/dev/null
     iptables -P FORWARD ACCEPT
-    iptables -t nat -C POSTROUTING -s {{ $network.internetPool }} -o eth0 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s {{ $network.internetPool }} -o eth0 -j MASQUERADE
-    {{- range $network.coreAddresses }}
+    iptables -t nat -C POSTROUTING -s {{ $network.dnnPools.internet }} -o eth0 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s {{ $network.dnnPools.internet }} -o eth0 -j MASQUERADE
+    {{- range $network.n6.coreAddresses }}
     iptables -t nat -C POSTROUTING -s {{ . | splitList "/" | first }}/32 -o eth0 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s {{ . | splitList "/" | first }}/32 -o eth0 -j MASQUERADE
     {{- end }}
-    arping -U -c 2 -I net1 {{ $network.gateway }} >/dev/null 2>&1 || true
-    log INFO "N6 lab gateway ready address={{ $network.gateway }} internetPool={{ $network.internetPool }} imsPool={{ $network.imsPool }} egress=eth0"
+    arping -U -c 2 -I net1 {{ $network.n6.gatewayAddress }} >/dev/null 2>&1 || true
+    log INFO "N6 lab gateway ready address={{ $network.n6.gatewayAddress }} internetPool={{ $network.dnnPools.internet }} imsPool={{ $network.dnnPools.ims }} egress=eth0"
     last=""
     unavailable_logged=false
     while true; do
@@ -34,12 +34,12 @@ data:
           found=true
           unavailable_logged=false
           if [ "$last" != "$i" ]; then
-            address=$(echo '{{ $network.coreAddresses | toJson }}' | jq -r ".[$i]" | cut -d/ -f1)
-            ip route replace {{ $network.imsPool }} via "$address" dev net1
-            ip route replace {{ $network.internetPool }} via "$address" dev net1
+            address=$(echo '{{ $network.n6.coreAddresses | toJson }}' | jq -r ".[$i]" | cut -d/ -f1)
+            ip route replace {{ $network.dnnPools.ims }} via "$address" dev net1
+            ip route replace {{ $network.dnnPools.internet }} via "$address" dev net1
             previous="${last:-none}"
             last="$i"
-            log INFO "Updated UE return routes previous_leader=$previous leader_pod={{ $name }}-$i next_hop=$address imsPool={{ $network.imsPool }} internetPool={{ $network.internetPool }}"
+            log INFO "Updated UE return routes previous_leader=$previous leader_pod={{ $name }}-$i next_hop=$address imsPool={{ $network.dnnPools.ims }} internetPool={{ $network.dnnPools.internet }}"
           fi
           break
         fi

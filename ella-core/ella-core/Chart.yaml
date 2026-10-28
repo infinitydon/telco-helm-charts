@@ -1,6 +1,6 @@
 apiVersion: v2
 name: ella-core
 description: Unified standalone/HA Ella Core with DNS discovery, persistence, UI and diagnostics
-version: 2.2.0
+version: 2.3.0
 appVersion: "v1.20.0+c7cf035"
 type: application

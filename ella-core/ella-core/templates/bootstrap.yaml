@@ -1,4 +1,4 @@
-{{- $network := mergeOverwrite (deepCopy .Values.network) ((.Values.global | default dict).network | default dict) }}
+{{- $network := include "core.network" . | fromJson }}
 {{- if .Values.bootstrap.enabled }}
 {{- $name := include "core.fullname" . }}
 {{- if not .Values.admin.existingSecret }}
@@ -54,10 +54,10 @@ spec:
             - {name: MEMBER_DISPLAY_NAME_TEMPLATE, value: {{ .Values.memberDisplayName.template | quote }}}
             - {name: IMS_API, value: {{ printf "http://%s-ella-ims:5020" .Release.Name | quote }}}
             - {name: SMSC_API, value: {{ printf "http://%s-ella-smsc:5010" .Release.Name | quote }}}
-            - {name: INTERNET_POOL, value: {{ $network.internetPool | quote }}}
-            - {name: IMS_POOL, value: {{ $network.imsPool | quote }}}
-            - {name: IMS_ADDRESS, value: {{ $network.imsAddress | quote }}}
-            - {name: SMSC_ADDRESS_HOST, value: {{ printf "%s-ella-smsc-diameter" .Release.Name | quote }}}
+            - {name: INTERNET_POOL, value: {{ $network.dnnPools.internet | quote }}}
+            - {name: IMS_POOL, value: {{ $network.dnnPools.ims | quote }}}
+            - {name: IMS_ADDRESS, value: {{ $network.n6.imsAddress | quote }}}
+            - {name: SMSC_ADDRESS, value: {{ default "" $network.n6.smscAddress | quote }}}
             - {name: CORE_ADDRESS_HOST, value: {{ printf "%s-active" $name | quote }}}
           resources: {requests: {cpu: 10m, memory: 32Mi}, limits: {memory: 128Mi}}
           volumeMounts: [{name: script, mountPath: /scripts, readOnly: true}]

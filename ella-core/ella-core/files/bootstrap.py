@@ -94,7 +94,7 @@ if SERVICES:
     def peer(base,path,value,authenticated=False):
         items=api(base,'GET',path,auth=authenticated).get('items',[])
         api(base,'PUT' if items else 'POST',path+'/'+str(items[0]['id']) if items else path,value,authenticated)
-    peer(CORE,'operator/sms/smsc-peers',{'diameterIdentity':'smsc.node.epc.mnc001.mcc001.3gppnetwork.org','address':socket.gethostbyname(os.environ['SMSC_ADDRESS_HOST']),'port':3868,'serviceCentres':['+15550000000']},True)
+    peer(CORE,'operator/sms/smsc-peers',{'diameterIdentity':'smsc.node.epc.mnc001.mcc001.3gppnetwork.org','address':os.environ['SMSC_ADDRESS'],'port':3868,'serviceCentres':['+15550000000']},True)
     operator={'mcc':'001','mnc':'01','numbering':{'country_code':'1','national_prefix':'1','international_prefix':'011'}}
     api(IMS,'PUT','operator',operator)
     api(SMSC,'PUT','operator',{**operator,'service_centre_address':'+15550000000'})

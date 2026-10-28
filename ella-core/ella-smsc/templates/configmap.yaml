@@ -15,7 +15,7 @@ data:
       address: 0.0.0.0
       port: {{ .Values.api.port }}
     diameter:
-      address: {{ default "__POD_IP__" .Values.diameter.address | quote }}
+      address: {{ tpl (default "__POD_IP__" .Values.diameter.address) . | quote }}
       port: {{ .Values.diameter.port }}
 
 {{- end }}

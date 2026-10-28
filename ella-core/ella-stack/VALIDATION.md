@@ -9,6 +9,33 @@ All four passed in both recorded full topology runs below. The original
 scenarios are retained with `--suite extended`. The expanded results and known
 failures below are historical evidence, not removed or relabelled as passing.
 
+## Scoped network values upgrade (October 28, 2026)
+
+Upgraded the existing standalone and HA releases to `ella-stack` 1.4.0
+(`ella-core` 2.3.0, `ella-smsc` 0.2.1) with the explicit N6/N2/N3 values
+structure. Standalone needed a reset-values upgrade with the saved release
+overrides and the standalone example: `--reuse-values` retained an older empty
+SMSC subchart configuration, leaving SMSC without its N6 attachment. After
+the corrected upgrade, Core reached SMSC at `10.240.0.6:5010` through N6.
+
+| Release | Topology | Helm hooks | Phone essential | Native simulators |
+| --- | --- | --- | --- | --- |
+| `ella-sa` revision 5 | 1 Core ready; Services and routes aligned | Core, IMS, SMSC, PacketRusher and UERANSIM all reported Succeeded | 12/12 | 11/11 |
+| `ella-ha` revision 6 | 3 Core voters ready; elected leader, Services and routes aligned | Core, IMS, SMSC, PacketRusher and UERANSIM all reported Succeeded | 12/12 | 11/11 |
+
+Both phone suites covered attachment, IMS registration, bidirectional NAS SMS,
+calls with bidirectional voice QFI, release and HTTPS through each UE. Native
+simulator suites verified UERANSIM and PacketRusher registration, PDU address,
+ICMP, DNS and HTTPS through each UE; PacketRusher's own eBPF programs attached
+without fallback. The scoped address values are also rendered and schema
+validated by the chart tests.
+
+The workstation's Helm 4.2.1 client printed all five successful hook results
+but remained alive instead of returning. After switching to the official Helm
+4.3.1 client, both full `helm test` commands returned exit code 0 and all five
+hooks succeeded. The phone, topology and native-simulator suites also passed
+as recorded above.
+
 ## Fresh separate-stack install (October 27, 2026)
 
 After removing the three prior Ella lab releases and their dedicated test

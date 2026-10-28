@@ -57,7 +57,7 @@ spec:
           securityContext: {privileged: true}
           env:
             - {name: UE_MODE, value: {{ default $.Values.mode ($.Values.global | default dict).mode | quote }}}
-            - {name: IMS_ADDRESS, value: {{ dig "network" "imsAddress" "10.6.0.5" ($.Values.global | default dict) | quote }}}
+            - {name: IMS_ADDRESS, value: {{ if hasKey ($.Values.global.network | default dict) "imsAddress" }}{{ $.Values.global.network.imsAddress | quote }}{{ else }}{{ dig "network" "n6" "imsAddress" "10.6.0.5" ($.Values.global | default dict) | quote }}{{ end }}}
             - name: POD_IP
               valueFrom: {fieldRef: {fieldPath: status.podIP}}
             - {name: N2N3_ADDRESS, value: {{ $n2n3Address | quote }}}
