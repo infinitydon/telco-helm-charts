@@ -76,15 +76,21 @@ a wider set of Linux kernels.
 
 Raft uses the Kubernetes pod network and stable per-member FQDNs. N6 is a
 Multus macvlan interface (`net1`); N2/N3 use a separate Multus attachment
-(`net2`) by default in `ella-stack`. Core, phone UEs, UERANSIM and PacketRusher
-must share the N2/N3 Layer 2 network. Standalone assigns all three configured
-Core N2/N3 addresses to its one Core Pod; HA assigns one address to each
-member. Each radio has its own static address. The phone and simulator
+(`net2`) by default in `ella-stack`. `global.network.n6.coreAddresses` contains
+the Core N6/net1 addresses, while
+`global.network.n2n3.coreInterfaceAddresses` contains its shared N2/N3/net2
+addresses. Both lists are ordered by StatefulSet ordinal: standalone has one
+Core Pod and needs exactly one address in each list; HA needs one address per
+Core replica (three by default). The standalone example uses `.2` on each
+interface; the HA example maps `.2`, `.3` and `.4` to `core-0`, `core-1` and
+`core-2`, respectively. N2 SCTP and N3 GTP-U share `net2`. Core, phone UEs,
+UERANSIM and PacketRusher must share the N2/N3 Layer 2 network. Each radio has
+its own static address. The phone and simulator
 supervisors inspect the active Core API and reattach their gNB after
 leadership changes. These are static addresses, not Whereabouts allocations.
 
 N6 macvlan must also share Layer 2 across the Core hosts, IMS and gateway. The
-default example uses gateway `10.6.0.1`, Core `10.6.0.2/.3/.4`, IMS
+default HA example uses gateway `10.6.0.1`, Core `10.6.0.2/.3/.4`, IMS
 `10.6.0.5`, N2/N3 Core `10.211.0.2/.3/.4`, radio devices `.20/.21/.30/.31`,
 internet pool `10.45.0.0/16`, and IMS pool `10.60.0.0/16`. The dedicated
 `*-n2n3-test.yaml` files use distinct subnets and ports for simultaneous SA

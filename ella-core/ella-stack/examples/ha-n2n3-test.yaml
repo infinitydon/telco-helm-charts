@@ -4,6 +4,7 @@ global:
     type: macvlan
     master: eth0
     n6:
+      # One N6/net1 address per Core replica: .2 -> core-0, .3 -> core-1, .4 -> core-2.
       coreAddresses: [10.244.0.2/24, 10.244.0.3/24, 10.244.0.4/24]
       gatewayAddress: 10.244.0.1
       imsAddress: 10.244.0.5
@@ -13,7 +14,9 @@ global:
       ims: 10.60.0.0/16
     n2n3:
       enabled: true
+      # One shared N2/N3 net2 address per Core replica, in the same ordinal order.
       coreInterfaceAddresses: [10.245.0.2/24, 10.245.0.3/24, 10.245.0.4/24]
+      # N2 SCTP destinations advertised to radios; N2 and N3 use net2.
       coreN2Addresses: [10.245.0.2, 10.245.0.3, 10.245.0.4]
       phoneAddresses: [10.245.0.20/24, 10.245.0.21/24]
       ueransimAddress: 10.245.0.30/24

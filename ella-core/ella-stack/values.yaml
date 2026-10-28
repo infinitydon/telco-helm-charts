@@ -5,7 +5,9 @@ global:
     master: eth0
     bridge: ella-stack-n6
     n6:
-      # Core's per-pod N6/net1 addresses; the gateway, IMS and SMSC share this subnet.
+      # Core N6/net1 addresses in Core StatefulSet ordinal order.
+      # Standalone needs one address; HA needs one per Core replica.
+      # The gateway, IMS and SMSC use separate addresses on this same subnet.
       coreAddresses: [10.6.0.2/24, 10.6.0.3/24, 10.6.0.4/24]
       gatewayAddress: 10.6.0.1
       imsAddress: 10.6.0.5
@@ -15,7 +17,8 @@ global:
       ims: 10.60.0.0/16
     n2n3:
       enabled: true
-      # Core's N2/N3 net2 addresses. N2 SCTP and N3 GTP-U share this interface.
+      # Core's shared N2/N3 net2 addresses in StatefulSet ordinal order.
+      # Use one for standalone or one per Core replica for HA. N2 SCTP and N3 GTP-U share net2.
       coreInterfaceAddresses: [10.211.0.2/24, 10.211.0.3/24, 10.211.0.4/24]
       # N2 destination list that UEs/gNBs use when connecting to Core.
       coreN2Addresses: [10.211.0.2, 10.211.0.3, 10.211.0.4]

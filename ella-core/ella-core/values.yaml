@@ -35,7 +35,9 @@ network:
   bridge: ella-stack-n6
   master: eth0
   n6:
-    coreAddresses: [10.6.0.2/24, 10.6.0.3/24, 10.6.0.4/24]
+    # N6/net1 address for each Core Pod, in StatefulSet ordinal order.
+    # Standalone needs one address; HA needs one per replica (three by default).
+    coreAddresses: [10.6.0.2/24]
     gatewayAddress: 10.6.0.1
     imsAddress: 10.6.0.5
     smscAddress: 10.6.0.6
@@ -44,7 +46,9 @@ network:
     ims: 10.60.0.0/16
   n2n3:
     enabled: false
-    coreInterfaceAddresses: [10.211.0.2/24, 10.211.0.3/24, 10.211.0.4/24]
+    # Shared N2/N3 net2 address for each Core Pod, in ordinal order.
+    # Standalone needs one address; HA needs one per replica. N2 and N3 share net2.
+    coreInterfaceAddresses: [10.211.0.2/24]
 controller:
   enabled: true
   image: ghcr.io/infinitydon/ella-ue-phones:0.4.5

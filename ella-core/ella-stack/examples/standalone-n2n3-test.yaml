@@ -4,7 +4,8 @@ global:
     type: macvlan
     master: eth0
     n6:
-      coreAddresses: [10.240.0.2/24, 10.240.0.3/24, 10.240.0.4/24]
+      # One standalone Core Pod: one N6/net1 address. Other addresses belong to gateway/IMS/SMSC.
+      coreAddresses: [10.240.0.2/24]
       gatewayAddress: 10.240.0.1
       imsAddress: 10.240.0.5
       smscAddress: 10.240.0.6
@@ -13,8 +14,10 @@ global:
       ims: 10.60.0.0/16
     n2n3:
       enabled: true
-      coreInterfaceAddresses: [10.241.0.2/24, 10.241.0.3/24, 10.241.0.4/24]
-      coreN2Addresses: [10.241.0.2, 10.241.0.3, 10.241.0.4]
+      # One standalone Core Pod: one shared N2/N3 net2 address.
+      coreInterfaceAddresses: [10.241.0.2/24]
+      # Radios connect to the Core's N2 SCTP endpoint on net2.
+      coreN2Addresses: [10.241.0.2]
       phoneAddresses: [10.241.0.20/24, 10.241.0.21/24]
       ueransimAddress: 10.241.0.30/24
       packetrusherAddress: 10.241.0.31/24
